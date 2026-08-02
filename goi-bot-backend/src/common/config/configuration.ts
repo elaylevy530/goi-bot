@@ -1,3 +1,5 @@
+import { resolveDatabaseConnection } from "./database-url";
+
 export default () => {
   const corsOrigins = (
     process.env.CORS_ORIGINS ??
@@ -8,6 +10,7 @@ export default () => {
     .filter(Boolean);
 
   const synchronizeRaw = (process.env.DB_SYNCHRONIZE ?? "false").toLowerCase();
+  const database = resolveDatabaseConnection();
 
   return {
     port: parseInt(process.env.PORT ?? "3001", 10),
@@ -16,11 +19,7 @@ export default () => {
       origins: corsOrigins,
     },
     database: {
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT ?? "5432", 10),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      name: process.env.DB_NAME,
+      ...database,
       synchronize: synchronizeRaw === "true" || synchronizeRaw === "1",
     },
     jwt: {
