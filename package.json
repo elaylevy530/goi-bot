@@ -1,0 +1,21 @@
+{
+  "name": "goi-bot",
+  "private": true,
+  "workspaces": [
+    "goi-bot-frontend",
+    "goi-bot-backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=goi-bot-frontend",
+    "dev:frontend": "npm run dev --workspace=goi-bot-frontend",
+    "dev:backend": "npm run start:dev --workspace=goi-bot-backend",
+    "build": "npm run build --workspaces --if-present",
+    "build:frontend": "npm run build --workspace=goi-bot-frontend",
+    "build:backend": "npm run build --workspace=goi-bot-backend",
+    "start:backend": "npm run start:prod --workspace=goi-bot-backend",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

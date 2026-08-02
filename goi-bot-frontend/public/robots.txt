@@ -1,0 +1,32 @@
+# robots.txt for Goi — https://goi-bot.lovable.app
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /couriers
+Allow: /drivers
+Allow: /for-business
+Allow: /join
+
+# Application / private areas — no need to index
+Disallow: /dashboard
+Disallow: /admin-login
+Disallow: /auth
+Disallow: /courier
+Disallow: /courier/
+Disallow: /courier-login
+Disallow: /courier-reset-password
+Disallow: /business
+Disallow: /business/
+Disallow: /business-login
+Disallow: /signup-business
+Disallow: /clinic
+Disallow: /store
+Disallow: /restaurant
+Disallow: /r
+Disallow: /order/
+Disallow: /track/
+Disallow: /express/
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://goi-bot.lovable.app/sitemap.xml
