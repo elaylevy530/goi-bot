@@ -30,6 +30,9 @@ goi-bot-backend/coverage
 .wrangler/
 .dev.vars
 
+# Netlify CLI local link state
+.netlify/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

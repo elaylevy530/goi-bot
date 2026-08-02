@@ -1,0 +1,18 @@
+# Netlify builds the TanStack Start frontend from this monorepo.
+# Nitro currently emits a Cloudflare-oriented server bundle; we publish the
+# static client assets from `.output/public`. Full SSR on Netlify needs a
+# Netlify Nitro preset (follow-up).
+
+[build]
+  base = "."
+  command = "npm install && npm run build --workspace=goi-bot-frontend"
+  publish = "goi-bot-frontend/.output/public"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NODE_OPTIONS = "--max-old-space-size=8192"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

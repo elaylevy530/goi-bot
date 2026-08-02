@@ -16,6 +16,6 @@
     "lint": "npm run lint --workspaces --if-present"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   }
 }
