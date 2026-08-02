@@ -1,8 +1,6 @@
-# TanStack Start + Nitro on Netlify (SSR via functions-internal).
-# base must be the frontend package so `.netlify/functions-internal` is discovered.
+# Used when Netlify base directory is `goi-bot-frontend`.
 
 [build]
-  base = "goi-bot-frontend"
   command = "cd .. && npm install && npm run build --workspace=goi-bot-frontend"
   publish = "dist"
 
@@ -13,7 +11,6 @@
   VITE_API_URL = "https://goi-bot.fly.dev"
   API_URL = "https://goi-bot.fly.dev"
 
-# Fallback SSR routing if Nitro leaves `_redirects` empty outside Netlify CI.
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/server"
