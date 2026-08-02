@@ -1,16 +1,21 @@
-# Netlify builds the TanStack Start frontend from this monorepo.
-# NITRO_PRESET=netlify emits SSR into `.netlify/functions-internal` and
-# static assets into `goi-bot-frontend/dist`.
+# TanStack Start + Nitro on Netlify (SSR via functions-internal).
+# base must be the frontend package so `.netlify/functions-internal` is discovered.
 
 [build]
-  base = "."
-  command = "npm install && npm run build --workspace=goi-bot-frontend --if-present"
-  publish = "goi-bot-frontend/dist"
+  base = "goi-bot-frontend"
+  command = "cd .. && npm install && npm run build --workspace=goi-bot-frontend"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "22"
-  # Netlify build containers are memory-limited; 8GB heap OOMs the build.
   NODE_OPTIONS = "--max-old-space-size=4096"
   NITRO_PRESET = "netlify"
   VITE_API_URL = "https://goi-bot.fly.dev"
   API_URL = "https://goi-bot.fly.dev"
+
+# Fallback SSR routing if Nitro leaves `_redirects` empty outside Netlify CI.
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/server"
+  status = 200
+  force = false
