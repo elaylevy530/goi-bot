@@ -17,6 +17,7 @@ import { CreateJobDto } from "./dto/create-job.dto";
 import { CreateQuoteDto } from "./dto/create-quote.dto";
 import { ClaimJobDto, RespondOfferDto } from "./dto/courier-actions.dto";
 import { CourierDeclineDto } from "./dto/courier-decline.dto";
+import { CancelJobDto } from "./dto/cancel-job.dto";
 import { UpdateJobDto } from "./dto/update-job.dto";
 import { JobsService } from "./jobs.service";
 
@@ -162,6 +163,16 @@ export class JobsController {
     // Ensure caller can update the job before opening it to couriers.
     await this.jobs.getForUser(id, auth.userId, auth.roles);
     return this.jobs.dispatchJob(id);
+  }
+
+  @Post(":id/cancel")
+  @UseGuards(JwtAuthGuard)
+  cancel(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CancelJobDto,
+  ) {
+    return this.jobs.cancelByStaff(id, auth.userId, auth.roles, dto.reason);
   }
 
   @Patch(":id")

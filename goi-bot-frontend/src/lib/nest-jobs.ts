@@ -71,6 +71,14 @@ export function nestUpdateJob(id: string, body: Record<string, unknown>) {
   });
 }
 
+export function nestCancelJob(id: string, reason?: string) {
+  return apiFetch<NestJob>(`/api/jobs/${id}/cancel`, {
+    method: "POST",
+    accessToken: token(),
+    body: JSON.stringify({ reason: reason?.trim() || undefined }),
+  });
+}
+
 export function nestGetJobByToken(tokenValue: string) {
   return apiFetch<Record<string, unknown>>(`/api/jobs/by-token/${encodeURIComponent(tokenValue)}`);
 }

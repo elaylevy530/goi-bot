@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -275,6 +276,15 @@ export class JobsService {
       dto.job_number ??
       `J-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
+    const toNumeric = (value: number | null | undefined): string | null =>
+      value == null ? null : String(value);
+
+    const pricingSnapshot: Record<string, unknown> = {};
+    if (dto.package_type != null) pricingSnapshot.package_type = dto.package_type;
+    if (dto.delivery_deadline != null) pricingSnapshot.delivery_deadline = dto.delivery_deadline;
+    if (dto.base_price != null) pricingSnapshot.base_price = dto.base_price;
+    if (dto.price_per_km != null) pricingSnapshot.price_per_km = dto.price_per_km;
+
     return this.jobs.save(
       this.jobs.create({
         job_number: jobNumber,
@@ -282,17 +292,42 @@ export class JobsService {
         status: dto.status ?? "pending",
         job_type: dto.job_type ?? "delivery",
         pricing_type: dto.pricing_type ?? "fixed",
+        matching_model: dto.matching_model ?? null,
         customer_id: customerId,
         customer_name: dto.customer_name ?? null,
         created_by: userId,
         pickup_address: dto.pickup_address ?? null,
         pickup_area: dto.pickup_area ?? null,
+        pickup_lat: dto.pickup_lat ?? null,
+        pickup_lng: dto.pickup_lng ?? null,
+        pickup_contact_name: dto.pickup_contact_name ?? null,
+        pickup_contact_phone: dto.pickup_contact_phone ?? null,
+        pickup_instructions: dto.pickup_instructions ?? null,
+        pickup_notes: dto.pickup_notes ?? null,
+        pickup_ready: dto.pickup_ready ?? false,
+        pickup_ready_at: dto.pickup_ready_at ? new Date(dto.pickup_ready_at) : null,
         dropoff_address: dto.dropoff_address ?? null,
         dropoff_area: dto.dropoff_area ?? null,
+        dropoff_lat: dto.dropoff_lat ?? null,
+        dropoff_lng: dto.dropoff_lng ?? null,
+        dropoff_notes: dto.dropoff_notes ?? null,
         recipient_name: dto.recipient_name ?? null,
         recipient_phone: dto.recipient_phone ?? null,
         description: dto.description ?? null,
-        payment: dto.payment ?? "0",
+        payment: toNumeric(dto.payment) ?? "0",
+        customer_price: toNumeric(dto.customer_price),
+        suggested_courier_payment: toNumeric(dto.suggested_courier_payment),
+        estimated_distance_km: toNumeric(dto.estimated_distance_km),
+        fragile: dto.fragile ?? false,
+        number_of_packages: dto.number_of_packages ?? null,
+        vehicle_required: dto.vehicle_required ?? null,
+        job_date: dto.job_date ?? null,
+        job_time: dto.job_time ?? null,
+        invoice_required: dto.invoice_required ?? false,
+        couriers_needed: dto.couriers_needed ?? 1,
+        matching_couriers_count: dto.matching_couriers_count ?? 0,
+        pricing_snapshot:
+          Object.keys(pricingSnapshot).length > 0 ? pricingSnapshot : null,
         guest_name: dto.guest_name ?? null,
         guest_phone: dto.guest_phone ?? null,
       }),
@@ -319,6 +354,54 @@ export class JobsService {
       job.per_job_amount = String(dto.per_job_amount);
     }
     return this.jobs.save(job);
+  }
+
+  /** Admin/manager cancel — closes the job and clears pending courier offers. */
+  async cancelByStaff(
+    id: string,
+    userId: string,
+    roles: AppRole[],
+    reason?: string | null,
+  ) {
+    if (!roles.includes("admin") && !roles.includes("manager")) {
+      throw new ForbiddenException("Only staff can cancel jobs");
+    }
+    const job = await this.getForUser(id, userId, roles);
+    if (job.status === "בוטלה" || job.status === "הושלמה") {
+      throw new BadRequestException("Job is already closed");
+    }
+
+    const previousStatus = job.status;
+    job.status = "בוטלה";
+    await this.jobs.save(job);
+    await this.cancelPendingOffersForJob(job.id);
+
+    await this.statusLogs.save(
+      this.statusLogs.create({
+        entity_type: "job",
+        entity_id: job.id,
+        changed_by: userId,
+        old_status: previousStatus,
+        new_status: "בוטלה",
+        note: reason?.trim() ? `ביטול אדמין: ${reason.trim()}` : "ביטול אדמין",
+      }),
+    );
+
+    let outcome = await this.outcomes.findOne({ where: { job_id: job.id } });
+    if (!outcome) {
+      outcome = this.outcomes.create({
+        job_id: job.id,
+        courier_id: job.selected_courier_id,
+      });
+    }
+    outcome.was_cancelled = true;
+    outcome.cancellation_reason = reason?.trim() || "ביטול על ידי אדמין";
+    if (!outcome.courier_id && job.selected_courier_id) {
+      outcome.courier_id = job.selected_courier_id;
+    }
+    await this.outcomes.save(outcome);
+
+    return job;
   }
 
   async listQuotes(jobId: string, userId: string, roles: AppRole[]) {
