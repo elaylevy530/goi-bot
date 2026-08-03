@@ -19,6 +19,14 @@ import {
 import { useMyCourier } from "@/components/CourierShell";
 import { toast } from "sonner";
 import { geocodeAddresses } from "@/lib/geocode.functions";
+import {
+  fetchDrivingRoute,
+  haversineKm,
+  nextLegEndpoints,
+  routeCacheKey,
+  type DrivingRoute,
+  type LatLng,
+} from "@/lib/google-driving-route";
 import { useNavigate } from "@tanstack/react-router";
 
 const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
@@ -68,17 +76,6 @@ type ActiveJob = {
   package_type?: string | null;
   job_outcomes?: any;
 };
-
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(x));
-}
 
 function stagePin(label: string, accent: string, filled: boolean) {
   const w = Math.max(56, 24 + label.length * 9);
@@ -134,11 +131,15 @@ export function CourierActiveMap() {
   const pickupMarkerRef = useRef<google.maps.Marker | null>(null);
   const dropMarkerRef = useRef<google.maps.Marker | null>(null);
   const polyRef = useRef<google.maps.Polyline | null>(null);
+  const routeReqRef = useRef(0);
+  const routeKeyRef = useRef<string | null>(null);
+  const fittedJobKeyRef = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [drivingRoute, setDrivingRoute] = useState<DrivingRoute | null>(null);
 
   // Poll jobs and status from Nest.
   useEffect(() => {
@@ -375,13 +376,12 @@ export function CourierActiveMap() {
     });
   }, [myPos, ready]);
 
-  // Active job pickup/drop markers + route
+  // Active job pickup/drop markers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !window.google) return;
     if (pickupMarkerRef.current) { pickupMarkerRef.current.setMap(null); pickupMarkerRef.current = null; }
     if (dropMarkerRef.current) { dropMarkerRef.current.setMap(null); dropMarkerRef.current = null; }
-    if (polyRef.current) { polyRef.current.setMap(null); polyRef.current = null; }
     if (!active) return;
 
     const outcome = Array.isArray((active as any).job_outcomes) ? (active as any).job_outcomes[0] : (active as any).job_outcomes;
@@ -415,34 +415,98 @@ export function CourierActiveMap() {
         zIndex: 700,
       });
     }
+  }, [active, ready]);
 
-    // Polyline: depending on stage - me→pickup (if not picked up) else pickup→drop
-    const path: google.maps.LatLngLiteral[] = [];
-    if (!pickedUp) {
-      if (myPos) path.push(myPos);
-      if (pickup) path.push(pickup);
-    } else if (!delivered) {
-      if (pickup) path.push(pickup);
-      if (drop) path.push(drop);
-    } else if (pickup && drop) {
-      path.push(pickup, drop);
+  // Driving route (roads) + distance/ETA for the current leg
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google || !ready) return;
+
+    if (!active) {
+      if (polyRef.current) { polyRef.current.setMap(null); polyRef.current = null; }
+      routeKeyRef.current = null;
+      fittedJobKeyRef.current = null;
+      setDrivingRoute(null);
+      return;
     }
-    if (path.length >= 2) {
+
+    const outcome = Array.isArray((active as any).job_outcomes) ? (active as any).job_outcomes[0] : (active as any).job_outcomes;
+    const pickedUp = !!outcome?.picked_up_at;
+    const delivered = !!outcome?.delivered_at;
+    const pickup: LatLng | null = active.pickup_lat != null && active.pickup_lng != null
+      ? { lat: Number(active.pickup_lat), lng: Number(active.pickup_lng) } : null;
+    const drop: LatLng | null = active.dropoff_lat != null && active.dropoff_lng != null
+      ? { lat: Number(active.dropoff_lat), lng: Number(active.dropoff_lng) } : null;
+
+    const leg = nextLegEndpoints({ pickedUp, delivered, myPos, pickup, drop });
+    if (!leg) {
+      if (polyRef.current) { polyRef.current.setMap(null); polyRef.current = null; }
+      routeKeyRef.current = null;
+      setDrivingRoute(null);
+      return;
+    }
+
+    const stageKey = `${active.id}:${pickedUp ? 1 : 0}:${delivered ? 1 : 0}`;
+    const cacheKey = `${stageKey}|${routeCacheKey(leg.origin, leg.destination)}`;
+    if (routeKeyRef.current === cacheKey && polyRef.current) return;
+
+    if (polyRef.current) { polyRef.current.setMap(null); polyRef.current = null; }
+    routeKeyRef.current = cacheKey;
+
+    const color = pickedUp ? "#35AD29" : "#1e6cf2";
+    const fallbackPath = [leg.origin, leg.destination];
+    const reqId = ++routeReqRef.current;
+
+    const drawPath = (path: LatLng[], solid: boolean) => {
+      if (polyRef.current) { polyRef.current.setMap(null); polyRef.current = null; }
+      if (path.length < 2) return;
       polyRef.current = new window.google.maps.Polyline({
         path,
-        strokeColor: pickedUp ? "#35AD29" : "#1e6cf2",
-        strokeOpacity: 0,
-        icons: [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 }, offset: "0", repeat: "10px" }],
+        strokeColor: color,
+        strokeOpacity: solid ? 0.95 : 0,
+        strokeWeight: solid ? 5 : 0,
+        icons: solid
+          ? undefined
+          : [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 }, offset: "0", repeat: "10px" }],
         map,
+        zIndex: 500,
       });
-    }
+    };
 
-    // Fit bounds
-    const bounds = new window.google.maps.LatLngBounds();
-    if (myPos) bounds.extend(myPos);
-    if (pickup) bounds.extend(pickup);
-    if (drop) bounds.extend(drop);
-    if (!bounds.isEmpty()) map.fitBounds(bounds, 80);
+    const fitOnce = (points: LatLng[]) => {
+      if (fittedJobKeyRef.current === stageKey || !points.length) return;
+      fittedJobKeyRef.current = stageKey;
+      const bounds = new window.google.maps.LatLngBounds();
+      for (const p of points) bounds.extend(p);
+      if (myPos) bounds.extend(myPos);
+      if (pickup) bounds.extend(pickup);
+      if (drop) bounds.extend(drop);
+      map.fitBounds(bounds, 80);
+    };
+
+    const applyFallback = () => {
+      const km = Math.round(haversineKm(leg.origin, leg.destination) * 10) / 10;
+      setDrivingRoute({
+        path: fallbackPath,
+        distanceKm: km,
+        durationMin: Math.max(1, Math.round((km / 30) * 60)),
+      });
+      drawPath(fallbackPath, false);
+      fitOnce(fallbackPath);
+    };
+
+    fetchDrivingRoute(leg.origin, leg.destination)
+      .then((route) => {
+        if (routeReqRef.current !== reqId) return;
+        if (!route) { applyFallback(); return; }
+        setDrivingRoute(route);
+        drawPath(route.path, true);
+        fitOnce(route.path);
+      })
+      .catch(() => {
+        if (routeReqRef.current !== reqId) return;
+        applyFallback();
+      });
   }, [active, myPos, ready]);
 
   const setStep = useMutation({
@@ -523,13 +587,15 @@ export function CourierActiveMap() {
   const current = (lastSteps as Record<string, string>)[active.id];
   const started = active.status === "פעילה" || pickedUp || delivered || current === "בדרך לאיסוף";
 
-  const distanceKm = active.pickup_lat != null && active.pickup_lng != null
+  const fallbackDistanceKm = active.pickup_lat != null && active.pickup_lng != null
     && active.dropoff_lat != null && active.dropoff_lng != null
     ? haversineKm(
         { lat: Number(active.pickup_lat), lng: Number(active.pickup_lng) },
         { lat: Number(active.dropoff_lat), lng: Number(active.dropoff_lng) },
       )
     : null;
+  const distanceKm = drivingRoute?.distanceKm ?? fallbackDistanceKm;
+  const etaMin = drivingRoute?.durationMin ?? null;
 
   const qty = Number(active.number_of_packages ?? 0);
   const category = active.item_category ?? active.package_type ?? active.job_type ?? "—";
@@ -636,7 +702,11 @@ export function CourierActiveMap() {
           <div className="grid grid-cols-4 gap-1 shrink-0">
             {[
               { icon: RouteIcon, label: "ק״מ", value: distanceKm != null ? distanceKm.toFixed(1) : "—" },
-              { icon: Clock, label: "זמן", value: active.job_time ?? active.job_date ?? "מיידי" },
+              {
+                icon: Clock,
+                label: etaMin != null ? "ETA" : "זמן",
+                value: etaMin != null ? `~${etaMin} דק׳` : (active.job_time ?? active.job_date ?? "מיידי"),
+              },
               { icon: Package, label: "כמות", value: qty > 0 ? String(qty) : "1" },
               { icon: Info, label: "סוג", value: category },
             ].map((c, i) => (
@@ -814,7 +884,14 @@ export function CourierActiveMap() {
             <DetailBlock title="פרטי עבודה">
               <DetailLine label="זמן" value={active.job_time ?? active.job_date ?? "מיידי"} />
               <DetailLine label="סוג" value={active.job_type} />
-              <DetailLine label="מרחק" value={distanceKm != null ? `${distanceKm.toFixed(1)} ק״מ` : null} />
+              <DetailLine
+                label="מרחק"
+                value={
+                  distanceKm != null
+                    ? `${distanceKm.toFixed(1)} ק״מ${etaMin != null ? ` · ~${etaMin} דק׳` : ""}`
+                    : null
+                }
+              />
               <DetailLine label="הערות" value={active.description} multiline />
             </DetailBlock>
           </div>
