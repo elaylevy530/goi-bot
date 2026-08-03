@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
@@ -21,9 +21,10 @@ import {
 
 import { getTileVisual, TONE_STYLES } from "@/config/deliveryTypeVisuals";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   Loader2, Radar, Send, ArrowRight, User, Phone, StickyNote,
-  ChevronLeft, Truck, Plus, Menu, Bike, Car, Building2,
+  Truck, Plus, Menu, Bike, Car, Building2, AlertCircle,
 } from "lucide-react";
 import timingNowImg from "@/assets/timing-now.png";
 import timingHourImg from "@/assets/timing-hour.png";
@@ -38,6 +39,41 @@ const TIMING_ICONS: Record<Timing, string> = {
 };
 
 type ExtraStop = { place: SelectedPlace | null; text: string; name: string; phone: string };
+
+type FieldKey =
+  | "pickup"
+  | "dropoff"
+  | "pickupContactName"
+  | "pickupContactPhone"
+  | "pickupReadyTime"
+  | "scheduledAt"
+  | "offeredPrice"
+  | "basePrice"
+  | "pricePerKm";
+
+type FieldErrors = Partial<Record<FieldKey, string>>;
+
+function isValidPhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 9 && digits.length <= 15;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1 px-0.5 text-[11px] font-medium text-destructive" role="alert">
+      {message}
+    </p>
+  );
+}
+
+const fieldInputClass = (hasError: boolean) =>
+  cn(
+    "w-full rounded-xl border bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm focus:outline-none focus:ring-2",
+    hasError
+      ? "border-destructive/50 focus:ring-destructive/30"
+      : "border-transparent focus:ring-[#35AD29]/30",
+  );
 
 export const Route = createFileRoute("/business/new-delivery")({
   head: () => ({ meta: [{ title: "משלוח חדש — Goi" }] }),
@@ -161,6 +197,107 @@ function NewDeliveryPage() {
   const [pricePerKm, setPricePerKm] = useState<string>("4");
 
   const [payDialog, setPayDialog] = useState<{ jobId: string; amount: number } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const sheetBodyRef = useRef<HTMLDivElement>(null);
+
+  const clearFieldError = (key: FieldKey) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const collectFieldErrors = (): FieldErrors => {
+    const errors: FieldErrors = {};
+
+    if (!pickup) {
+      errors.pickup = pickupText.trim()
+        ? "בחרו כתובת מהרשימה (לא רק להקליד)"
+        : "חובה לבחור כתובת איסוף";
+    }
+    if (!dropoff) {
+      errors.dropoff = dropoffText.trim()
+        ? "בחרו כתובת מהרשימה (לא רק להקליד)"
+        : "חובה לבחור כתובת מסירה";
+    }
+    if (!pickupContactName.trim()) {
+      errors.pickupContactName = "הזינו שם איש קשר באיסוף";
+    }
+    if (!pickupContactPhone.trim()) {
+      errors.pickupContactPhone = "הזינו טלפון איש קשר באיסוף";
+    } else if (!isValidPhone(pickupContactPhone)) {
+      errors.pickupContactPhone = "מספר טלפון לא תקין";
+    }
+    if (!pickupReadyNow && !pickupReadyTime) {
+      errors.pickupReadyTime = "בחרו שעה שבה החבילה תהיה מוכנה";
+    }
+    if (timing === "scheduled" && !scheduledAt) {
+      errors.scheduledAt = "בחרו תאריך ושעה למשלוח מתוזמן";
+    }
+    if (pricingModel === "fixed_price") {
+      const price = Number(offeredPrice);
+      if (!offeredPrice.trim()) {
+        errors.offeredPrice = "הזינו מחיר לשליח";
+      } else if (!Number.isFinite(price) || price <= 0) {
+        errors.offeredPrice = "המחיר חייב להיות גדול מ־0";
+      }
+    }
+    if (pricingModel === "distance_based") {
+      if (!basePrice.trim() || !Number.isFinite(Number(basePrice)) || Number(basePrice) < 0) {
+        errors.basePrice = "הזינו מחיר בסיס תקין";
+      }
+      if (!pricePerKm.trim() || !Number.isFinite(Number(pricePerKm)) || Number(pricePerKm) < 0) {
+        errors.pricePerKm = "הזינו מחיר לק״מ תקין";
+      }
+    }
+
+    return errors;
+  };
+
+  const scrollToFirstError = (errors: FieldErrors) => {
+    const order: FieldKey[] = [
+      "pickup",
+      "dropoff",
+      "pickupContactName",
+      "pickupContactPhone",
+      "pickupReadyTime",
+      "scheduledAt",
+      "offeredPrice",
+      "basePrice",
+      "pricePerKm",
+    ];
+    const first = order.find((k) => errors[k]);
+    if (!first) return;
+    // Wait for expanded sheet to mount before scrolling.
+    window.setTimeout(() => {
+      const root = sheetBodyRef.current ?? document;
+      const el = root.querySelector(`[data-field="${first}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+  };
+
+  const attemptSubmit = () => {
+    if (!me) {
+      toast.error("חסר פרופיל עסק — השלימו את הפרופיל וחזרו לכאן");
+      return;
+    }
+    setExpanded(true);
+    const errors = collectFieldErrors();
+    setFieldErrors(errors);
+    const count = Object.keys(errors).length;
+    if (count > 0) {
+      toast.error(
+        count === 1
+          ? "יש להשלים שדה חובה אחד"
+          : `יש ${count} שדות שדורשים תיקון`,
+      );
+      scrollToFirstError(errors);
+      return;
+    }
+    submit.mutate();
+  };
 
   const distanceKm = useMemo(() => {
     if (!pickup || !dropoff) return null;
@@ -194,14 +331,7 @@ function NewDeliveryPage() {
   const submit = useMutation({
     mutationFn: async () => {
       if (!me) throw new Error("חסר פרופיל עסק");
-      if (!pickup) throw new Error("בחר כתובת איסוף");
-      if (!dropoff) throw new Error("בחר כתובת מסירה");
-      if (!pickupContactName.trim()) throw new Error("הזן שם איש קשר באיסוף");
-      if (!pickupContactPhone.trim()) throw new Error("הזן טלפון איש קשר באיסוף");
-      if (!pickupReadyNow && !pickupReadyTime) throw new Error("בחר את השעה שבה החבילה תהיה מוכנה לאיסוף");
-      if (timing === "scheduled" && !scheduledAt) throw new Error("בחר תאריך ושעה למשלוח מתוזמן");
-      if (pricingModel === "fixed_price" && !offeredPrice) throw new Error("הזן מחיר לשליח");
-
+      if (!pickup || !dropoff) throw new Error("חסרות כתובות");
 
       // Compute deadline + job date/time
       let deliveryDeadline: string | null = null;
@@ -437,24 +567,41 @@ function NewDeliveryPage() {
           {!expanded && (
             <div className="flex-shrink-0 px-3 pt-1 pb-2 space-y-2">
               {useBusinessAddress && businessPickupAddress ? (
-                <BusinessPickupCard
-                  address={businessPickupAddress}
-                  onChangeAddress={() => { setUseBusinessAddress(false); setPickup(null); setPickupText(""); }}
-                />
+                <div data-field="pickup">
+                  <BusinessPickupCard
+                    address={businessPickupAddress}
+                    error={fieldErrors.pickup}
+                    onChangeAddress={() => {
+                      setUseBusinessAddress(false);
+                      setPickup(null);
+                      setPickupText("");
+                      clearFieldError("pickup");
+                    }}
+                  />
+                </div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1" data-field="pickup">
                   <AddressAutocomplete
                     label="מאיפה?"
                     placeholder="כתובת איסוף"
                     value={pickupText}
-                    onChange={(v) => { setPickupText(v); if (!v) setPickup(null); }}
-                    onSelect={(p) => { setPickup(p); setPickupText(p.address); }}
+                    onChange={(v) => {
+                      setPickupText(v);
+                      if (!v) setPickup(null);
+                      clearFieldError("pickup");
+                    }}
+                    onSelect={(p) => {
+                      setPickup(p);
+                      setPickupText(p.address);
+                      clearFieldError("pickup");
+                    }}
                     accent="green"
+                    error={fieldErrors.pickup}
                   />
                   {businessPickupAddress ? (
                     <button
                       type="button"
-                      onClick={() => { setUseBusinessAddress(true); }}
+                      onClick={() => { setUseBusinessAddress(true); clearFieldError("pickup"); }}
                       className="text-[11px] font-medium text-[#35AD29]/80 hover:text-[#35AD29] hover:underline px-1"
                     >
                       השתמש בכתובת העסק
@@ -470,42 +617,80 @@ function NewDeliveryPage() {
                   )}
                 </div>
               )}
-              <AddressAutocomplete
-                label="לאן?"
-                placeholder="כתובת מסירה"
-                value={dropoffText}
-                onChange={(v) => { setDropoffText(v); if (!v) setDropoff(null); }}
-                onSelect={(p) => { setDropoff(p); setDropoffText(p.address); }}
-                accent="red"
-              />
+              <div data-field="dropoff">
+                <AddressAutocomplete
+                  label="לאן?"
+                  placeholder="כתובת מסירה"
+                  value={dropoffText}
+                  onChange={(v) => {
+                    setDropoffText(v);
+                    if (!v) setDropoff(null);
+                    clearFieldError("dropoff");
+                  }}
+                  onSelect={(p) => {
+                    setDropoff(p);
+                    setDropoffText(p.address);
+                    clearFieldError("dropoff");
+                  }}
+                  accent="red"
+                  error={fieldErrors.dropoff}
+                />
+              </div>
             </div>
           )}
 
           {/* Expanded body — everything scrolls together */}
           {expanded && (
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-4 space-y-4">
+            <div ref={sheetBodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-4 space-y-4">
+
+              {Object.keys(fieldErrors).length > 0 && (
+                <div
+                  className="flex items-start gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-2.5 text-[12px] font-medium text-destructive"
+                  role="alert"
+                >
+                  <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                  <span>יש להשלים את השדות המסומנים באדום לפני השליחה</span>
+                </div>
+              )}
 
               {/* Addresses (scroll with body) */}
               <div className="space-y-2">
                 {useBusinessAddress && businessPickupAddress ? (
-                  <BusinessPickupCard
-                    address={businessPickupAddress}
-                    onChangeAddress={() => { setUseBusinessAddress(false); setPickup(null); setPickupText(""); }}
-                  />
+                  <div data-field="pickup">
+                    <BusinessPickupCard
+                      address={businessPickupAddress}
+                      error={fieldErrors.pickup}
+                      onChangeAddress={() => {
+                        setUseBusinessAddress(false);
+                        setPickup(null);
+                        setPickupText("");
+                        clearFieldError("pickup");
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-1" data-field="pickup">
                     <AddressAutocomplete
                       label="מאיפה?"
                       placeholder="כתובת איסוף"
                       value={pickupText}
-                      onChange={(v) => { setPickupText(v); if (!v) setPickup(null); }}
-                      onSelect={(p) => { setPickup(p); setPickupText(p.address); }}
+                      onChange={(v) => {
+                        setPickupText(v);
+                        if (!v) setPickup(null);
+                        clearFieldError("pickup");
+                      }}
+                      onSelect={(p) => {
+                        setPickup(p);
+                        setPickupText(p.address);
+                        clearFieldError("pickup");
+                      }}
                       accent="green"
+                      error={fieldErrors.pickup}
                     />
                     {businessPickupAddress ? (
                       <button
                         type="button"
-                        onClick={() => { setUseBusinessAddress(true); }}
+                        onClick={() => { setUseBusinessAddress(true); clearFieldError("pickup"); }}
                         className="text-[11px] font-medium text-[#35AD29]/80 hover:text-[#35AD29] hover:underline px-1"
                       >
                         השתמש בכתובת העסק
@@ -521,14 +706,25 @@ function NewDeliveryPage() {
                     )}
                   </div>
                 )}
-                <AddressAutocomplete
-                  label="לאן?"
-                  placeholder="כתובת מסירה"
-                  value={dropoffText}
-                  onChange={(v) => { setDropoffText(v); if (!v) setDropoff(null); }}
-                  onSelect={(p) => { setDropoff(p); setDropoffText(p.address); }}
-                  accent="red"
-                />
+                <div data-field="dropoff">
+                  <AddressAutocomplete
+                    label="לאן?"
+                    placeholder="כתובת מסירה"
+                    value={dropoffText}
+                    onChange={(v) => {
+                      setDropoffText(v);
+                      if (!v) setDropoff(null);
+                      clearFieldError("dropoff");
+                    }}
+                    onSelect={(p) => {
+                      setDropoff(p);
+                      setDropoffText(p.address);
+                      clearFieldError("dropoff");
+                    }}
+                    accent="red"
+                    error={fieldErrors.dropoff}
+                  />
+                </div>
               </div>
 
               {/* Extra stops (same courier, multiple destinations) */}
@@ -541,25 +737,45 @@ function NewDeliveryPage() {
                 </label>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="relative">
-                      <User className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-[#101418]/40" />
-                      <input
-                        type="text"
-                        value={pickupContactName}
-                        onChange={(e) => setPickupContactName(e.target.value)}
-                        placeholder="שם איש קשר באיסוף"
-                        className="w-full rounded-xl border-0 bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
-                      />
+                    <div data-field="pickupContactName">
+                      <div className="relative">
+                        <User className={cn(
+                          "absolute right-3 top-1/2 -translate-y-1/2 size-4",
+                          fieldErrors.pickupContactName ? "text-destructive" : "text-[#101418]/40",
+                        )} />
+                        <input
+                          type="text"
+                          value={pickupContactName}
+                          onChange={(e) => {
+                            setPickupContactName(e.target.value);
+                            clearFieldError("pickupContactName");
+                          }}
+                          placeholder="שם איש קשר באיסוף"
+                          aria-invalid={!!fieldErrors.pickupContactName}
+                          className={fieldInputClass(!!fieldErrors.pickupContactName)}
+                        />
+                      </div>
+                      <FieldError message={fieldErrors.pickupContactName} />
                     </div>
-                    <div className="relative">
-                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-[#101418]/40" />
-                      <input
-                        type="tel"
-                        value={pickupContactPhone}
-                        onChange={(e) => setPickupContactPhone(e.target.value)}
-                        placeholder="טלפון באיסוף"
-                        className="w-full rounded-xl border-0 bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
-                      />
+                    <div data-field="pickupContactPhone">
+                      <div className="relative">
+                        <Phone className={cn(
+                          "absolute right-3 top-1/2 -translate-y-1/2 size-4",
+                          fieldErrors.pickupContactPhone ? "text-destructive" : "text-[#101418]/40",
+                        )} />
+                        <input
+                          type="tel"
+                          value={pickupContactPhone}
+                          onChange={(e) => {
+                            setPickupContactPhone(e.target.value);
+                            clearFieldError("pickupContactPhone");
+                          }}
+                          placeholder="טלפון באיסוף"
+                          aria-invalid={!!fieldErrors.pickupContactPhone}
+                          className={fieldInputClass(!!fieldErrors.pickupContactPhone)}
+                        />
+                      </div>
+                      <FieldError message={fieldErrors.pickupContactPhone} />
                     </div>
                   </div>
                   <div className="relative">
@@ -569,13 +785,16 @@ function NewDeliveryPage() {
                       onChange={(e) => setPickupInstructions(e.target.value)}
                       placeholder="הוראות איסוף (כניסה, קומה, חניה, למי לפנות…)"
                       rows={2}
-                      className="w-full rounded-xl border-0 bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
+                      className="w-full rounded-xl border border-transparent bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
                     />
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setPickupReadyNow(true)}
+                      onClick={() => {
+                        setPickupReadyNow(true);
+                        clearFieldError("pickupReadyTime");
+                      }}
                       aria-pressed={pickupReadyNow}
                       className={`flex-1 py-2 rounded-xl text-[11px] font-black transition ${
                         pickupReadyNow ? "bg-[#35AD29] text-white shadow-sm" : "bg-[#F5F3EF] text-[#101418]/70"
@@ -595,15 +814,27 @@ function NewDeliveryPage() {
                     </button>
                   </div>
                   {!pickupReadyNow && (
-                    <div className="flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2">
-                      <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">מוכן ב־</span>
-                      <input
-                        type="time"
-                        value={pickupReadyTime}
-                        onChange={(e) => setPickupReadyTime(e.target.value)}
-                        className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
-                        dir="ltr"
-                      />
+                    <div data-field="pickupReadyTime">
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2 border",
+                          fieldErrors.pickupReadyTime ? "border-destructive/50" : "border-transparent",
+                        )}
+                      >
+                        <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">מוכן ב־</span>
+                        <input
+                          type="time"
+                          value={pickupReadyTime}
+                          onChange={(e) => {
+                            setPickupReadyTime(e.target.value);
+                            clearFieldError("pickupReadyTime");
+                          }}
+                          aria-invalid={!!fieldErrors.pickupReadyTime}
+                          className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
+                          dir="ltr"
+                        />
+                      </div>
+                      <FieldError message={fieldErrors.pickupReadyTime} />
                     </div>
                   )}
                 </div>
@@ -689,7 +920,10 @@ function NewDeliveryPage() {
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setTiming(t)}
+                        onClick={() => {
+                          setTiming(t);
+                          if (t !== "scheduled") clearFieldError("scheduledAt");
+                        }}
                         aria-pressed={on}
                         className={`flex-1 relative inline-flex items-center justify-center gap-1.5 py-2 px-2 rounded-full text-xs font-black transition-all ${
                           on
@@ -727,15 +961,27 @@ function NewDeliveryPage() {
                   </div>
                 )}
                 {timing === "scheduled" && (
-                  <div className="mt-2 flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2">
-                    <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">תאריך ושעה</span>
-                    <input
-                      type="datetime-local"
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
-                      dir="ltr"
-                    />
+                  <div className="mt-2" data-field="scheduledAt">
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2 border",
+                        fieldErrors.scheduledAt ? "border-destructive/50" : "border-transparent",
+                      )}
+                    >
+                      <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">תאריך ושעה</span>
+                      <input
+                        type="datetime-local"
+                        value={scheduledAt}
+                        onChange={(e) => {
+                          setScheduledAt(e.target.value);
+                          clearFieldError("scheduledAt");
+                        }}
+                        aria-invalid={!!fieldErrors.scheduledAt}
+                        className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                    <FieldError message={fieldErrors.scheduledAt} />
                   </div>
                 )}
               </div>
@@ -904,7 +1150,12 @@ function NewDeliveryPage() {
                       <button
                         key={opt.key}
                         type="button"
-                        onClick={() => setPricingModel(opt.key as "fixed_price" | "distance_based" | "quote_request")}
+                        onClick={() => {
+                          setPricingModel(opt.key as "fixed_price" | "distance_based" | "quote_request");
+                          clearFieldError("offeredPrice");
+                          clearFieldError("basePrice");
+                          clearFieldError("pricePerKm");
+                        }}
                         className={`py-2 rounded-xl text-[11px] font-bold transition ${
                           on ? "bg-[#101418] text-white" : "bg-[#F5F3EF] text-[#101418]/70"
                         }`}
@@ -916,55 +1167,94 @@ function NewDeliveryPage() {
                 </div>
 
                 {pricingModel === "fixed_price" && (
-                  <div className="flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2.5">
-                    <span className="text-lg font-black text-[#101418]/40">₪</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={offeredPrice}
-                      onChange={(e) => setOfferedPrice(e.target.value)}
-                      placeholder={String(suggestedPrice)}
-                      className="flex-1 bg-transparent border-0 outline-none text-lg font-black text-[#101418]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setOfferedPrice(String(suggestedPrice))}
-                      className="text-[11px] font-bold text-[#101418]/60 bg-white px-2 py-1 rounded-lg shadow-sm"
+                  <div data-field="offeredPrice">
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2.5 border",
+                        fieldErrors.offeredPrice ? "border-destructive/50" : "border-transparent",
+                      )}
                     >
-                      מוצע: ₪{suggestedPrice}
-                    </button>
+                      <span className="text-lg font-black text-[#101418]/40">₪</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={offeredPrice}
+                        onChange={(e) => {
+                          setOfferedPrice(e.target.value);
+                          clearFieldError("offeredPrice");
+                        }}
+                        placeholder={String(suggestedPrice)}
+                        aria-invalid={!!fieldErrors.offeredPrice}
+                        className="flex-1 bg-transparent border-0 outline-none text-lg font-black text-[#101418]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOfferedPrice(String(suggestedPrice));
+                          clearFieldError("offeredPrice");
+                        }}
+                        className="text-[11px] font-bold text-[#101418]/60 bg-white px-2 py-1 rounded-lg shadow-sm"
+                      >
+                        מוצע: ₪{suggestedPrice}
+                      </button>
+                    </div>
+                    <FieldError message={fieldErrors.offeredPrice} />
                   </div>
                 )}
 
                 {pricingModel === "distance_based" && (
                   <div className="bg-[#F5F3EF] rounded-xl p-3 space-y-2">
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-white rounded-lg px-3 py-2">
-                        <div className="text-[10px] font-bold text-[#101418]/50 mb-0.5">מחיר בסיס</div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-black text-[#101418]/40">₪</span>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            value={basePrice}
-                            onChange={(e) => setBasePrice(e.target.value)}
-                            className="w-full bg-transparent border-0 outline-none text-base font-black text-[#101418]"
-                          />
+                      <div data-field="basePrice">
+                        <div
+                          className={cn(
+                            "bg-white rounded-lg px-3 py-2 border",
+                            fieldErrors.basePrice ? "border-destructive/50" : "border-transparent",
+                          )}
+                        >
+                          <div className="text-[10px] font-bold text-[#101418]/50 mb-0.5">מחיר בסיס</div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-black text-[#101418]/40">₪</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={basePrice}
+                              onChange={(e) => {
+                                setBasePrice(e.target.value);
+                                clearFieldError("basePrice");
+                              }}
+                              aria-invalid={!!fieldErrors.basePrice}
+                              className="w-full bg-transparent border-0 outline-none text-base font-black text-[#101418]"
+                            />
+                          </div>
                         </div>
+                        <FieldError message={fieldErrors.basePrice} />
                       </div>
-                      <div className="bg-white rounded-lg px-3 py-2">
-                        <div className="text-[10px] font-bold text-[#101418]/50 mb-0.5">₪ לק״מ</div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-black text-[#101418]/40">₪</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            value={pricePerKm}
-                            onChange={(e) => setPricePerKm(e.target.value)}
-                            className="w-full bg-transparent border-0 outline-none text-base font-black text-[#101418]"
-                          />
+                      <div data-field="pricePerKm">
+                        <div
+                          className={cn(
+                            "bg-white rounded-lg px-3 py-2 border",
+                            fieldErrors.pricePerKm ? "border-destructive/50" : "border-transparent",
+                          )}
+                        >
+                          <div className="text-[10px] font-bold text-[#101418]/50 mb-0.5">₪ לק״מ</div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-black text-[#101418]/40">₪</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.5"
+                              value={pricePerKm}
+                              onChange={(e) => {
+                                setPricePerKm(e.target.value);
+                                clearFieldError("pricePerKm");
+                              }}
+                              aria-invalid={!!fieldErrors.pricePerKm}
+                              className="w-full bg-transparent border-0 outline-none text-base font-black text-[#101418]"
+                            />
+                          </div>
                         </div>
+                        <FieldError message={fieldErrors.pricePerKm} />
                       </div>
                     </div>
                     <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#101418]/70">
@@ -990,34 +1280,37 @@ function NewDeliveryPage() {
 
 
           {/* CTA footer */}
-          {expanded && (
-            <div className="flex-shrink-0 bg-white pt-2.5 pb-4 px-4 border-t border-black/5 shadow-[0_-10px_20px_rgba(0,0,0,0.04)]">
-              <button
-                type="button"
-                onClick={() => submit.mutate()}
-                disabled={submit.isPending || !canContinue}
-                className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#35AD29] hover:bg-[#2d9623] disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-black transition shadow-[0_8px_20px_-6px_rgba(53,173,41,0.55)] active:scale-[0.98]"
-              >
-                {submit.isPending ? (
-                  <Loader2 className="size-5 animate-spin" />
-                ) : !canContinue ? (
-                  <>
-                    <ArrowRight className="size-5" />
-                    {!pickup ? "בחר כתובת איסוף" : "בחר כתובת מסירה"}
-                  </>
-                ) : pricingModel === "quote_request" ? (
-                  <>
-                    <Send className="size-5" /> בקש הצעות משליחים
-                  </>
-                ) : (
-                  <>
-                    <Radar className="size-5" /> שלח לשליחים
-                    <Truck className="size-5" />
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          <div className="flex-shrink-0 bg-white pt-2.5 pb-4 px-4 border-t border-black/5 shadow-[0_-10px_20px_rgba(0,0,0,0.04)]">
+            {expanded && Object.keys(fieldErrors).length > 0 && (
+              <p className="mb-2 text-center text-[11px] font-medium text-destructive">
+                יש שדות שדורשים תיקון — ראו את ההערות האדומות למעלה
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={attemptSubmit}
+              disabled={submit.isPending}
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#35AD29] hover:bg-[#2d9623] disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-black transition shadow-[0_8px_20px_-6px_rgba(53,173,41,0.55)] active:scale-[0.98]"
+            >
+              {submit.isPending ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : !expanded || !canContinue ? (
+                <>
+                  <ArrowRight className="size-5" />
+                  המשך להשלמת הפרטים
+                </>
+              ) : pricingModel === "quote_request" ? (
+                <>
+                  <Send className="size-5" /> בקש הצעות משליחים
+                </>
+              ) : (
+                <>
+                  <Radar className="size-5" /> שלח לשליחים
+                  <Truck className="size-5" />
+                </>
+              )}
+            </button>
+          </div>
 
 
         </div>
@@ -1078,23 +1371,39 @@ function BusinessExtraStops({
   );
 }
 
-function BusinessPickupCard({ address, onChangeAddress }: { address: string; onChangeAddress: () => void }) {
+function BusinessPickupCard({
+  address,
+  onChangeAddress,
+  error,
+}: {
+  address: string;
+  onChangeAddress: () => void;
+  error?: string;
+}) {
   return (
-    <div className="rounded-2xl bg-[#F5F3EF]/70 border border-[#35AD29]/15 px-3 py-2.5 flex items-center gap-3">
-      <div className="size-8 rounded-full bg-[#35AD29]/10 flex items-center justify-center shrink-0">
-        <Building2 className="size-4 text-[#35AD29]" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] font-medium text-[#101418]/50 tracking-wide">איסוף מכתובת העסק</div>
-        <div className="text-sm font-semibold text-[#101418] truncate" title={address}>{address}</div>
-      </div>
-      <button
-        type="button"
-        onClick={onChangeAddress}
-        className="text-[11px] font-medium text-[#101418]/50 hover:text-[#101418] hover:underline shrink-0"
+    <div>
+      <div
+        className={cn(
+          "rounded-2xl bg-[#F5F3EF]/70 px-3 py-2.5 flex items-center gap-3 border",
+          error ? "border-destructive/50" : "border-[#35AD29]/15",
+        )}
       >
-        כתובת אחרת
-      </button>
+        <div className="size-8 rounded-full bg-[#35AD29]/10 flex items-center justify-center shrink-0">
+          <Building2 className="size-4 text-[#35AD29]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] font-medium text-[#101418]/50 tracking-wide">איסוף מכתובת העסק</div>
+          <div className="text-sm font-semibold text-[#101418] truncate" title={address}>{address}</div>
+        </div>
+        <button
+          type="button"
+          onClick={onChangeAddress}
+          className="text-[11px] font-medium text-[#101418]/50 hover:text-[#101418] hover:underline shrink-0"
+        >
+          כתובת אחרת
+        </button>
+      </div>
+      <FieldError message={error} />
     </div>
   );
 }

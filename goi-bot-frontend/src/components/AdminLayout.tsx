@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Bike, Users, Briefcase, Send, Bot,
+  LayoutDashboard, Bike, Users, Briefcase, Send, Bot, Activity,
   MessageSquare, MapPin, BarChart3, Settings, Search, Bell, LogOut, Wallet, Menu, Gift, HandCoins, Sparkles, Rocket, DollarSign, Globe, Banknote,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -21,6 +21,7 @@ const navItems = [
   { to: "/couriers-map", label: "מפת שליחים", icon: MapPin },
   { to: "/customers", label: "מזמינים", icon: Users },
   { to: "/businesses", label: "ניהול עסקים", icon: Users },
+  { to: "/active-jobs", label: "משלוחים פעילים", icon: Activity },
   { to: "/jobs", label: "עבודות", icon: Briefcase },
   { to: "/send-job", label: "שליחת עבודה", icon: Send },
   { to: "/quote-requests", label: "הצעות מחיר", icon: HandCoins },
@@ -42,7 +43,7 @@ const navItems = [
 // Bottom-tab items for mobile (most-used 5)
 const bottomNav = [
   { to: "/dashboard", label: "ראשי", icon: LayoutDashboard, exact: true },
-  { to: "/couriers-admin", label: "שליחים", icon: Bike },
+  { to: "/active-jobs", label: "פעילים", icon: Activity },
   { to: "/send-job", label: "שליחה", icon: Send, primary: true },
   { to: "/jobs", label: "עבודות", icon: Briefcase },
   { to: "/withdrawals", label: "משיכות", icon: Wallet },

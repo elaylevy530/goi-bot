@@ -30,6 +30,7 @@ import { Route as RestaurantRouteImport } from './routes/restaurant'
 import { Route as SignupBusinessRouteImport } from './routes/signup-business'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as WhatsappBotRouteImport } from './routes/whatsapp-bot'
+import { Route as AuthenticatedActiveJobsRouteImport } from './routes/_authenticated.active-jobs'
 import { Route as AuthenticatedAreasTagsRouteImport } from './routes/_authenticated.areas-tags'
 import { Route as AuthenticatedBonusesRouteImport } from './routes/_authenticated.bonuses'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated.businesses'
@@ -225,6 +226,11 @@ const WhatsappBotRoute = WhatsappBotRouteImport.update({
   id: '/whatsapp-bot',
   path: '/whatsapp-bot',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedActiveJobsRoute = AuthenticatedActiveJobsRouteImport.update({
+  id: '/active-jobs',
+  path: '/active-jobs',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAreasTagsRoute = AuthenticatedAreasTagsRouteImport.update({
   id: '/areas-tags',
@@ -720,6 +726,7 @@ export interface FileRoutesByFullPath {
   '/signup-business': typeof SignupBusinessRoute
   '/store': typeof StoreRoute
   '/whatsapp-bot': typeof WhatsappBotRoute
+  '/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/areas-tags': typeof AuthenticatedAreasTagsRoute
   '/bonuses': typeof AuthenticatedBonusesRoute
   '/businesses': typeof AuthenticatedBusinessesRouteWithChildren
@@ -832,6 +839,7 @@ export interface FileRoutesByTo {
   '/signup-business': typeof SignupBusinessRoute
   '/store': typeof StoreRoute
   '/whatsapp-bot': typeof WhatsappBotRoute
+  '/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/areas-tags': typeof AuthenticatedAreasTagsRoute
   '/bonuses': typeof AuthenticatedBonusesRoute
   '/businesses': typeof AuthenticatedBusinessesRouteWithChildren
@@ -946,6 +954,7 @@ export interface FileRoutesById {
   '/signup-business': typeof SignupBusinessRoute
   '/store': typeof StoreRoute
   '/whatsapp-bot': typeof WhatsappBotRoute
+  '/_authenticated/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/_authenticated/areas-tags': typeof AuthenticatedAreasTagsRoute
   '/_authenticated/bonuses': typeof AuthenticatedBonusesRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRouteWithChildren
@@ -1061,6 +1070,7 @@ export interface FileRouteTypes {
     | '/signup-business'
     | '/store'
     | '/whatsapp-bot'
+    | '/active-jobs'
     | '/areas-tags'
     | '/bonuses'
     | '/businesses'
@@ -1173,6 +1183,7 @@ export interface FileRouteTypes {
     | '/signup-business'
     | '/store'
     | '/whatsapp-bot'
+    | '/active-jobs'
     | '/areas-tags'
     | '/bonuses'
     | '/businesses'
@@ -1286,6 +1297,7 @@ export interface FileRouteTypes {
     | '/signup-business'
     | '/store'
     | '/whatsapp-bot'
+    | '/_authenticated/active-jobs'
     | '/_authenticated/areas-tags'
     | '/_authenticated/bonuses'
     | '/_authenticated/businesses'
@@ -1561,6 +1573,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/whatsapp-bot'
       preLoaderRoute: typeof WhatsappBotRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/active-jobs': {
+      id: '/_authenticated/active-jobs'
+      path: '/active-jobs'
+      fullPath: '/active-jobs'
+      preLoaderRoute: typeof AuthenticatedActiveJobsRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/areas-tags': {
       id: '/_authenticated/areas-tags'
@@ -2217,6 +2236,7 @@ const AuthenticatedBusinessesRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedActiveJobsRoute: typeof AuthenticatedActiveJobsRoute
   AuthenticatedAreasTagsRoute: typeof AuthenticatedAreasTagsRoute
   AuthenticatedBonusesRoute: typeof AuthenticatedBonusesRoute
   AuthenticatedBusinessesRoute: typeof AuthenticatedBusinessesRouteWithChildren
@@ -2246,6 +2266,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedActiveJobsRoute: AuthenticatedActiveJobsRoute,
   AuthenticatedAreasTagsRoute: AuthenticatedAreasTagsRoute,
   AuthenticatedBonusesRoute: AuthenticatedBonusesRoute,
   AuthenticatedBusinessesRoute: AuthenticatedBusinessesRouteWithChildren,

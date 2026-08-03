@@ -59,6 +59,8 @@ type Props = {
   onSelect: (place: SelectedPlace) => void;
   accent: "green" | "red";
   autoFocus?: boolean;
+  /** Inline validation message shown under the field. */
+  error?: string | null;
 };
 
 /** OpenStreetMap Nominatim — used when Google Places is blocked (common on localhost referrer restrictions). */
@@ -102,7 +104,7 @@ async function fetchNominatimSuggestions(query: string): Promise<Suggestion[]> {
   }).filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng));
 }
 
-export function AddressAutocomplete({ label, placeholder, value, onChange, onSelect, accent, autoFocus }: Props) {
+export function AddressAutocomplete({ label, placeholder, value, onChange, onSelect, accent, autoFocus, error }: Props) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -228,13 +230,26 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
   };
 
   const dotClass = accent === "green" ? "bg-[#0E7A4A] ring-[#E6F7EF]" : "bg-[#DC2626] ring-red-50";
+  const hasError = Boolean(error);
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-2.5 ring-1 ring-black/5 focus-within:ring-black/25 transition">
+      <div
+        className={`flex items-center gap-3 bg-white rounded-2xl px-4 py-2.5 ring-1 transition ${
+          hasError
+            ? "ring-destructive/60 focus-within:ring-destructive"
+            : "ring-black/5 focus-within:ring-black/25"
+        }`}
+      >
         <div className={`size-3 rounded-full ${dotClass} ring-4 shrink-0`} />
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-bold text-[#101418]/50 uppercase tracking-wider">{label}</div>
+          <div
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              hasError ? "text-destructive" : "text-[#101418]/50"
+            }`}
+          >
+            {label}
+          </div>
           <input
             type="text"
             value={value}
@@ -242,6 +257,7 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
             onFocus={() => value.length >= 2 && suggestions.length > 0 && setOpen(true)}
             placeholder={placeholder}
             autoFocus={autoFocus}
+            aria-invalid={hasError}
             className="w-full bg-transparent border-0 outline-none text-sm font-semibold text-[#101418] placeholder:text-[#101418]/40 placeholder:font-normal py-0.5"
           />
         </div>
@@ -260,6 +276,11 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
           <MapPin className="size-4 text-[#101418]/30 shrink-0" />
         )}
       </div>
+      {hasError && (
+        <p className="mt-1 px-1 text-[11px] font-medium text-destructive" role="alert">
+          {error}
+        </p>
+      )}
 
       {open && suggestions.length > 0 && rect && typeof document !== "undefined" && createPortal(
         <div
