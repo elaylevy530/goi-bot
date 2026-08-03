@@ -124,7 +124,11 @@ type CourierRow = {
 
 async function fetchCouriers(): Promise<CourierRow[]> {
   const data = await nestListCouriers({ limit: 500 });
-  return (data ?? []) as unknown as CourierRow[];
+  // Nest listCouriers does not include courier_tags (legacy Supabase join).
+  return (data ?? []).map((raw) => {
+    const c = raw as unknown as CourierRow;
+    return { ...c, courier_tags: c.courier_tags ?? [] };
+  });
 }
 
 function NewCourierDialog() {
