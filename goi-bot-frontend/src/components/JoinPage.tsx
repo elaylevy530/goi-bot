@@ -7,9 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { nestRegisterCourier } from "@/lib/nest-auth";
 import {
   CheckCircle2, Loader2, User, Phone, MapPin, Bike,
-  Car, Zap, MoreHorizontal, Package, Clock, Route as RouteIcon, Plus,
-  UtensilsCrossed, Boxes, Check, ClipboardList, MessageCircle, Lock,
-  Briefcase, Award, Ruler, Bell, ThumbsUp, Sparkles, Send,
+  Car, Zap, MoreHorizontal, Package, Plus,
+  Boxes, Check, ClipboardList, MessageCircle, Lock,
+  Ruler, Sparkles, Send,
   Camera, Upload, X, KeyRound,
 } from "lucide-react";
 import { BackNav } from "@/components/BackNav";
@@ -41,31 +41,6 @@ const VEHICLES_BY_KIND: Record<CourierKind, { value: string; icon: typeof Bike }
     { value: "משאית 15 טון+", icon: Package },
     { value: "צוות מובילים", icon: Boxes },
     { value: "אחר", icon: MoreHorizontal },
-  ],
-};
-
-const JOB_OPTIONS_BY_KIND: Record<
-  CourierKind,
-  { value: string; icon: typeof Package; db: string }[]
-> = {
-  courier: [
-    { value: "משלוחים בודדים", icon: Package, db: "משלוח בודד" },
-    { value: "משמרות לפי שעה", icon: Clock, db: "משמרת לפי שעה" },
-    { value: "קווים קבועים / חלוקה", icon: RouteIcon, db: "קו חלוקה" },
-    { value: "משלוחי אוכל", icon: Package, db: "משלוחי אוכל" },
-    { value: "חבילות / מסמכים", icon: Boxes, db: "חבילות / מסמכים" },
-    { value: "הכול מתאים לי", icon: Check, db: "*" },
-  ],
-  mover: [
-    { value: "הובלות קטנות / פריט בודד", icon: Package, db: "הובלה קטנה" },
-    { value: "הובלת דירה שלמה", icon: Boxes, db: "הובלת דירה" },
-    { value: "הובלת משרד", icon: Briefcase, db: "הובלת משרד" },
-    { value: "פינויי דירה", icon: Package, db: "פינוי דירה" },
-    { value: "הובלות בין עירוניות", icon: RouteIcon, db: "הובלה בין עירונית" },
-    { value: "פירוק והרכבה", icon: Boxes, db: "פירוק והרכבה" },
-    { value: "אריזה", icon: Package, db: "אריזה" },
-    { value: "אחסנה", icon: Boxes, db: "אחסנה" },
-    { value: "הכול מתאים לי", icon: Check, db: "*" },
   ],
 };
 
@@ -104,27 +79,6 @@ const DISTANCE_OPTIONS = [
   "עד 30 ק״מ מחוץ לעיר",
   "כל אזור המרכז",
   "כל הארץ",
-];
-
-const EXPERIENCE_STATUS = [
-  "כן, עובד בזה היום",
-  "כן, עבדתי בעבר",
-  "אין ניסיון אבל רוצה להתחיל",
-];
-
-const EXPERIENCE_DURATION = [
-  "פחות מחודש",
-  "1-3 חודשים",
-  "3-6 חודשים",
-  "חצי שנה עד שנה",
-  "שנה ומעלה",
-  "מעל 3 שנים",
-];
-
-const INVOICE_OPTIONS = [
-  { value: "כן", db: "כן" as const },
-  { value: "לא", db: "לא" as const },
-  { value: "תסדרו אותי", db: "תסדרו אותי" as const, sub: "אפשר לעבוד בלי — נטפל בקיזוז" },
 ];
 
 function toggle<T>(list: T[], v: T) {
@@ -338,10 +292,6 @@ export function JoinPage() {
 
   const [distance, setDistance] = useState<string>("");
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
-  const [jobs, setJobs] = useState<string[]>([]);
-  const [invoice, setInvoice] = useState<string>("");
-  const [expStatus, setExpStatus] = useState<string>("");
-  const [expDuration, setExpDuration] = useState<string>("");
   const [password, setPassword] = useState("");
   const [consent, setConsent] = useState(true);
   const [done, setDone] = useState(false);
@@ -355,19 +305,9 @@ export function JoinPage() {
 
 
   const VEHICLES = kind ? VEHICLES_BY_KIND[kind] : VEHICLES_BY_KIND.courier;
-  const JOB_OPTIONS = kind ? JOB_OPTIONS_BY_KIND[kind] : JOB_OPTIONS_BY_KIND.courier;
-
-
-  const showDuration = expStatus === "כן, עובד בזה היום" || expStatus === "כן, עבדתי בעבר";
 
   const mut = useMutation({
     mutationFn: async () => {
-      const dbJobs = jobs.includes("הכול מתאים לי")
-        ? JOB_OPTIONS.filter((j) => j.db !== "*").map((j) => j.db)
-        : (jobs.map((j) => JOB_OPTIONS.find((x) => x.value === j)?.db).filter(Boolean) as string[]);
-
-      const invoiceDb = INVOICE_OPTIONS.find((i) => i.value === invoice)?.db ?? "לא";
-
       let id_photo_base64: string | null = null;
       let id_photo_mime: string | null = null;
       if (idPhotoFront) {
@@ -404,17 +344,14 @@ export function JoinPage() {
         vehicle_types: kind === "mover"
           ? [...vehicleTypes, ...equipment.map((e) => `ציוד: ${e}`)]
           : vehicleTypes,
+        // Job matching is by GPS proximity + wanted work cities — no questionnaire job prefs.
         job_types: kind === "mover"
           ? [
-              ...dbJobs,
               ...(crewSize ? [`צוות: ${crewSize}`] : []),
               ...(floors ? [`קומות: ${floors}`] : []),
               ...(minJobPrice ? [`מינימום עבודה: ${minJobPrice} ₪`] : []),
             ]
-          : dbJobs,
-        invoice_status: invoiceDb,
-        courier_experience_status: expStatus || null,
-        courier_experience_duration: showDuration ? (expDuration || null) : null,
+          : [],
         consent_whatsapp: consent,
         password: password || null,
         courier_kind: kind ?? "courier",
@@ -453,7 +390,6 @@ export function JoinPage() {
     idNumber.trim().length >= 9 &&
     gender &&
     baseCity.trim().length >= 2 &&
-    expStatus &&
     vehicleTypes.length > 0 &&
     password.length >= 6 &&
     consent;
@@ -650,7 +586,7 @@ export function JoinPage() {
           </p>
           <button
             type="button"
-            onClick={() => { setKind(null); setVehicleTypes([]); setJobs([]); setCrewSize(""); setEquipment([]); setFloors(""); setMinJobPrice(""); }}
+            onClick={() => { setKind(null); setVehicleTypes([]); setCrewSize(""); setEquipment([]); setFloors(""); setMinJobPrice(""); }}
             className="mt-3 text-xs text-primary hover:underline font-semibold"
           >
             נרשמת בטעות כ{kindLabelSingular}? החלף סוג
@@ -786,93 +722,24 @@ export function JoinPage() {
             </div>
           </Section>
 
-          {/* 6. Job types */}
-          <Section n={6} title="איזה עבודות מעניינות אותך?" icon={Package} sub="אפשר לבחור יותר מאחד">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {JOB_OPTIONS.map((j) => {
-                const on = jobs.includes(j.value);
-                return (
-                  <button
-                    key={j.value}
-                    type="button"
-                    onClick={() => setJobs(toggle(jobs, j.value))}
-                    className={`rounded-xl border-2 p-3 flex flex-col items-center gap-2 transition-all ${
-                      on ? "border-primary bg-primary/5" : "border-border bg-white hover:border-primary/50"
-                    }`}
-                  >
-                    <Checkbox checked={on} className="pointer-events-none self-start" />
-                    <j.icon className={`size-6 ${on ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className="text-xs font-medium text-center">{j.value}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
-
           {/* Mover-only extras */}
           {kind === "mover" && (
-            <>
-              <Section n={"6א"} title="עובד לבד או עם צוות?" icon={Boxes} sub="חשוב לנו כדי להתאים לך עבודות בגודל הנכון">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {CREW_OPTIONS.map((c) => (
-                    <ChoiceCard key={c} active={crewSize === c} onClick={() => setCrewSize(c)}>
-                      <div className={`size-4 rounded-full border-2 shrink-0 ${crewSize === c ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
-                        {crewSize === c && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
-                      </div>
-                      <span className="text-sm font-medium">{c}</span>
-                    </ChoiceCard>
-                  ))}
-                </div>
-              </Section>
-
-
-
-            </>
+            <Section n={6} title="עובד לבד או עם צוות?" icon={Boxes} sub="חשוב לנו כדי להתאים לך עבודות בגודל הנכון">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {CREW_OPTIONS.map((c) => (
+                  <ChoiceCard key={c} active={crewSize === c} onClick={() => setCrewSize(c)}>
+                    <div className={`size-4 rounded-full border-2 shrink-0 ${crewSize === c ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
+                      {crewSize === c && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
+                    </div>
+                    <span className="text-sm font-medium">{c}</span>
+                  </ChoiceCard>
+                ))}
+              </div>
+            </Section>
           )}
 
-
-
-          {/* 7. Experience */}
-          <Section n={7} title={`יש לך ניסיון כ${kindLabelSingular}?`} icon={Award}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {EXPERIENCE_STATUS.map((e) => (
-                <ChoiceCard key={e} active={expStatus === e} onClick={() => setExpStatus(e)}>
-                  <div className={`size-4 rounded-full border-2 shrink-0 ${expStatus === e ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
-                    {expStatus === e && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
-                  </div>
-                  <span className="text-sm font-medium">{e}</span>
-                </ChoiceCard>
-              ))}
-            </div>
-            {showDuration && (
-              <div className="mt-4">
-                <p className="text-sm font-medium mb-2">כמה זמן ניסיון יש לך {kind === "mover" ? "בהובלות" : "בשליחויות"}?</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {EXPERIENCE_DURATION.map((d) => (
-                    <ChoiceCard key={d} active={expDuration === d} onClick={() => setExpDuration(d)} className="justify-center">
-                      <span className="text-sm font-medium">{d}</span>
-                    </ChoiceCard>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Section>
-
-          {/* 8. Invoice */}
-          <Section n={8} title="יש לך חשבונית / קבלה?" icon={Briefcase}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {INVOICE_OPTIONS.filter((i) => (kind === "mover" ? i.value !== "לא" : true)).map((i) => (
-                <ChoiceCard key={i.value} active={invoice === i.value} onClick={() => setInvoice(i.value)} className={`justify-center flex-col ${i.sub ? "py-3" : ""}`}>
-                  <span className="text-sm font-medium">{i.value}</span>
-                  {i.sub && <span className="text-[11px] text-muted-foreground text-center leading-tight">{i.sub}</span>}
-                </ChoiceCard>
-              ))}
-            </div>
-          </Section>
-
-
-          {/* 8b. Password — for personal area */}
-          <Section n={9} title="בחר סיסמה לאזור האישי שלך" icon={KeyRound} sub="עם המספר שלך + הסיסמה תוכל להיכנס לאזור האישי שלך באתר">
+          {/* Password — for personal area */}
+          <Section n={kind === "mover" ? 7 : 6} title="בחר סיסמה לאזור האישי שלך" icon={KeyRound} sub="עם המספר שלך + הסיסמה תוכל להיכנס לאזור האישי שלך באתר">
             <Input
               type="password"
               value={password}
