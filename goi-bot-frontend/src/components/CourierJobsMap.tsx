@@ -242,10 +242,14 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     return null;
   }, [me?.last_lat, me?.last_lng]);
 
+  // Create the map once. Do NOT depend on myPos — when GPS arrives later the old
+  // effect cleanup disconnected ResizeObserver and never re-attached it, leaving
+  // a blank/white map after the first layout shift (jobs carousel, etc.).
   useEffect(() => {
     if (!ready || !mapDivRef.current || mapRef.current) return;
-    mapRef.current = new window.google.maps.Map(mapDivRef.current, {
-      center: myPos ?? DEFAULT_CENTER,
+    const div = mapDivRef.current;
+    mapRef.current = new window.google.maps.Map(div, {
+      center: DEFAULT_CENTER,
       zoom: 13,
       mapTypeControl: false,
       streetViewControl: false,
@@ -254,13 +258,49 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       clickableIcons: false,
       gestureHandling: "greedy",
     });
-    const div = mapDivRef.current;
+
+    const invalidate = () => {
+      const map = mapRef.current;
+      if (!map || !div) return;
+      if (div.clientWidth < 2 || div.clientHeight < 2) return;
+      window.google.maps.event.trigger(map, "resize");
+      // Re-apply center after resize so vector/raster tiles repaint (Maps JS quirk).
+      const c = map.getCenter();
+      if (c) map.setCenter(c);
+    };
+
     const ro = new ResizeObserver(() => {
-      if (mapRef.current) window.google.maps.event.trigger(mapRef.current, "resize");
+      requestAnimationFrame(invalidate);
     });
     ro.observe(div);
-    return () => ro.disconnect();
-  }, [ready, myPos]);
+    requestAnimationFrame(invalidate);
+    const t1 = window.setTimeout(invalidate, 120);
+    const t2 = window.setTimeout(invalidate, 450);
+
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [ready]);
+
+  // After jobs land (carousel / layout shift), force a map repaint.
+  useEffect(() => {
+    const map = mapRef.current;
+    const div = mapDivRef.current;
+    if (!ready || !map || !div) return;
+    const invalidate = () => {
+      if (div.clientWidth < 2 || div.clientHeight < 2) return;
+      window.google.maps.event.trigger(map, "resize");
+      const c = map.getCenter();
+      if (c) map.setCenter(c);
+    };
+    const id = window.requestAnimationFrame(() => {
+      invalidate();
+      window.setTimeout(invalidate, 80);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [ready, jobs.length]);
 
   const visibleJobs = useMemo(() => {
     return jobs.filter((j) => {
@@ -323,6 +363,12 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     }
   };
 
+
+  // Pan when GPS arrives — without rebuilding the map (see init effect above).
+  useEffect(() => {
+    if (!mapRef.current || !myPos || activeId) return;
+    mapRef.current.panTo(myPos);
+  }, [myPos, activeId]);
 
   useEffect(() => {
     if (!mapRef.current || !window.google) return;
@@ -489,9 +535,9 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
   return (
     // Mobile: fills the full-bleed shell viewport minus the bottom tab bar. Desktop: card.
-    <div className="flex-1 min-h-0 sm:rounded-3xl sm:border sm:border-slate-200 sm:bg-white sm:shadow-sm sm:overflow-hidden flex flex-col">
-      {/* Map area — fills all available height */}
-      <div className="relative flex-1 min-h-0 sm:min-h-[420px]">
+    <div className="flex-1 min-h-0 h-full sm:rounded-3xl sm:border sm:border-slate-200 sm:bg-white sm:shadow-sm sm:overflow-hidden flex flex-col">
+      {/* Map area — definite min-height on mobile so flex layout can't collapse tiles to white */}
+      <div className="relative flex-1 min-h-[50dvh] sm:min-h-[420px]">
 
         {mapError ? (
           <div className="h-full flex items-center justify-center text-slate-500 bg-slate-50 text-sm">

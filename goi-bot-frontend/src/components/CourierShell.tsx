@@ -452,7 +452,12 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   const MOBILE_TABS = buildMobileTabs(kind);
 
   return (
-    <div dir="rtl" className="rtl-panel min-h-dvh bg-slate-50 flex w-full lg:h-dvh lg:overflow-hidden">
+    <div
+      dir="rtl"
+      className={`rtl-panel bg-slate-50 flex w-full lg:h-dvh lg:overflow-hidden ${
+        fullBleed ? "h-dvh overflow-hidden" : "min-h-dvh"
+      }`}
+    >
       {/* Desktop sidebar (right side in RTL) */}
       <aside className="hidden lg:flex w-[260px] shrink-0 bg-black text-slate-100 flex-col sticky top-0 h-screen">
         <SidebarBody path={path} onSignOut={handleSignOut} counts={navCounts} kind={kind} />
@@ -467,7 +472,11 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
       </Sheet>
 
 
-      <main className="flex-1 min-w-0 flex flex-col min-h-dvh lg:min-h-0">
+      <main
+        className={`flex-1 min-w-0 flex flex-col ${
+          fullBleed ? "h-full min-h-0 overflow-hidden" : "min-h-dvh lg:min-h-0"
+        }`}
+      >
         {/* ===== Desktop top bar ===== */}
         <header className="hidden lg:block bg-background border-b border-slate-200 px-6 py-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
@@ -570,7 +579,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         {/* Content — full-bleed removes padding on mobile so the map fills the viewport. */}
         <div className={`flex-1 min-h-0 flex flex-col overscroll-y-contain scroll-smooth ${
           fullBleed
-            ? "p-0 pb-0 lg:p-0 lg:overflow-hidden"
+            ? "p-0 pb-0 overflow-hidden h-full"
             : "px-3 py-3 sm:px-5 sm:py-4 lg:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:overflow-y-auto lg:[-webkit-overflow-scrolling:touch] [&>*]:shrink-0"
         }`}>{children}</div>
 

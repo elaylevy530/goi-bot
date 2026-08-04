@@ -143,6 +143,12 @@
     font-family: var(--font-sans);
     font-feature-settings: "ss01", "cv01";
   }
+
+  /* Tailwind preflight sets img { max-width: 100% } which breaks Google Maps tiles. */
+  .gm-style img,
+  .gm-style-cc img {
+    max-width: none !important;
+  }
 }
 
 @layer utilities {
