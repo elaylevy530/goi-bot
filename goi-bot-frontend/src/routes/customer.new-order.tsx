@@ -19,6 +19,7 @@ import {
   getGuestJobQuotesFn,
   selectGuestJobQuoteFn,
 } from "@/lib/guest-order.functions";
+import { getPartnerBySlugFn } from "@/lib/partners.functions";
 
 
 import {
@@ -41,7 +42,11 @@ import tileMoveClearImg from "@/assets/tile-move-clear.png";
 
 const searchSchema = z.object({
   service: z.enum(["same_day", "scheduled", "small_move", "big_move"]).optional(),
+  guest: z.union([z.string(), z.number()]).optional(),
+  p: z.string().trim().min(1).max(60).optional(),
 });
+
+const PARTNER_SLUG_KEY = "goi_partner_slug";
 
 export const Route = createFileRoute("/customer/new-order")({
   head: () => ({ meta: [{ title: "הזמנת הובלה — Goi" }] }),
@@ -250,10 +255,38 @@ type CreatedOrder = Awaited<ReturnType<typeof createGuestOrderFn>>;
 
 function NewOrderPage() {
   const navigate = useNavigate();
-  const { service: initialService } = Route.useSearch();
+  const { service: initialService, guest: guestParam, p: partnerSlugParam } = Route.useSearch();
   const [service, setService] = useState<ServiceKey>(initialService ?? "small_move");
   const [serviceId, setServiceId] = useState<string>("move");
-  
+
+  const [partnerSlug, setPartnerSlug] = useState<string | null>(() => {
+    if (partnerSlugParam) return partnerSlugParam;
+    try {
+      return typeof window !== "undefined"
+        ? window.localStorage.getItem(PARTNER_SLUG_KEY)
+        : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (partnerSlugParam) {
+      try {
+        window.localStorage.setItem(PARTNER_SLUG_KEY, partnerSlugParam);
+      } catch {
+        /* ignore */
+      }
+      setPartnerSlug(partnerSlugParam);
+    }
+  }, [partnerSlugParam]);
+
+  const getPartner = useServerFn(getPartnerBySlugFn);
+  const { data: partner } = useQuery({
+    queryKey: ["partner", partnerSlug],
+    enabled: !!partnerSlug,
+    queryFn: () => getPartner({ data: { slug: partnerSlug as string } }),
+  });
+
 
   const [pickup, setPickup] = useState<SelectedPlace | null>(null);
   const [dropoff, setDropoff] = useState<SelectedPlace | null>(null);
@@ -504,9 +537,10 @@ function NewOrderPage() {
 
   useEffect(() => {
     (async () => {
+      const forceGuest = guestParam != null && String(guestParam) !== "" && String(guestParam) !== "0";
       const { fetchNestSession } = await import("@/lib/nest-auth");
       const session = await fetchNestSession();
-      if (!session?.roles.includes("customer")) {
+      if (forceGuest || !session?.roles.includes("customer")) {
         // Guest mode — reuse the details they entered on a previous order
         const g = getGuestIdentity();
         if (g) setProfile({ full_name: g.full_name, phone: g.phone });
@@ -518,7 +552,7 @@ function NewOrderPage() {
         phone: session.profile?.phone ?? session.email?.split("@")[0] ?? "",
       });
     })();
-  }, []);
+  }, [guestParam]);
 
   const getRules = useServerFn(getPricingRulesFn);
   const { data: rules } = useQuery({ queryKey: ["pricing-rules"], queryFn: () => getRules() });
@@ -769,6 +803,7 @@ function NewOrderPage() {
         items: items.length > 0 ? items : null,
         photo_paths: photos.length > 0 ? photos.map((p) => p.path) : null,
         terms_accepted: true as const,
+        partner_slug: partnerSlug ?? null,
       };
       return await createOrder({ data: payload });
     },
@@ -1004,6 +1039,12 @@ function NewOrderPage() {
         <div className="w-full flex justify-center pt-2 pb-1" aria-hidden>
           <div className="w-10 h-1 bg-black/15 rounded-full" />
         </div>
+
+        {partner ? (
+          <div className="px-3 pb-1 text-center text-xs font-bold text-[#101418]/70">
+            🤝 בשיתוף {partner.name}
+          </div>
+        ) : null}
 
         {/* Address inputs — fixed at top only when collapsed; scroll with body when expanded */}
         {!expanded && (

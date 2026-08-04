@@ -18,6 +18,7 @@ import { AdminPreviewSession } from "../auth/entities/admin-preview-session.enti
 import { Message } from "../chat/entities/message.entity";
 import { ExpressPricingRule } from "../jobs/entities/express-pricing-rule.entity";
 import { Job } from "../jobs/entities/job.entity";
+import { JobLead } from "../jobs/entities/job-lead.entity";
 import { JobOutcome } from "../jobs/entities/job-outcome.entity";
 import { JobQuote } from "../jobs/entities/job-quote.entity";
 import { JobStop } from "../jobs/entities/job-stop.entity";
@@ -31,6 +32,7 @@ import { Kiosk } from "../munch/entities/kiosk.entity";
 import { KioskCategory } from "../munch/entities/kiosk-category.entity";
 import { KioskProduct } from "../munch/entities/kiosk-product.entity";
 import { MunchOrder } from "../munch/entities/munch-order.entity";
+import { Partner } from "../partners/entities/partner.entity";
 import { PilotCity } from "../pilot-cities/entities/pilot-city.entity";
 import { PricingRule } from "../pricing/entities/pricing-rule.entity";
 import { BusinessPushSubscription } from "../push/entities/business-push-subscription.entity";
@@ -62,6 +64,7 @@ export const TYPEORM_ENTITIES = [
   CourierStats,
   WithdrawalRequest,
   Job,
+  JobLead,
   JobOutcome,
   JobStop,
   JobQuote,
@@ -91,6 +94,7 @@ export const TYPEORM_ENTITIES = [
   Area,
   SupportTicket,
   PilotCity,
+  Partner,
   Kiosk,
   KioskCategory,
   KioskProduct,

@@ -4,10 +4,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getMyOrderFn, cancelMyOrderFn, sendCourierMessageFn,
-  getMyQuotesFn, selectMyQuoteFn,
+  getMyQuotesFn, selectMyQuoteFn, repriceMyOrderFn,
 } from "@/lib/customer-account.functions";
 import {
   getGuestOrderDetailFn, cancelGuestOrderFn, getGuestJobQuotesFn, selectGuestJobQuoteFn,
+  repriceGuestOrderFn,
 } from "@/lib/guest-order.functions";
 import { guestTokenFor } from "@/lib/guest-session";
 import { Button } from "@/components/ui/button";
@@ -108,6 +109,24 @@ function OrderDetailPage() {
     onError: (e: any) => toast.error(e?.message ?? "לא ניתן לבטל"),
   });
 
+  const repriceGuest = useServerFn(repriceGuestOrderFn);
+  const repriceMine = useServerFn(repriceMyOrderFn);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [priceText, setPriceText] = useState("");
+  const reprice = useMutation({
+    mutationFn: (p: number) =>
+      guestToken
+        ? repriceGuest({ data: { job_id: id, tracking_token: guestToken, price: p } })
+        : repriceMine({ data: { id, price: p } }),
+    onSuccess: () => {
+      toast.success("המחיר עודכן וההזמנה נשלחה מחדש לקבוצה");
+      setPriceOpen(false);
+      qc.invalidateQueries({ queryKey: ["my-order", id] });
+      qc.invalidateQueries({ queryKey: ["my-orders"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "עדכון המחיר נכשל"),
+  });
+
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgText, setMsgText] = useState("");
   const [preset, setPreset] = useState<string | null>(null);
@@ -141,6 +160,7 @@ function OrderDetailPage() {
   const courierStepLabel = job.status === "בוטלה" ? "בוטלה" : (TIMELINE[activeStep]?.label ?? job.status);
 
   const canCancel = !job.selected_courier_id && !["הושלמה", "בוטלה", "פעילה"].includes(job.status);
+  const canReprice = canCancel && job.pricing_type !== "quote_request";
   const canMessageCourier = Boolean(job.selected_courier_id) && !["הושלמה", "בוטלה"].includes(job.status);
 
   const presets = [
@@ -495,6 +515,55 @@ function OrderDetailPage() {
               <MapPin className="size-4" /> מעקב חי <ExternalLink className="size-3.5" />
             </Link>
           </Button>
+        )}
+        {canReprice && (
+          <Dialog
+            open={priceOpen}
+            onOpenChange={(o) => {
+              setPriceOpen(o);
+              if (o) {
+                setPriceText(
+                  job.customer_price ? String(Math.round(Number(job.customer_price))) : "",
+                );
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" className="rounded-full">
+                <Tag className="size-4" /> עריכת מחיר ושליחה מחדש
+              </Button>
+            </DialogTrigger>
+            <DialogContent dir="rtl" className="max-w-sm">
+              <DialogHeader className="text-end">
+                <DialogTitle>עדכון מחיר ההזמנה</DialogTitle>
+                <DialogDescription>
+                  המחיר החדש יעודכן בהזמנה וההובלה תישלח מחדש לקבוצת הוואטסאפ.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="text-end space-y-2">
+                <label className="text-sm font-bold">מחיר חדש (₪)</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={priceText}
+                  onChange={(e) => setPriceText(e.target.value)}
+                  className="w-full rounded-xl border border-black/10 px-3 py-2 text-lg font-bold text-end"
+                  placeholder="0"
+                />
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="ghost" onClick={() => setPriceOpen(false)}>ביטול</Button>
+                <Button
+                  className="rounded-full"
+                  disabled={reprice.isPending || !(Number(priceText) > 0)}
+                  onClick={() => reprice.mutate(Number(priceText))}
+                >
+                  {reprice.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                  עדכן ושלח מחדש
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
         {canCancel && (
           <Button

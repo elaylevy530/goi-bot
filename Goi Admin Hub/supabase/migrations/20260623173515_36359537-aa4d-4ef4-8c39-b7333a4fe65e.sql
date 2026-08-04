@@ -1,0 +1,1 @@
+ALTER TABLE public.couriers ADD COLUMN IF NOT EXISTS accepting_jobs boolean NOT NULL DEFAULT true;

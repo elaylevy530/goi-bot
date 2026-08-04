@@ -24,6 +24,7 @@ import type { UpdateJobDto } from "./dto/update-job.dto";
 import { JobOutcome } from "./entities/job-outcome.entity";
 import { JobStop } from "./entities/job-stop.entity";
 import { StatusLog } from "./entities/status-log.entity";
+import { generateJobShortCode } from "./job-short-code";
 
 /**
  * Statuses under which a job is still "open" to couriers (not yet assigned).
@@ -277,9 +278,17 @@ export class JobsService {
     if (dto.base_price != null) pricingSnapshot.base_price = dto.base_price;
     if (dto.price_per_km != null) pricingSnapshot.price_per_km = dto.price_per_km;
 
+    let shortCode = generateJobShortCode();
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const exists = await this.jobs.exist({ where: { short_code: shortCode } });
+      if (!exists) break;
+      shortCode = generateJobShortCode();
+    }
+
     return this.jobs.save(
       this.jobs.create({
         job_number: jobNumber,
+        short_code: shortCode,
         recipient_tracking_token: generateTrackingToken(),
         status: dto.status ?? "pending",
         job_type: dto.job_type ?? "delivery",
@@ -343,6 +352,41 @@ export class JobsService {
       job.per_job_amount = String(dto.per_job_amount);
     }
     return this.jobs.save(job);
+  }
+
+  /** Owner/customer reprice + WhatsApp group resend while unassigned. */
+  async repriceForUser(id: string, userId: string, roles: AppRole[], price: number) {
+    if (!(price > 0)) {
+      throw new BadRequestException("נא למלא מחיר תקין");
+    }
+    const job = await this.getForUser(id, userId, roles);
+    if (job.selected_courier_id) {
+      throw new ForbiddenException("כבר שובץ מוביל — לא ניתן לעדכן מחיר");
+    }
+    if (["הושלמה", "בוטלה", "פעילה"].includes(String(job.status))) {
+      throw new ForbiddenException("לא ניתן לעדכן הזמנה במצב זה");
+    }
+    if (job.pricing_type === "quote_request") {
+      throw new ForbiddenException("לא ניתן לעדכן מחיר לבקשת הצעות");
+    }
+
+    job.customer_price = String(price);
+    job.payment = String(price);
+    job.suggested_courier_payment = String(price);
+    job.pricing_type = "fixed_price";
+    job.status = "נשלחה לשליחים";
+    if (!job.short_code) {
+      let code = generateJobShortCode();
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const exists = await this.jobs.exist({ where: { short_code: code } });
+        if (!exists) break;
+        code = generateJobShortCode();
+      }
+      job.short_code = code;
+    }
+    await this.jobs.save(job);
+    const whatsapp = await this.whatsappDispatch.notifyJobDispatched(job);
+    return { ok: true as const, whatsapp };
   }
 
   /** Admin/manager cancel — closes the job and clears pending courier offers. */

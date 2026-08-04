@@ -12,6 +12,7 @@ import { HealthModule } from "./health/health.module";
 import { JobsModule } from "./jobs/jobs.module";
 import { MunchModule } from "./munch/munch.module";
 import { PaymentsModule } from "./payments/payments.module";
+import { PartnersModule } from "./partners/partners.module";
 import { PilotCitiesModule } from "./pilot-cities/pilot-cities.module";
 import { PlatformModule } from "./platform/platform.module";
 import { PricingModule } from "./pricing/pricing.module";
@@ -37,6 +38,7 @@ import { WorkersModule } from "./workers/workers.module";
     PricingModule,
     PlatformModule,
     PilotCitiesModule,
+    PartnersModule,
     AdminAssistantModule,
     WhatsappModule,
     TrackingModule,

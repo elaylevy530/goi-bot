@@ -1,7 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, Bike, Users, Briefcase, Send, Bot, Activity,
-  MessageSquare, MapPin, BarChart3, Settings, Search, Bell, LogOut, Wallet, Menu, Gift, HandCoins, Sparkles, Rocket, DollarSign, Globe, Banknote,
+  MessageSquare, MapPin, BarChart3, Settings, Search, Bell, LogOut, Wallet, Menu, Gift, HandCoins, Sparkles, Rocket, DollarSign, Globe, Banknote, Handshake,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ const navItems = [
   { to: "/whatsapp-provider", label: "ספק וואטסאפ (Cloud API)", icon: MessageSquare },
 
   { to: "/dispatch-groups", label: "קבוצות שידור משלוחים", icon: MessageSquare },
+  { to: "/partners", label: "שותפים (פאנלים)", icon: Handshake },
 
   { to: "/areas-tags", label: "אזורים וסיווגים", icon: MapPin },
   { to: "/reports", label: "דוחות", icon: BarChart3 },

@@ -15,6 +15,10 @@ import {
   setDispatchGroups,
   type GreenApiGroup,
 } from "@/lib/whatsapp-dispatch-groups.functions";
+import {
+  getAdminNotifyPhoneFn,
+  setAdminNotifyPhoneFn,
+} from "@/lib/admin-notify-phone.functions";
 
 /**
  * Admin card: pick which WhatsApp groups receive new-job broadcasts.
@@ -25,6 +29,8 @@ export function DispatchGroupsCard() {
   const listGroupsFn = useServerFn(listGreenApiGroups);
   const getSettingsFn = useServerFn(getDispatchGroups);
   const setSettingsFn = useServerFn(setDispatchGroups);
+  const getPhoneFn = useServerFn(getAdminNotifyPhoneFn);
+  const setPhoneFn = useServerFn(setAdminNotifyPhoneFn);
   const qc = useQueryClient();
 
   const groupsQ = useQuery({
@@ -37,10 +43,16 @@ export function DispatchGroupsCard() {
     queryFn: () => getSettingsFn(),
   });
 
+  const phoneQ = useQuery({
+    queryKey: ["admin-notify-phone"],
+    queryFn: () => getPhoneFn(),
+  });
+
   const [couriersId, setCouriersId] = useState<string>("");
   const [moversId, setMoversId] = useState<string>("");
   const [couriersQuery, setCouriersQuery] = useState("");
   const [moversQuery, setMoversQuery] = useState("");
+  const [notifyPhone, setNotifyPhone] = useState("");
 
   useEffect(() => {
     if (settingsQ.data) {
@@ -48,6 +60,10 @@ export function DispatchGroupsCard() {
       setMoversId(settingsQ.data.movers_group_id ?? "");
     }
   }, [settingsQ.data]);
+
+  useEffect(() => {
+    if (phoneQ.data) setNotifyPhone(phoneQ.data.phone ?? "");
+  }, [phoneQ.data]);
 
   const groups: GreenApiGroup[] = groupsQ.data?.groups ?? [];
   const nameFor = (id: string) => groups.find((g) => g.chatId === id)?.name ?? "";
@@ -76,6 +92,15 @@ export function DispatchGroupsCard() {
     onSuccess: () => {
       toast.success("קבוצות שידור נשמרו");
       qc.invalidateQueries({ queryKey: ["dispatch-groups"] });
+    },
+    onError: (e: any) => toast.error(String(e?.message ?? e)),
+  });
+
+  const savePhoneM = useMutation({
+    mutationFn: () => setPhoneFn({ data: { phone: notifyPhone.trim() } }),
+    onSuccess: () => {
+      toast.success("מספר ההתראות נשמר");
+      qc.invalidateQueries({ queryKey: ["admin-notify-phone"] });
     },
     onError: (e: any) => toast.error(String(e?.message ?? e)),
   });
@@ -156,6 +181,30 @@ export function DispatchGroupsCard() {
               עודכן: {new Date(settingsQ.data.updated_at).toLocaleString("he-IL")}
             </Badge>
           )}
+        </div>
+
+        <div className="space-y-2 border-t pt-4">
+          <Label>מספר וואטסאפ לקבלת הצעות מהמובילים</Label>
+          <p className="text-xs text-muted-foreground">
+            כל מוביל שנכנס ללינק בקבוצה ומשאיר פרטים (לקח את העבודה או שלח הצעת מחיר) —
+            ההודעה תגיע למספר הזה.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={notifyPhone}
+              onChange={(e) => setNotifyPhone(e.target.value)}
+              placeholder="05X-XXXXXXX"
+              className="max-w-xs"
+            />
+            <Button
+              variant="outline"
+              onClick={() => savePhoneM.mutate()}
+              disabled={savePhoneM.isPending}
+            >
+              <Save className="h-3 w-3 mr-1" />
+              {savePhoneM.isPending ? "שומר…" : "שמור מספר"}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

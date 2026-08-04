@@ -18,6 +18,7 @@ import {
   GuestPaypalCaptureDto,
   GuestPaypalOrderDto,
 } from "./dto/guest-paypal.dto";
+import { GuestRepriceJobDto } from "./dto/reprice-job.dto";
 import { PublicJobsService } from "./public-jobs.service";
 
 /**
@@ -115,5 +116,14 @@ export class PublicJobsController {
     @Body() body: GuestCancelJobDto,
   ) {
     return this.publicJobs.cancel({ ...body, job_id: jobId });
+  }
+
+  @Post(":job_id/reprice")
+  @Header("Cache-Control", "no-store")
+  reprice(
+    @Param("job_id", ParseUUIDPipe) jobId: string,
+    @Body() body: GuestRepriceJobDto,
+  ) {
+    return this.publicJobs.repriceGuest(jobId, body);
   }
 }

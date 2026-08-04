@@ -1,0 +1,1 @@
+UPDATE public.jobs SET partner_id = '4e4d0c0b-b1d1-445c-b79d-a25f8be61857' WHERE id = '5b570283-faed-4a7c-8801-97c3b5038024' AND partner_id IS NULL;

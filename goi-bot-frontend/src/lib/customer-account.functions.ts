@@ -81,6 +81,19 @@ export const cancelMyOrderFn = createServerFn({ method: "POST" })
     }),
   );
 
+export const repriceMyOrderFn = createServerFn({ method: "POST" })
+  .middleware([requireNestAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string().uuid(), price: z.number().positive().max(100000) }).parse(data),
+  )
+  .handler(({ data, context }) =>
+    nestServerFetch(`/api/jobs/${data.id}/reprice`, {
+      method: "POST",
+      body: { price: data.price },
+      accessToken: context.accessToken,
+    }),
+  );
+
 export const updateCustomerProfileFn = createServerFn({ method: "POST" })
   .handler(async () => {
     throw new Error("TODO Nest: use PATCH /api/auth/me/customer");

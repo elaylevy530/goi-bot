@@ -9,6 +9,7 @@ const createSchema = z.object({
   guest_phone: z.string().min(9),
   pickup_address: z.string().min(3),
   dropoff_address: z.string().min(3),
+  partner_slug: z.string().trim().max(60).optional().nullable(),
 }).passthrough();
 
 export const getPricingRulesFn = createServerFn({ method: "GET" })
@@ -77,5 +78,19 @@ export const cancelGuestOrderFn = createServerFn({ method: "POST" })
     nestServerFetch(`/api/public/jobs/${data.job_id}`, {
       method: "PATCH",
       body: { ...data, status: "בוטלה" },
+    }),
+  );
+
+export const repriceGuestOrderFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    refSchema.extend({ price: z.number().positive().max(100000) }).parse(data),
+  )
+  .handler(({ data }) =>
+    nestServerFetch(`/api/public/jobs/${data.job_id}/reprice`, {
+      method: "POST",
+      body: {
+        tracking_token: data.tracking_token,
+        price: data.price,
+      },
     }),
   );

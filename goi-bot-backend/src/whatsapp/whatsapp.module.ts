@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { PartnersModule } from "../partners/partners.module";
 import { GreenApiWebhookEvent } from "./entities/green-webhook-event.entity";
 import { WaBotState } from "./entities/wa-bot-state.entity";
 import { WhatsappDispatchSettings } from "./entities/whatsapp-dispatch-settings.entity";
@@ -24,6 +25,7 @@ import { WhatsappWebhookService } from "./whatsapp-webhook.service";
       WaBotState,
       WhatsappDispatchSettings,
     ]),
+    PartnersModule,
   ],
   controllers: [
     GreenWebhookController,

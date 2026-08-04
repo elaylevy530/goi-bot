@@ -25,6 +25,11 @@ import { Route as CustomerLoginRouteImport } from './routes/customer-login'
 import { Route as DriversRouteImport } from './routes/drivers'
 import { Route as ForBusinessRouteImport } from './routes/for-business'
 import { Route as JoinRouteImport } from './routes/join'
+import { Route as CompanyRouteImport } from './routes/company'
+import { Route as DeliveriesRouteImport } from './routes/deliveries'
+import { Route as MovingRouteImport } from './routes/moving'
+import { Route as GCodeRouteImport } from './routes/g.$code'
+import { Route as PSlugRouteImport } from './routes/p.$slug'
 import { Route as RRouteImport } from './routes/r'
 import { Route as RestaurantRouteImport } from './routes/restaurant'
 import { Route as SignupBusinessRouteImport } from './routes/signup-business'
@@ -33,6 +38,7 @@ import { Route as WhatsappBotRouteImport } from './routes/whatsapp-bot'
 import { Route as AuthenticatedActiveJobsRouteImport } from './routes/_authenticated.active-jobs'
 import { Route as AuthenticatedAreasTagsRouteImport } from './routes/_authenticated.areas-tags'
 import { Route as AuthenticatedBonusesRouteImport } from './routes/_authenticated.bonuses'
+import { Route as AuthenticatedPartnersRouteImport } from './routes/_authenticated.partners'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated.businesses'
 import { Route as AuthenticatedCourierNotificationsRouteImport } from './routes/_authenticated.courier-notifications'
 import { Route as AuthenticatedCouriersAdminRouteImport } from './routes/_authenticated.couriers-admin'
@@ -202,6 +208,31 @@ const JoinRoute = JoinRouteImport.update({
   path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompanyRoute = CompanyRouteImport.update({
+  id: '/company',
+  path: '/company',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveriesRoute = DeliveriesRouteImport.update({
+  id: '/deliveries',
+  path: '/deliveries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MovingRoute = MovingRouteImport.update({
+  id: '/moving',
+  path: '/moving',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GCodeRoute = GCodeRouteImport.update({
+  id: '/g/$code',
+  path: '/g/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PSlugRoute = PSlugRouteImport.update({
+  id: '/p/$slug',
+  path: '/p/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RRoute = RRouteImport.update({
   id: '/r',
   path: '/r',
@@ -240,6 +271,11 @@ const AuthenticatedAreasTagsRoute = AuthenticatedAreasTagsRouteImport.update({
 const AuthenticatedBonusesRoute = AuthenticatedBonusesRouteImport.update({
   id: '/bonuses',
   path: '/bonuses',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPartnersRoute = AuthenticatedPartnersRouteImport.update({
+  id: '/partners',
+  path: '/partners',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedBusinessesRoute = AuthenticatedBusinessesRouteImport.update({
@@ -721,6 +757,11 @@ export interface FileRoutesByFullPath {
   '/drivers': typeof DriversRoute
   '/for-business': typeof ForBusinessRoute
   '/join': typeof JoinRoute
+  '/company': typeof CompanyRoute
+  '/deliveries': typeof DeliveriesRoute
+  '/moving': typeof MovingRoute
+  '/g/$code': typeof GCodeRoute
+  '/p/$slug': typeof PSlugRoute
   '/r': typeof RRoute
   '/restaurant': typeof RestaurantRoute
   '/signup-business': typeof SignupBusinessRoute
@@ -729,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/areas-tags': typeof AuthenticatedAreasTagsRoute
   '/bonuses': typeof AuthenticatedBonusesRoute
+  '/partners': typeof AuthenticatedPartnersRoute
   '/businesses': typeof AuthenticatedBusinessesRouteWithChildren
   '/courier-notifications': typeof AuthenticatedCourierNotificationsRoute
   '/couriers-admin': typeof AuthenticatedCouriersAdminRoute
@@ -834,6 +876,11 @@ export interface FileRoutesByTo {
   '/drivers': typeof DriversRoute
   '/for-business': typeof ForBusinessRoute
   '/join': typeof JoinRoute
+  '/company': typeof CompanyRoute
+  '/deliveries': typeof DeliveriesRoute
+  '/moving': typeof MovingRoute
+  '/g/$code': typeof GCodeRoute
+  '/p/$slug': typeof PSlugRoute
   '/r': typeof RRoute
   '/restaurant': typeof RestaurantRoute
   '/signup-business': typeof SignupBusinessRoute
@@ -842,6 +889,7 @@ export interface FileRoutesByTo {
   '/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/areas-tags': typeof AuthenticatedAreasTagsRoute
   '/bonuses': typeof AuthenticatedBonusesRoute
+  '/partners': typeof AuthenticatedPartnersRoute
   '/businesses': typeof AuthenticatedBusinessesRouteWithChildren
   '/courier-notifications': typeof AuthenticatedCourierNotificationsRoute
   '/couriers-admin': typeof AuthenticatedCouriersAdminRoute
@@ -949,6 +997,11 @@ export interface FileRoutesById {
   '/drivers': typeof DriversRoute
   '/for-business': typeof ForBusinessRoute
   '/join': typeof JoinRoute
+  '/company': typeof CompanyRoute
+  '/deliveries': typeof DeliveriesRoute
+  '/moving': typeof MovingRoute
+  '/g/$code': typeof GCodeRoute
+  '/p/$slug': typeof PSlugRoute
   '/r': typeof RRoute
   '/restaurant': typeof RestaurantRoute
   '/signup-business': typeof SignupBusinessRoute
@@ -957,6 +1010,7 @@ export interface FileRoutesById {
   '/_authenticated/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/_authenticated/areas-tags': typeof AuthenticatedAreasTagsRoute
   '/_authenticated/bonuses': typeof AuthenticatedBonusesRoute
+  '/_authenticated/partners': typeof AuthenticatedPartnersRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRouteWithChildren
   '/_authenticated/courier-notifications': typeof AuthenticatedCourierNotificationsRoute
   '/_authenticated/couriers-admin': typeof AuthenticatedCouriersAdminRoute
@@ -1065,6 +1119,11 @@ export interface FileRouteTypes {
     | '/drivers'
     | '/for-business'
     | '/join'
+  | '/company'
+  | '/deliveries'
+  | '/moving'
+  | '/g/$code'
+  | '/p/$slug'
     | '/r'
     | '/restaurant'
     | '/signup-business'
@@ -1073,6 +1132,7 @@ export interface FileRouteTypes {
     | '/active-jobs'
     | '/areas-tags'
     | '/bonuses'
+  | '/partners'
     | '/businesses'
     | '/courier-notifications'
     | '/couriers-admin'
@@ -1178,6 +1238,11 @@ export interface FileRouteTypes {
     | '/drivers'
     | '/for-business'
     | '/join'
+  | '/company'
+  | '/deliveries'
+  | '/moving'
+  | '/g/$code'
+  | '/p/$slug'
     | '/r'
     | '/restaurant'
     | '/signup-business'
@@ -1186,6 +1251,7 @@ export interface FileRouteTypes {
     | '/active-jobs'
     | '/areas-tags'
     | '/bonuses'
+  | '/partners'
     | '/businesses'
     | '/courier-notifications'
     | '/couriers-admin'
@@ -1292,6 +1358,11 @@ export interface FileRouteTypes {
     | '/drivers'
     | '/for-business'
     | '/join'
+  | '/company'
+  | '/deliveries'
+  | '/moving'
+  | '/g/$code'
+  | '/p/$slug'
     | '/r'
     | '/restaurant'
     | '/signup-business'
@@ -1300,6 +1371,7 @@ export interface FileRouteTypes {
     | '/_authenticated/active-jobs'
     | '/_authenticated/areas-tags'
     | '/_authenticated/bonuses'
+  | '/_authenticated/partners'
     | '/_authenticated/businesses'
     | '/_authenticated/courier-notifications'
     | '/_authenticated/couriers-admin'
@@ -1408,6 +1480,11 @@ export interface RootRouteChildren {
   DriversRoute: typeof DriversRoute
   ForBusinessRoute: typeof ForBusinessRoute
   JoinRoute: typeof JoinRoute
+  CompanyRoute: typeof CompanyRoute
+  DeliveriesRoute: typeof DeliveriesRoute
+  MovingRoute: typeof MovingRoute
+  GCodeRoute: typeof GCodeRoute
+  PSlugRoute: typeof PSlugRoute
   RRoute: typeof RRoute
   RestaurantRoute: typeof RestaurantRoute
   SignupBusinessRoute: typeof SignupBusinessRoute
@@ -1539,6 +1616,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/company': {
+      id: '/company'
+      path: '/company'
+      fullPath: '/company'
+      preLoaderRoute: typeof CompanyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deliveries': {
+      id: '/deliveries'
+      path: '/deliveries'
+      fullPath: '/deliveries'
+      preLoaderRoute: typeof DeliveriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/moving': {
+      id: '/moving'
+      path: '/moving'
+      fullPath: '/moving'
+      preLoaderRoute: typeof MovingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/g/$code': {
+      id: '/g/$code'
+      path: '/g/$code'
+      fullPath: '/g/$code'
+      preLoaderRoute: typeof GCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$slug': {
+      id: '/p/$slug'
+      path: '/p/$slug'
+      fullPath: '/p/$slug'
+      preLoaderRoute: typeof PSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/r': {
       id: '/r'
       path: '/r'
@@ -1593,6 +1705,13 @@ declare module '@tanstack/react-router' {
       path: '/bonuses'
       fullPath: '/bonuses'
       preLoaderRoute: typeof AuthenticatedBonusesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/partners': {
+      id: '/_authenticated/partners'
+      path: '/partners'
+      fullPath: '/partners'
+      preLoaderRoute: typeof AuthenticatedPartnersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/businesses': {
@@ -2239,6 +2358,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedActiveJobsRoute: typeof AuthenticatedActiveJobsRoute
   AuthenticatedAreasTagsRoute: typeof AuthenticatedAreasTagsRoute
   AuthenticatedBonusesRoute: typeof AuthenticatedBonusesRoute
+  AuthenticatedPartnersRoute: typeof AuthenticatedPartnersRoute
   AuthenticatedBusinessesRoute: typeof AuthenticatedBusinessesRouteWithChildren
   AuthenticatedCourierNotificationsRoute: typeof AuthenticatedCourierNotificationsRoute
   AuthenticatedCouriersAdminRoute: typeof AuthenticatedCouriersAdminRoute
@@ -2269,6 +2389,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedActiveJobsRoute: AuthenticatedActiveJobsRoute,
   AuthenticatedAreasTagsRoute: AuthenticatedAreasTagsRoute,
   AuthenticatedBonusesRoute: AuthenticatedBonusesRoute,
+  AuthenticatedPartnersRoute: AuthenticatedPartnersRoute,
   AuthenticatedBusinessesRoute: AuthenticatedBusinessesRouteWithChildren,
   AuthenticatedCourierNotificationsRoute:
     AuthenticatedCourierNotificationsRoute,
@@ -2475,6 +2596,11 @@ const rootRouteChildren: RootRouteChildren = {
   DriversRoute: DriversRoute,
   ForBusinessRoute: ForBusinessRoute,
   JoinRoute: JoinRoute,
+  CompanyRoute: CompanyRoute,
+  DeliveriesRoute: DeliveriesRoute,
+  MovingRoute: MovingRoute,
+  GCodeRoute: GCodeRoute,
+  PSlugRoute: PSlugRoute,
   RRoute: RRoute,
   RestaurantRoute: RestaurantRoute,
   SignupBusinessRoute: SignupBusinessRoute,

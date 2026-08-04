@@ -18,6 +18,7 @@ import { CreateQuoteDto } from "./dto/create-quote.dto";
 import { ClaimJobDto, RespondOfferDto } from "./dto/courier-actions.dto";
 import { CourierDeclineDto } from "./dto/courier-decline.dto";
 import { CancelJobDto } from "./dto/cancel-job.dto";
+import { RepriceJobDto } from "./dto/reprice-job.dto";
 import { UpdateJobDto } from "./dto/update-job.dto";
 import { JobsService } from "./jobs.service";
 
@@ -173,6 +174,16 @@ export class JobsController {
     @Body() dto: CancelJobDto,
   ) {
     return this.jobs.cancelByStaff(id, auth.userId, auth.roles, dto.reason);
+  }
+
+  @Post(":id/reprice")
+  @UseGuards(JwtAuthGuard)
+  reprice(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: RepriceJobDto,
+  ) {
+    return this.jobs.repriceForUser(id, auth.userId, auth.roles, dto.price);
   }
 
   @Patch(":id")

@@ -16,6 +16,11 @@ export class Job {
   @Column({ type: "varchar", length: 64 })
   job_number!: string;
 
+  /** Short public link code for /g/$code (WhatsApp mover leads). */
+  @Index({ unique: true })
+  @Column({ type: "varchar", length: 16, nullable: true })
+  short_code!: string | null;
+
   @Column({ type: "varchar", length: 32, default: "pending" })
   status!: string;
 
@@ -45,6 +50,11 @@ export class Job {
 
   @Column({ type: "uuid", nullable: true })
   created_by!: string | null;
+
+  /** Partner panel attribution (guest deep-link /p/$slug). */
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  partner_id!: string | null;
 
   /** Guest / private-customer order fields */
   @Column({ type: "varchar", length: 255, nullable: true })

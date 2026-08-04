@@ -1,0 +1,1 @@
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS delivery_cities text[] NOT NULL DEFAULT '{}'::text[];

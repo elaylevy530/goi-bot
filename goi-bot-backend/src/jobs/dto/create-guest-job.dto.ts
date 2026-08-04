@@ -97,4 +97,10 @@ export class CreateGuestJobDto {
   @IsOptional()
   @IsBoolean()
   terms_accepted?: boolean;
+
+  /** Partner panel deep-link slug (`/p/$slug`). Resolved to partner_id when active. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  partner_slug?: string | null;
 }

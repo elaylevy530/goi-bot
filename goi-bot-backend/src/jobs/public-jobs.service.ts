@@ -5,13 +5,21 @@ import { In, Repository } from "typeorm";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { AppError } from "../common/errors/app.error";
+import { PartnersService } from "../partners/partners.service";
 import { PaypalClientService } from "../payments/paypal-client.service";
+import { PlatformService } from "../platform/platform.service";
+import { GreenApiClient } from "../whatsapp/green-api.client";
+import { WhatsappDispatchService } from "../whatsapp/whatsapp-dispatch.service";
 import type { CreateGuestJobDto } from "./dto/create-guest-job.dto";
 import type { GuestJobRefDto, GuestSelectQuoteDto } from "./dto/guest-job-ref.dto";
 import type { GuestPaypalCaptureDto, GuestPaypalOrderDto } from "./dto/guest-paypal.dto";
+import type { GuestRepriceJobDto } from "./dto/reprice-job.dto";
+import type { SubmitJobLeadDto } from "./dto/submit-job-lead.dto";
 import { ExpressPricingRule } from "./entities/express-pricing-rule.entity";
 import { Job } from "./entities/job.entity";
+import { JobLead } from "./entities/job-lead.entity";
 import { JobQuote } from "./entities/job-quote.entity";
+import { generateJobShortCode } from "./job-short-code";
 import { JobsService } from "./jobs.service";
 
 const TERMINAL = new Set(["הושלמה", "בוטלה"]);
@@ -58,6 +66,7 @@ export class PublicJobsService {
   constructor(
     @InjectRepository(Job) private readonly jobs: Repository<Job>,
     @InjectRepository(JobQuote) private readonly quotes: Repository<JobQuote>,
+    @InjectRepository(JobLead) private readonly leads: Repository<JobLead>,
     @InjectRepository(ExpressPricingRule)
     private readonly expressRules: Repository<ExpressPricingRule>,
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
@@ -65,7 +74,48 @@ export class PublicJobsService {
     private readonly courierStats: Repository<CourierStats>,
     private readonly jobsService: JobsService,
     private readonly paypal: PaypalClientService,
+    private readonly partners: PartnersService,
+    private readonly platform: PlatformService,
+    private readonly greenApi: GreenApiClient,
+    private readonly whatsappDispatch: WhatsappDispatchService,
   ) {}
+
+  private isUuid(id: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      id,
+    );
+  }
+
+  private async findByPublicRef(ref: string): Promise<Job | null> {
+    const key = ref.trim();
+    if (!key || key.length < 4 || key.length > 60) return null;
+    if (this.isUuid(key)) {
+      return this.jobs.findOne({ where: { id: key } });
+    }
+    return this.jobs.findOne({ where: { short_code: key.toLowerCase() } });
+  }
+
+  private async isJobTakenForLeads(job: Job): Promise<boolean> {
+    if (job.selected_courier_id) return true;
+    if (job.pricing_type === "quote_request") return false;
+    const count = await this.leads.count({
+      where: { job_id: job.id, kind: "take" },
+    });
+    return count > 0;
+  }
+
+  private async ensureShortCode(job: Job): Promise<string> {
+    if (job.short_code) return job.short_code;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const code = generateJobShortCode();
+      const exists = await this.jobs.exist({ where: { short_code: code } });
+      if (exists) continue;
+      job.short_code = code;
+      await this.jobs.save(job);
+      return code;
+    }
+    throw new AppError("internal", { userMessage: "Failed to allocate short_code" });
+  }
 
   private async requireGuestJob(jobId: string, trackingToken: string): Promise<Job> {
     const job = await this.jobs.findOne({ where: { id: jobId } });
@@ -166,9 +216,31 @@ export class PublicJobsService {
       min_price: minPrice,
     };
 
+    // Partner deep-link attribution — skip unknown/inactive slugs (do not fail create).
+    let partnerId: string | null = null;
+    const partnerSlug = dto.partner_slug?.trim();
+    if (partnerSlug) {
+      const partner = await this.partners.findActiveBySlug(partnerSlug);
+      if (partner) {
+        partnerId = partner.id;
+      } else {
+        this.logger.warn(
+          `guest create: partner_slug="${partnerSlug}" not found or inactive — skipping attribution`,
+        );
+      }
+    }
+
+    let shortCode = generateJobShortCode();
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const exists = await this.jobs.exist({ where: { short_code: shortCode } });
+      if (!exists) break;
+      shortCode = generateJobShortCode();
+    }
+
     const job = await this.jobs.save(
       this.jobs.create({
         job_number: generateJobNumber(),
+        short_code: shortCode,
         recipient_tracking_token: trackingToken,
         status: "טיוטה",
         job_type:
@@ -202,6 +274,7 @@ export class PublicJobsService {
         job_date: jobDate,
         job_time: jobTime,
         pricing_snapshot: snapshot,
+        partner_id: partnerId,
         quote_deadline_at:
           pricingModel === "quote_request"
             ? new Date(Date.now() + OFFER_TTL_MS)
@@ -573,5 +646,179 @@ export class PublicJobsService {
         cause: e,
       });
     }
+  }
+
+  /** Public mover board — limited fields by uuid or short_code. */
+  async getPublicJob(ref: string) {
+    const job = await this.findByPublicRef(ref);
+    if (!job) return null;
+
+    let partner_name: string | null = null;
+    let partner_slug: string | null = null;
+    if (job.partner_id) {
+      const partner = await this.partners.findById(job.partner_id);
+      partner_name = partner?.name ?? null;
+      partner_slug = partner?.slug ?? null;
+    }
+
+    const price =
+      job.pricing_type === "quote_request"
+        ? null
+        : Number(job.suggested_courier_payment ?? job.payment ?? 0) || null;
+
+    return {
+      id: job.id,
+      job_number: job.job_number ?? null,
+      short_code: job.short_code ?? null,
+      service_category: job.service_category ?? null,
+      package_type: null as string | null,
+      package_size: null as string | null,
+      number_of_packages: job.number_of_packages ?? null,
+      description: job.description ?? null,
+      pickup_area: job.pickup_area ?? null,
+      pickup_address: job.pickup_address ?? null,
+      dropoff_area: job.dropoff_area ?? null,
+      dropoff_address: job.dropoff_address ?? null,
+      job_date: job.job_date ?? null,
+      job_time: job.job_time ?? null,
+      estimated_distance_km:
+        job.estimated_distance_km != null
+          ? Number(job.estimated_distance_km)
+          : null,
+      price,
+      status: job.status ?? null,
+      partner_name,
+      partner_slug,
+      taken: await this.isJobTakenForLeads(job),
+    };
+  }
+
+  async submitLead(ref: string, dto: SubmitJobLeadDto) {
+    const job = await this.findByPublicRef(ref);
+    if (!job) {
+      throw new AppError("not_found", { userMessage: "העבודה לא נמצאה" });
+    }
+    if (await this.isJobTakenForLeads(job)) {
+      throw new AppError("conflict", { userMessage: "העבודה כבר נתפסה" });
+    }
+
+    const digits = dto.phone.replace(/\D/g, "");
+    if (digits.length < 9) {
+      throw new AppError("bad_request", { userMessage: "נא למלא מספר טלפון תקין" });
+    }
+    if (dto.kind === "quote" && !(Number(dto.price) > 0)) {
+      throw new AppError("bad_request", { userMessage: "נא למלא מחיר" });
+    }
+
+    let partnerName: string | null = null;
+    let partnerSlug: string | null = null;
+    if (job.partner_id) {
+      const partner = await this.partners.findById(job.partner_id);
+      partnerName = partner?.name ?? null;
+      partnerSlug = partner?.slug ?? null;
+    }
+
+    const leadPrice =
+      dto.kind === "quote"
+        ? String(dto.price)
+        : String(job.suggested_courier_payment ?? job.payment ?? "") || null;
+
+    await this.leads.save(
+      this.leads.create({
+        job_id: job.id,
+        kind: dto.kind,
+        full_name: dto.full_name.trim(),
+        phone: dto.phone.trim(),
+        price: leadPrice,
+        note: dto.note?.trim() || null,
+        partner_slug: partnerSlug,
+      }),
+    );
+
+    await this.notifyAdminOfLead(job, dto, partnerName);
+    return { ok: true as const };
+  }
+
+  private async notifyAdminOfLead(
+    job: Job,
+    dto: SubmitJobLeadDto,
+    partnerName: string | null,
+  ) {
+    try {
+      const setting = await this.platform.get("admin_notify_phone");
+      const raw =
+        (typeof setting?.value === "string" ? setting.value : null) ||
+        process.env.ADMIN_NOTIFY_PHONE ||
+        "";
+      const phone = String(raw).trim();
+      if (!phone || !this.greenApi.isConfigured()) return;
+
+      const pickup =
+        [job.pickup_address, job.pickup_area].filter(Boolean).join(", ") || "—";
+      const dropoff =
+        [job.dropoff_address, job.dropoff_area].filter(Boolean).join(", ") || "—";
+      const when = [job.job_date, job.job_time].filter(Boolean).join(" ") || "עכשיו";
+      const lines = [
+        dto.kind === "take"
+          ? `✅ *מוביל לקח עבודה*${job.job_number ? ` #${job.job_number}` : ""}`
+          : `💬 *הצעת מחיר חדשה*${job.job_number ? ` #${job.job_number}` : ""}`,
+        `👤 ${dto.full_name.trim()}`,
+        `📱 ${dto.phone.trim()}`,
+        dto.kind === "quote" && dto.price ? `💰 הצעה: ₪${dto.price}` : "",
+        dto.kind === "take" && (job.suggested_courier_payment ?? job.payment)
+          ? `💰 מחיר: ₪${job.suggested_courier_payment ?? job.payment}`
+          : "",
+        dto.note ? `📝 ${dto.note}` : "",
+        "",
+        `📍 מ: ${pickup}`,
+        `🎯 ל: ${dropoff}`,
+        `⏰ ${when}`,
+        partnerName ? `🤝 שותף: ${partnerName}` : "",
+      ].filter(Boolean);
+      await this.greenApi.sendText(phone, lines.join("\n"));
+    } catch (e) {
+      this.logger.error(
+        `[public-job] admin notify failed for ${job.id}`,
+        e instanceof Error ? e.stack : e,
+      );
+    }
+  }
+
+  /** Guest reprice + WhatsApp group resend while unassigned. */
+  async repriceGuest(jobId: string, dto: GuestRepriceJobDto) {
+    const job = await this.requireGuestJob(jobId, dto.tracking_token);
+    return this.applyRepriceAndResend(job, dto.price);
+  }
+
+  async applyRepriceAndResend(job: Job, price: number) {
+    if (!(price > 0)) {
+      throw new AppError("bad_request", { userMessage: "נא למלא מחיר תקין" });
+    }
+    if (job.selected_courier_id) {
+      throw new AppError("conflict", {
+        userMessage: "כבר שובץ מוביל — לא ניתן לעדכן מחיר",
+      });
+    }
+    if (["הושלמה", "בוטלה", "פעילה"].includes(String(job.status))) {
+      throw new AppError("conflict", {
+        userMessage: "לא ניתן לעדכן הזמנה במצב זה",
+      });
+    }
+    if (job.pricing_type === "quote_request") {
+      throw new AppError("conflict", {
+        userMessage: "לא ניתן לעדכן מחיר לבקשת הצעות",
+      });
+    }
+
+    job.customer_price = String(price);
+    job.payment = String(price);
+    job.suggested_courier_payment = String(price);
+    job.pricing_type = "fixed_price";
+    job.status = "נשלחה לשליחים";
+    await this.ensureShortCode(job);
+    await this.jobs.save(job);
+
+    const whatsapp = await this.whatsappDispatch.notifyJobDispatched(job);
+    return { ok: true as const, whatsapp };
   }
 }
