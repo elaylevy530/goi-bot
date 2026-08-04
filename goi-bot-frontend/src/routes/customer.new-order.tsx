@@ -615,6 +615,13 @@ function NewOrderPage() {
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
 
+  const openGuestDialog = () => {
+    const saved = getGuestIdentity();
+    setGuestName((prev) => prev || profile.full_name || saved?.full_name || "");
+    setGuestPhone((prev) => prev || profile.phone || saved?.phone || "");
+    setGuestDialog(true);
+  };
+
   const submit = useMutation({
     mutationFn: async () => {
       if (!pickup) throw new Error("בחר כתובת איסוף מהרשימה");
@@ -926,26 +933,49 @@ function NewOrderPage() {
 
   return (
     <div className="fixed inset-0 bottom-16 md:bottom-0 flex flex-col bg-[#f5f6f8]">
-      {/* Guest checkout — collect contact details without registration */}
+      {/* Guest checkout — collect contact details without registration.
+          Sit above the customer bottom nav (h-16) so actions stay tappable on mobile. */}
       {guestDialog && (
-        <div className="fixed inset-0 z-50 bg-black/50 grid place-items-end sm:place-items-center p-0 sm:p-4" dir="rtl">
-          <div className="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-5 space-y-3">
-            <div>
-              <div className="text-lg font-extrabold">כמעט שם</div>
-              <p className="text-xs text-[#101418]/60 mt-0.5">
-                רק שם וטלפון כדי שהמוביל יוכל ליצור איתך קשר. לא צריך להירשם.
-              </p>
+        <div
+          className="fixed inset-0 z-[100] bg-black/50 grid place-items-end sm:place-items-center p-0 pb-16 sm:p-4 sm:pb-4"
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="guest-checkout-title"
+          onClick={() => setGuestDialog(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-5 space-y-3 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div id="guest-checkout-title" className="text-lg font-extrabold">כמעט שם</div>
+                <p className="text-xs text-[#101418]/60 mt-0.5">
+                  רק שם וטלפון כדי שהמוביל יוכל ליצור איתך קשר. לא צריך להירשם.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGuestDialog(false)}
+                aria-label="סגור"
+                className="size-9 shrink-0 rounded-full grid place-items-center text-[#101418]/50 hover:bg-[#f5f6f8] active:scale-95 transition"
+              >
+                <X className="size-5" strokeWidth={2.2} />
+              </button>
             </div>
             <input
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
               placeholder="שם מלא"
+              autoComplete="name"
               className="w-full rounded-2xl bg-[#f5f6f8] ring-1 ring-black/5 px-4 py-3 text-sm outline-none focus:ring-black/20"
             />
             <input
               value={guestPhone}
               onChange={(e) => setGuestPhone(e.target.value)}
               inputMode="tel"
+              autoComplete="tel"
               dir="ltr"
               placeholder="050-0000000"
               className="w-full rounded-2xl bg-[#f5f6f8] ring-1 ring-black/5 px-4 py-3 text-sm outline-none focus:ring-black/20 text-right"
@@ -1929,7 +1959,7 @@ function NewOrderPage() {
 
                 <button
                   type="button"
-                  onClick={() => (isGuestMode && !profile.phone ? setGuestDialog(true) : submit.mutate())}
+                  onClick={() => (isGuestMode && !profile.phone ? openGuestDialog() : submit.mutate())}
                   disabled={submit.isPending || !!missingReason}
                   className={`group relative w-full overflow-hidden inline-flex items-center justify-center gap-2.5 py-4 rounded-2xl text-white text-base font-black transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${ready ? "bg-gradient-to-b from-[#6B8F71] to-[#557259] shadow-[0_10px_28px_-8px_rgba(85,114,89,0.75)] hover:shadow-[0_14px_32px_-8px_rgba(85,114,89,0.9)] animate-claim-pulse" : "bg-[#6B8F71]/80 shadow-[0_4px_16px_-4px_rgba(85,114,89,0.4)]"}`}
                 >
@@ -1991,7 +2021,7 @@ function NewOrderPage() {
 
               <button
                 type="button"
-                onClick={() => (isGuestMode && !profile.phone ? setGuestDialog(true) : submit.mutate())}
+                onClick={() => (isGuestMode && !profile.phone ? openGuestDialog() : submit.mutate())}
                 disabled={submit.isPending || !!missingReason}
                 className={`group relative w-full overflow-hidden inline-flex items-center justify-center gap-2.5 py-4 rounded-2xl text-white text-base font-black transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${ready ? "bg-gradient-to-b from-[#6B8F71] to-[#557259] shadow-[0_10px_28px_-8px_rgba(85,114,89,0.75)] hover:shadow-[0_14px_32px_-8px_rgba(85,114,89,0.9)] animate-claim-pulse" : "bg-[#6B8F71]/80 shadow-[0_4px_16px_-4px_rgba(85,114,89,0.4)]"}`}
               >
