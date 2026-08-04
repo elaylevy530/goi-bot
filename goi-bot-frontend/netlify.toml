@@ -1,9 +1,9 @@
 # Used when Netlify base directory is `goi-bot-frontend`.
 
 [build]
-  # --include=optional: Netlify is Linux; lockfile is often generated on macOS and
-  # may not materialize platform binaries like @esbuild/linux-x64 without this.
-  command = "cd .. && npm install --include=optional && npm run build --workspace=goi-bot-frontend"
+  # Clean install on Linux so optional native binaries (esbuild/lightningcss/oxide)
+  # resolve for this platform. Keep package-lock.json; only wipe node_modules.
+  command = "cd .. && rm -rf node_modules goi-bot-frontend/node_modules goi-bot-backend/node_modules && npm install --include=optional && npm run build --workspace=goi-bot-frontend"
   publish = "dist"
 
 [build.environment]
