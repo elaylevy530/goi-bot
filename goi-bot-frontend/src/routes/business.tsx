@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { fetchNestSession } from "@/lib/nest-auth";
+import { fetchNestSession, isPreviewSession } from "@/lib/nest-auth";
 
 export const Route = createFileRoute("/business")({
   ssr: false,
@@ -7,14 +7,24 @@ export const Route = createFileRoute("/business")({
     const session = await fetchNestSession();
     if (!session) throw redirect({ to: "/auth" });
 
-    if (!session.roles.includes("business") || !session.profile?.customerId) {
+    const previewBusiness = isPreviewSession(session, "business");
+    const businessId =
+      session.profile?.customerId ?? session.preview?.customerId ?? null;
+
+    if (
+      (!session.roles.includes("business") || !businessId) &&
+      !previewBusiness
+    ) {
       throw redirect({ to: "/signup-business" });
     }
 
-    const niche = session.profile.businessNiche ?? "manual_dispatch";
-    if (niche === "restaurant") throw redirect({ to: "/restaurant" });
-    if (niche === "online_store") throw redirect({ to: "/store" });
-    if (niche === "pharmacy_clinic") throw redirect({ to: "/clinic" });
+    // Niche shortcuts skip the shared business shell; keep admin preview on /business/*.
+    if (!previewBusiness) {
+      const niche = session.profile?.businessNiche ?? "manual_dispatch";
+      if (niche === "restaurant") throw redirect({ to: "/restaurant" });
+      if (niche === "online_store") throw redirect({ to: "/store" });
+      if (niche === "pharmacy_clinic") throw redirect({ to: "/clinic" });
+    }
 
     if (location.pathname === "/business" || location.pathname === "/business/") {
       throw redirect({ to: "/business/dashboard" });
@@ -22,7 +32,8 @@ export const Route = createFileRoute("/business")({
 
     return {
       user: session,
-      businessId: session.profile.customerId,
+      businessId: businessId!,
+      preview: session.preview ?? null,
     };
   },
   component: () => <Outlet />,

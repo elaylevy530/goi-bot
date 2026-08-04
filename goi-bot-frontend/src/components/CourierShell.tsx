@@ -419,16 +419,31 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
 
 
 
-  // Live GPS tracking — runs only while the courier is marked active
+  // Live GPS tracking — runs only while the courier is marked active (never in admin preview).
   useCourierGpsTracker({
-    enabled: isAvailable && (me?.location_sharing_enabled ?? true),
+    enabled:
+      isAvailable &&
+      (me?.location_sharing_enabled ?? true) &&
+      !(
+        typeof window !== "undefined" &&
+        !!window.sessionStorage.getItem("goi_nest_preview")
+      ),
     courierId: me?.id ?? null,
   });
 
   const handleSignOut = async () => {
     await qc.cancelQueries();
     qc.clear();
-    const { nestLogout } = await import("@/lib/nest-auth");
+    const {
+      isNestPreviewReadOnly,
+      nestExitPreview,
+      nestLogout,
+    } = await import("@/lib/nest-auth");
+    if (isNestPreviewReadOnly()) {
+      await nestExitPreview();
+      navigate({ to: "/dashboard", replace: true });
+      return;
+    }
     nestLogout();
     navigate({ to: "/auth", replace: true });
   };

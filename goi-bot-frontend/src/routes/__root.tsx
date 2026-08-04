@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { AdminPreviewBanner } from "@/components/AdminPreviewBanner";
 import { registerServiceWorker } from "@/lib/pwa";
 import { InstallBanner, UpdateBanner } from "@/components/InstallApp";
 
@@ -203,6 +204,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AdminPreviewBanner />
       <Outlet />
       <Toaster position="top-center" richColors />
       <UpdateBanner />

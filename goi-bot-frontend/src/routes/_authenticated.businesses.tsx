@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { nestListCustomers } from "@/lib/nest-accounts";
+import { ViewPanelButton } from "@/components/ViewPanelButton";
 import { MessageCircle, CheckCircle2, Clock, CreditCard, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
@@ -139,6 +140,13 @@ function BusinessesPage() {
                     <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString("he-IL")}</TableCell>
                     <TableCell className="text-end">
                       <div className="flex items-center justify-end gap-1">
+                        <ViewPanelButton
+                          panel="business"
+                          entityId={r.id}
+                          label="פאנל"
+                          variant="outline"
+                          size="sm"
+                        />
                         <Link to="/businesses/$id" params={{ id: r.id }}>
                           <Button size="icon" variant="ghost"><ExternalLink className="size-4" /></Button>
                         </Link>

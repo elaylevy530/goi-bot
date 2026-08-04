@@ -6,6 +6,8 @@
  * to Nest (see docs/API_CUTOVER.md).
  */
 
+import { isNestPreviewReadOnly } from "@/lib/nest-preview-cache";
+
 function apiBaseUrl(): string {
   const fromEnv = import.meta.env.VITE_API_URL as string | undefined;
   // Empty string → same-origin (Vite proxy). Absolute URL → direct Nest call.
@@ -48,6 +50,17 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { accessToken, headers: initHeaders, ...rest } = options;
   const headers = new Headers(initHeaders);
+
+  const method = (rest.method ?? "GET").toUpperCase();
+  const isMutating = !["GET", "HEAD", "OPTIONS"].includes(method);
+  const isPreviewExit = path.includes("/api/auth/admin/preview/exit");
+  if (isMutating && !isPreviewExit && isNestPreviewReadOnly()) {
+    throw new ApiClientError(
+      403,
+      "preview_read_only",
+      "מצב תצוגת מנהל הוא לקריאה בלבד. לא ניתן לבצע פעולות כתיבה.",
+    );
+  }
 
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);

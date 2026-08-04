@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { nestCreateCustomer, nestListCustomers } from "@/lib/nest-accounts";
 import { CUSTOMER_TYPES, PREFERRED_JOB_TYPES, CUSTOMER_STATUSES } from "@/lib/constants";
+import { ViewPanelButton } from "@/components/ViewPanelButton";
 import { Plus, MessageCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -132,10 +133,19 @@ function CustomersPage() {
                   <TableCell><Badge variant="outline" className={c.status === "פעיל" ? "bg-primary/10 text-primary border-primary/20" : c.status === "חדש" ? "bg-sky-100 text-sky-700 border-sky-200" : "bg-amber-100 text-amber-700 border-amber-200"}>{c.status}</Badge></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("he-IL")}</TableCell>
                   <TableCell className="text-end">
-                    <Button size="icon" variant="ghost" onClick={() => {
-                      const phone = c.phone.replace(/\D/g, "").replace(/^0/, "972");
-                      window.open(`https://wa.me/${phone}`, "_blank");
-                    }}><MessageCircle className="size-4" /></Button>
+                    <div className="inline-flex items-center gap-1">
+                      <ViewPanelButton
+                        panel={c.customer_type === "business" ? "business" : "customer"}
+                        entityId={c.id}
+                        label="פאנל"
+                        variant="outline"
+                        size="sm"
+                      />
+                      <Button size="icon" variant="ghost" onClick={() => {
+                        const phone = c.phone.replace(/\D/g, "").replace(/^0/, "972");
+                        window.open(`https://wa.me/${phone}`, "_blank");
+                      }}><MessageCircle className="size-4" /></Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

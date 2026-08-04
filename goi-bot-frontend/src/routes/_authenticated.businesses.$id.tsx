@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { nestGetCustomer, nestUpdateCustomer } from "@/lib/nest-accounts";
 import { nestListCustomerJobs } from "@/lib/nest-domain";
+import { ViewPanelButton } from "@/components/ViewPanelButton";
 import {
   ArrowRight, MessageCircle, Save, Loader2, CheckCircle2, Clock, CreditCard, MapPin, Phone, Mail, Building2, Briefcase, Wallet, Copy,
 } from "lucide-react";
@@ -106,6 +107,7 @@ function BusinessProfile() {
           <Button variant="outline" onClick={() => navigate({ to: "/businesses" })}>
             <ArrowRight className="size-4" /> חזרה
           </Button>
+          <ViewPanelButton panel="business" entityId={id} label="צפה בפאנל" />
           {phoneDigits && (
             <Button variant="outline" onClick={() => window.open(waLink, "_blank")}>
               <MessageCircle className="size-4" /> וואטסאפ

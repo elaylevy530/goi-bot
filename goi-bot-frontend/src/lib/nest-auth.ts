@@ -6,8 +6,21 @@
  */
 
 import { apiFetch } from "@/lib/api-client";
+import {
+  clearNestPreviewCache,
+  getCachedNestPreview,
+  isNestPreviewReadOnly,
+  setNestPreviewCache,
+  type CachedNestPreview,
+} from "@/lib/nest-preview-cache";
 
 const NEST_TOKEN_KEY = "goi_nest_access_token";
+
+export type PreviewPanel = "courier" | "business" | "customer";
+
+export type NestAuthPreview = CachedNestPreview;
+
+export { getCachedNestPreview, isNestPreviewReadOnly };
 
 export type NestAuthProfile = {
   customerId?: string;
@@ -26,6 +39,7 @@ export type NestAuthUser = {
   email: string | null;
   roles: string[];
   profile?: NestAuthProfile;
+  preview?: NestAuthPreview;
 };
 
 export type NestAuthSession = {
@@ -34,6 +48,7 @@ export type NestAuthSession = {
   email: string;
   roles: string[];
   profile: NestAuthProfile;
+  preview?: NestAuthPreview;
 };
 
 export type NestAdminPing = {
@@ -47,6 +62,7 @@ export type NestCustomerProfile = Record<string, unknown> & {
   user_id: string | null;
   name: string;
   phone: string;
+  customer_type?: string | null;
   business_name?: string | null;
   business_niche?: string | null;
   logo_url?: string | null;
@@ -100,10 +116,12 @@ export function clearNestAccessToken(): void {
   } catch {
     // ignore
   }
+  clearNestPreviewCache();
 }
 
 function persistSession(session: NestAuthSession): NestAuthSession {
   setNestAccessToken(session.accessToken);
+  setNestPreviewCache(session.preview);
   return session;
 }
 
@@ -161,7 +179,33 @@ export function nestLoginWithPhone(
 }
 
 export function nestMe(accessToken = getNestAccessToken()) {
-  return apiFetch<NestAuthUser>("/api/auth/me", { accessToken });
+  return apiFetch<NestAuthUser>("/api/auth/me", { accessToken }).then((me) => {
+    setNestPreviewCache(me.preview);
+    return me;
+  });
+}
+
+/** Admin/manager: open a product panel as read-only preview for an entity. */
+export function nestStartPreview(panel: PreviewPanel, entityId: string) {
+  return apiFetch<NestAuthSession>("/api/auth/admin/preview", {
+    method: "POST",
+    accessToken: getNestAccessToken(),
+    body: JSON.stringify({ panel, entityId }),
+  }).then(persistSession);
+}
+
+/** Exit preview and restore a normal admin/manager JWT. */
+export function nestExitPreview() {
+  return apiFetch<NestAuthSession>("/api/auth/admin/preview/exit", {
+    method: "POST",
+    accessToken: getNestAccessToken(),
+  }).then(persistSession);
+}
+
+export function nestPreviewHomePath(panel: PreviewPanel): string {
+  if (panel === "courier") return "/courier/new-jobs";
+  if (panel === "business") return "/business/dashboard";
+  return "/customer/dashboard";
 }
 
 export function nestMyCustomer(accessToken = getNestAccessToken()) {
@@ -257,6 +301,15 @@ export async function fetchNestSession(): Promise<NestAuthUser | null> {
     clearNestAccessToken();
     return null;
   }
+}
+
+export function isPreviewSession(
+  session: NestAuthUser | NestAuthSession | null | undefined,
+  panel?: PreviewPanel,
+): boolean {
+  if (!session?.preview?.readOnly) return false;
+  if (!panel) return true;
+  return session.preview.panel === panel;
 }
 
 export function nestHomePath(user: NestAuthUser): string {

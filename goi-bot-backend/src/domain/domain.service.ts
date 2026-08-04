@@ -11,6 +11,7 @@ import { Customer } from "../accounts/entities/customer.entity";
 import { CourierAdminNotification } from "../accounts/entities/courier-admin-notification.entity";
 import { WithdrawalRequest } from "../accounts/entities/withdrawal-request.entity";
 import { CourierBonus } from "../accounts/entities/courier-bonus.entity";
+import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import type { AppRole } from "../auth/auth.types";
 import { Message } from "../chat/entities/message.entity";
 import { ExpressPricingRule } from "../jobs/entities/express-pricing-rule.entity";
@@ -79,6 +80,11 @@ export class DomainService {
   }
 
   private async identities(userId: string) {
+    const previewC = previewCourierId();
+    const previewB = previewCustomerId();
+    if (previewC || previewB) {
+      return { courierId: previewC, businessId: previewB };
+    }
     const [courier, business] = await Promise.all([
       this.couriers.findOne({ where: { user_id: userId }, select: ["id"] }),
       this.customers.findOne({ where: { user_id: userId }, select: ["id"] }),
@@ -231,13 +237,19 @@ export class DomainService {
     if (roles.includes("admin") || roles.includes("manager")) {
       return this.withdrawals.find({ order: { created_at: "DESC" } });
     }
-    const courier = await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
+    const previewId = previewCourierId();
+    const courier = previewId
+      ? await this.couriers.findOne({ where: { id: previewId }, select: ["id"] })
+      : await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
     return courier
       ? this.withdrawals.find({ where: { courier_id: courier.id }, order: { created_at: "DESC" } })
       : [];
   }
   async createWithdrawal(userId: string, body: Mutable) {
-    const courier = await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
+    const previewId = previewCourierId();
+    const courier = previewId
+      ? await this.couriers.findOne({ where: { id: previewId }, select: ["id"] })
+      : await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
     const courierId = courier?.id ?? (body.courier_id as string | undefined);
     if (!courierId) throw new ForbiddenException("Courier profile required");
     const withdrawal = this.withdrawals.create({
@@ -286,7 +298,10 @@ export class DomainService {
   }
 
   async createTicket(userId: string, body: Mutable) {
-    const customer = await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
+    const previewId = previewCustomerId();
+    const customer = previewId
+      ? await this.customers.findOne({ where: { id: previewId }, select: ["id"] })
+      : await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
     const businessId = customer?.id ?? (body.business_id as string | undefined);
     if (!businessId) throw new ForbiddenException("Business profile required");
     const ticket = this.tickets.create({ business_id: businessId });
@@ -430,7 +445,10 @@ export class DomainService {
   }
 
   private async requireBusinessId(userId: string) {
-    const customer = await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
+    const previewId = previewCustomerId();
+    const customer = previewId
+      ? await this.customers.findOne({ where: { id: previewId }, select: ["id"] })
+      : await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
     if (!customer) throw new ForbiddenException("Business profile required");
     return customer.id;
   }
@@ -541,7 +559,10 @@ export class DomainService {
   }
 
   private async requireCourierId(userId: string) {
-    const courier = await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
+    const previewId = previewCourierId();
+    const courier = previewId
+      ? await this.couriers.findOne({ where: { id: previewId }, select: ["id"] })
+      : await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
     if (!courier) throw new ForbiddenException("Courier profile required");
     return courier.id;
   }

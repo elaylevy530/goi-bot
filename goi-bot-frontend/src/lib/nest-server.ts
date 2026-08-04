@@ -44,9 +44,18 @@ export async function nestServerFetch<T = unknown>(
     const text = await res.text();
     let msg = text;
     try {
-      const parsed = JSON.parse(text) as { message?: string | string[]; error?: string };
+      const parsed = JSON.parse(text) as {
+        message?: string | string[];
+        error?: string | { code?: string; message?: string };
+      };
+      const envelope =
+        typeof parsed.error === "object" && parsed.error
+          ? parsed.error.message
+          : undefined;
       const m = parsed.message;
-      msg = Array.isArray(m) ? m.join(", ") : (m ?? parsed.error ?? text);
+      msg = Array.isArray(m)
+        ? m.join(", ")
+        : (m ?? envelope ?? (typeof parsed.error === "string" ? parsed.error : text));
     } catch {
       /* use raw text */
     }

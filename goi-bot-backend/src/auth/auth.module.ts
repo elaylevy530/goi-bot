@@ -1,4 +1,5 @@
 import { Global, Module } from "@nestjs/common";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
@@ -11,8 +12,10 @@ import { UserRole } from "../accounts/entities/user-role.entity";
 import { CronSecretGuard } from "../workers/guards/cron-secret.guard";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { AdminPreviewSession } from "./entities/admin-preview-session.entity";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
+import { AuthRequestInterceptor } from "./interceptors/auth-request.interceptor";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 
 @Global()
@@ -35,6 +38,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       Customer,
       Courier,
       CourierPasswordReset,
+      AdminPreviewSession,
     ]),
   ],
   controllers: [AuthController],
@@ -44,6 +48,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
     JwtAuthGuard,
     RolesGuard,
     CronSecretGuard,
+    { provide: APP_INTERCEPTOR, useClass: AuthRequestInterceptor },
   ],
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule, PassportModule],
 })

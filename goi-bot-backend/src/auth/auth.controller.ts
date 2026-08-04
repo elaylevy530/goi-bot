@@ -14,6 +14,7 @@ import { RegisterBusinessDto } from "./dto/register-business.dto";
 import { RegisterCourierDto } from "./dto/register-courier.dto";
 import { RegisterCustomerDto } from "./dto/register-customer.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { StartPreviewDto } from "./dto/start-preview.dto";
 import { UpdateCustomerProfileDto } from "./dto/update-customer-profile.dto";
 import { UpdatePasswordDto } from "./dto/update-password.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -55,7 +56,30 @@ export class AuthController {
   @Get("me")
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() auth: AuthUserContext) {
-    return this.authService.getMe(auth.userId, auth.email);
+    return this.authService.getMe(auth);
+  }
+
+  /** Enter read-only product panel preview for a courier / business / customer. */
+  @Post("admin/preview")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "manager")
+  startPreview(
+    @CurrentUser() auth: AuthUserContext,
+    @Body() dto: StartPreviewDto,
+  ) {
+    return this.authService.startPreview(
+      auth.realUserId,
+      auth.email ?? "",
+      dto.panel,
+      dto.entityId,
+    );
+  }
+
+  /** Exit preview and restore a normal admin/manager JWT. */
+  @Post("admin/preview/exit")
+  @UseGuards(JwtAuthGuard)
+  exitPreview(@CurrentUser() auth: AuthUserContext) {
+    return this.authService.exitPreview(auth);
   }
 
   @Get("me/customer")

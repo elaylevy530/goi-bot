@@ -10,6 +10,7 @@ import { randomBytes } from "crypto";
 import { In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
 import { Courier } from "../accounts/entities/courier.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import type { AppRole } from "../auth/auth.types";
 import { OfferPushService } from "../push/offer-push.service";
 import { WhatsappDispatchService } from "../whatsapp/whatsapp-dispatch.service";
@@ -205,10 +206,7 @@ export class JobsService {
     }
 
     if (roles.includes("business") || roles.includes("customer")) {
-      const customer = await this.customers.findOne({
-        where: { user_id: userId },
-        select: ["id"],
-      });
+      const customer = await this.findCustomerForUser(userId);
       if (!customer) return [];
       return this.jobs.find({
         where: status
@@ -220,10 +218,7 @@ export class JobsService {
     }
 
     if (roles.includes("courier")) {
-      const courier = await this.couriers.findOne({
-        where: { user_id: userId },
-        select: ["id"],
-      });
+      const courier = await this.findCourierForUser(userId);
       if (!courier) return [];
       const assigned = await this.jobs.find({
         where: { selected_courier_id: courier.id },
@@ -262,10 +257,7 @@ export class JobsService {
 
     let customerId = dto.customer_id ?? null;
     if (!customerId && (roles.includes("business") || roles.includes("customer"))) {
-      const customer = await this.customers.findOne({
-        where: { user_id: userId },
-        select: ["id", "name"],
-      });
+      const customer = await this.findCustomerForUser(userId);
       customerId = customer?.id ?? null;
       if (!dto.customer_name && customer?.name) {
         dto.customer_name = customer.name;
@@ -341,10 +333,7 @@ export class JobsService {
       !roles.includes("manager") &&
       job.created_by !== userId
     ) {
-      const customer = await this.customers.findOne({
-        where: { user_id: userId },
-        select: ["id"],
-      });
+      const customer = await this.findCustomerForUser(userId);
       if (!customer || job.customer_id !== customer.id) {
         throw new ForbiddenException("Cannot update this job");
       }
@@ -424,10 +413,7 @@ export class JobsService {
     const job = await this.jobs.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException("Job not found");
 
-    const courier = await this.couriers.findOne({
-      where: { user_id: userId },
-      select: ["id"],
-    });
+    const courier = await this.findCourierForUser(userId);
     if (!courier && !roles.includes("admin")) {
       throw new ForbiddenException("Courier profile required");
     }
@@ -510,8 +496,37 @@ export class JobsService {
     return { job, quote };
   }
 
+  private async findCourierForUser(
+    userId: string,
+  ): Promise<Pick<Courier, "id"> | null> {
+    const previewId = previewCourierId();
+    if (previewId) {
+      return this.couriers.findOne({ where: { id: previewId }, select: ["id"] });
+    }
+    return this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
+  }
+
+  private async findCustomerForUser(
+    userId: string,
+  ): Promise<Pick<Customer, "id" | "name"> | null> {
+    const previewId = previewCustomerId();
+    if (previewId) {
+      return this.customers.findOne({
+        where: { id: previewId },
+        select: ["id", "name"],
+      });
+    }
+    return this.customers.findOne({
+      where: { user_id: userId },
+      select: ["id", "name"],
+    });
+  }
+
   private async requireCourier(userId: string): Promise<Courier> {
-    const courier = await this.couriers.findOne({ where: { user_id: userId } });
+    const previewId = previewCourierId();
+    const courier = previewId
+      ? await this.couriers.findOne({ where: { id: previewId } })
+      : await this.couriers.findOne({ where: { user_id: userId } });
     if (!courier) throw new ForbiddenException("Courier profile required");
     return courier;
   }
@@ -768,18 +783,12 @@ export class JobsService {
     if (roles.includes("admin") || roles.includes("manager")) return;
 
     if (roles.includes("business") || roles.includes("customer")) {
-      const customer = await this.customers.findOne({
-        where: { user_id: userId },
-        select: ["id"],
-      });
+      const customer = await this.findCustomerForUser(userId);
       if (customer && job.customer_id === customer.id) return;
     }
 
     if (roles.includes("courier")) {
-      const courier = await this.couriers.findOne({
-        where: { user_id: userId },
-        select: ["id"],
-      });
+      const courier = await this.findCourierForUser(userId);
       if (
         courier &&
         (job.selected_courier_id === courier.id ||

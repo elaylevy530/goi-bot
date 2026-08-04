@@ -14,6 +14,7 @@ import { IntegrationRequestLog } from "../accounts/entities/integration-request-
 import { User } from "../accounts/entities/user.entity";
 import { UserRole } from "../accounts/entities/user-role.entity";
 import { WithdrawalRequest } from "../accounts/entities/withdrawal-request.entity";
+import { AdminPreviewSession } from "../auth/entities/admin-preview-session.entity";
 import { Message } from "../chat/entities/message.entity";
 import { ExpressPricingRule } from "../jobs/entities/express-pricing-rule.entity";
 import { Job } from "../jobs/entities/job.entity";
@@ -50,6 +51,7 @@ import { WhatsappMessage } from "../whatsapp/entities/whatsapp-message.entity";
 export const TYPEORM_ENTITIES = [
   User,
   UserRole,
+  AdminPreviewSession,
   Customer,
   BusinessNotification,
   BusinessFavoriteCourier,

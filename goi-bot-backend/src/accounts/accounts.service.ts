@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
+import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import { normalizePhone } from "../auth/phone.util";
 import { Job } from "../jobs/entities/job.entity";
 import { BusinessNotification } from "./entities/business-notification.entity";
@@ -66,7 +67,10 @@ export class AccountsService {
   // ---- Courier self-service ----
 
   async getMyCourier(userId: string): Promise<Courier> {
-    const courier = await this.couriers.findOne({ where: { user_id: userId } });
+    const previewId = previewCourierId();
+    const courier = previewId
+      ? await this.couriers.findOne({ where: { id: previewId } })
+      : await this.couriers.findOne({ where: { user_id: userId } });
     if (!courier) {
       throw new NotFoundException("Courier profile not found");
     }
@@ -83,7 +87,10 @@ export class AccountsService {
   }
 
   async getMyCustomer(userId: string): Promise<Customer> {
-    const customer = await this.customers.findOne({ where: { user_id: userId } });
+    const previewId = previewCustomerId();
+    const customer = previewId
+      ? await this.customers.findOne({ where: { id: previewId } })
+      : await this.customers.findOne({ where: { user_id: userId } });
     if (!customer) {
       throw new NotFoundException("Customer profile not found");
     }

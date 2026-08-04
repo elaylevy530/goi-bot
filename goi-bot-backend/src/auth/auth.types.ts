@@ -1,9 +1,22 @@
 /** Roles used by Nest guards. `customer` is resolved via customers.user_id. */
 export type AppRole = "admin" | "manager" | "courier" | "business" | "customer";
 
+export type PreviewPanel = "courier" | "business" | "customer";
+
+/** Embedded in short-lived admin preview JWTs. */
+export type JwtPreviewClaim = {
+  panel: PreviewPanel;
+  courierId?: string;
+  customerId?: string;
+  /** Audit row id for this preview session. */
+  sessionId?: string;
+  readOnly: true;
+};
+
 export type JwtPayload = {
   sub: string;
   email: string;
+  preview?: JwtPreviewClaim;
 };
 
 export type AuthProfile = {
@@ -24,13 +37,27 @@ export type NestAuthSession = {
   email: string;
   roles: AppRole[];
   profile: AuthProfile;
+  preview?: {
+    panel: PreviewPanel;
+    courierId?: string;
+    customerId?: string;
+    readOnly: true;
+    sessionId?: string;
+    expiresAt?: string;
+  };
 };
 
 export type AuthUserContext = {
   userId: string;
+  /** Always the authenticated admin/user from JWT `sub` (never swapped). */
+  realUserId: string;
   email: string | null;
   accessToken: string;
+  /** Effective roles for the request (panel roles while previewing). */
   roles: AppRole[];
+  /** Roles loaded for JWT `sub` (admin/manager during preview). */
+  realRoles: AppRole[];
+  preview?: JwtPreviewClaim;
 };
 
 declare module "express" {

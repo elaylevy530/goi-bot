@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -15,16 +16,30 @@ import { CourierPasswordReset } from "../accounts/entities/courier-password-rese
 import { Customer } from "../accounts/entities/customer.entity";
 import { User } from "../accounts/entities/user.entity";
 import { UserRole } from "../accounts/entities/user-role.entity";
-import type { AppRole, AuthProfile, JwtPayload, NestAuthSession } from "./auth.types";
+import { previewCourierId, previewCustomerId } from "./auth-als";
+import type {
+  AppRole,
+  AuthProfile,
+  AuthUserContext,
+  JwtPayload,
+  JwtPreviewClaim,
+  NestAuthSession,
+  PreviewPanel,
+} from "./auth.types";
 import type { RegisterBusinessDto } from "./dto/register-business.dto";
 import type { RegisterCourierDto } from "./dto/register-courier.dto";
 import type { RegisterCustomerDto } from "./dto/register-customer.dto";
+import { AdminPreviewSession } from "./entities/admin-preview-session.entity";
 import {
   businessPhoneToEmail,
   courierPhoneToEmail,
   customerPhoneToEmail,
   normalizePhone,
 } from "./phone.util";
+
+/** Short-lived preview JWT lifetime. */
+const PREVIEW_EXPIRES_IN = "30m";
+const PREVIEW_TTL_MS = 30 * 60 * 1000;
 
 function hashResetCode(code: string, phone: string) {
   return createHash("sha256").update(`${phone}:${code}`).digest("hex");
@@ -48,6 +63,8 @@ export class AuthService {
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
     @InjectRepository(CourierPasswordReset)
     private readonly passwordResets: Repository<CourierPasswordReset>,
+    @InjectRepository(AdminPreviewSession)
+    private readonly previewSessions: Repository<AdminPreviewSession>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -163,33 +180,247 @@ export class AuthService {
     return this.issueSession(user);
   }
 
-  async getMe(userId: string, email: string | null) {
-    const roles = await this.loadRoles(userId);
-    const profile = await this.loadProfile(userId, roles);
+  async getMe(auth: AuthUserContext) {
+    if (auth.preview) {
+      const profile = await this.loadPreviewProfile(auth.preview);
+      return {
+        userId: auth.realUserId,
+        email: auth.email,
+        roles: auth.roles,
+        profile,
+        preview: {
+          panel: auth.preview.panel,
+          courierId: auth.preview.courierId,
+          customerId: auth.preview.customerId,
+          readOnly: true as const,
+          sessionId: auth.preview.sessionId,
+        },
+      };
+    }
+
+    const roles = await this.loadRoles(auth.userId);
+    const profile = await this.loadProfile(auth.userId, roles);
     return {
-      userId,
-      email,
+      userId: auth.userId,
+      email: auth.email,
       roles,
       profile,
     };
   }
 
   async getMyCustomer(userId: string): Promise<Customer | null> {
+    const id = previewCustomerId();
+    if (id) return this.customers.findOne({ where: { id } });
     return this.customers.findOne({ where: { user_id: userId } });
   }
 
   async getMyCourier(userId: string): Promise<Courier | null> {
+    const id = previewCourierId();
+    if (id) return this.couriers.findOne({ where: { id } });
     return this.couriers.findOne({ where: { user_id: userId } });
   }
 
   async updateMyCustomerName(userId: string, fullName: string) {
-    const customer = await this.customers.findOne({ where: { user_id: userId } });
+    const customer = await this.getMyCustomer(userId);
     if (!customer) {
       throw new BadRequestException("Customer profile not found");
     }
     customer.name = fullName.trim();
     await this.customers.save(customer);
     return { ok: true as const, name: customer.name };
+  }
+
+  /**
+   * Validate a preview claim against the live entity (used by JwtStrategy).
+   * Returns the subject user_id when the entity is linked to a login.
+   */
+  async resolvePreviewTarget(preview: JwtPreviewClaim): Promise<{
+    subjectUserId: string | null;
+    courierId?: string;
+    customerId?: string;
+  }> {
+    if (preview.panel === "courier") {
+      if (!preview.courierId) {
+        throw new UnauthorizedException("Invalid preview claim");
+      }
+      const courier = await this.couriers.findOne({
+        where: { id: preview.courierId },
+        select: ["id", "user_id"],
+      });
+      if (!courier) {
+        throw new UnauthorizedException("Preview courier not found");
+      }
+      return {
+        subjectUserId: courier.user_id,
+        courierId: courier.id,
+      };
+    }
+
+    if (!preview.customerId) {
+      throw new UnauthorizedException("Invalid preview claim");
+    }
+    const customer = await this.customers.findOne({
+      where: { id: preview.customerId },
+      select: ["id", "user_id", "customer_type"],
+    });
+    if (!customer) {
+      throw new UnauthorizedException("Preview customer not found");
+    }
+    return {
+      subjectUserId: customer.user_id,
+      customerId: customer.id,
+    };
+  }
+
+  /** Admin/manager: enter read-only product panel preview for an entity. */
+  async startPreview(
+    adminUserId: string,
+    adminEmail: string,
+    panel: PreviewPanel,
+    entityId: string,
+  ): Promise<NestAuthSession> {
+    const roles = await this.loadRoles(adminUserId);
+    if (!roles.includes("admin") && !roles.includes("manager")) {
+      throw new ForbiddenException("Only admin or manager can start preview");
+    }
+
+    let courierId: string | null = null;
+    let customerId: string | null = null;
+    let profile: AuthProfile = {};
+    let panelRole: AppRole;
+
+    if (panel === "courier") {
+      const courier = await this.couriers.findOne({ where: { id: entityId } });
+      if (!courier) throw new NotFoundException("Courier not found");
+      courierId = courier.id;
+      panelRole = "courier";
+      profile = {
+        courierId: courier.id,
+        name: courier.full_name,
+        phone: courier.whatsapp_phone,
+        courierStatus: courier.courier_status,
+      };
+    } else {
+      const customer = await this.customers.findOne({ where: { id: entityId } });
+      if (!customer) throw new NotFoundException("Customer not found");
+      customerId = customer.id;
+      panelRole = panel === "business" ? "business" : "customer";
+      profile = {
+        customerId: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        businessName: customer.business_name,
+        businessNiche: customer.business_niche,
+        customerType: customer.customer_type,
+        logoUrl: customer.logo_url,
+      };
+    }
+
+    const expiresAt = new Date(Date.now() + PREVIEW_TTL_MS);
+    const session = await this.previewSessions.save(
+      this.previewSessions.create({
+        admin_user_id: adminUserId,
+        panel,
+        courier_id: courierId,
+        customer_id: customerId,
+        expires_at: expiresAt,
+        ended_at: null,
+      }),
+    );
+
+    const previewClaim: JwtPreviewClaim = {
+      panel,
+      readOnly: true,
+      sessionId: session.id,
+      ...(courierId ? { courierId } : {}),
+      ...(customerId ? { customerId } : {}),
+    };
+
+    const payload: JwtPayload = {
+      sub: adminUserId,
+      email: adminEmail,
+      preview: previewClaim,
+    };
+
+    return {
+      accessToken: this.jwtService.sign(payload, { expiresIn: PREVIEW_EXPIRES_IN }),
+      userId: adminUserId,
+      email: adminEmail,
+      roles: [panelRole],
+      profile,
+      preview: {
+        panel,
+        courierId: courierId ?? undefined,
+        customerId: customerId ?? undefined,
+        readOnly: true,
+        sessionId: session.id,
+        expiresAt: expiresAt.toISOString(),
+      },
+    };
+  }
+
+  /** End preview and restore a normal admin/manager session JWT. */
+  async exitPreview(auth: AuthUserContext): Promise<NestAuthSession> {
+    if (!auth.preview) {
+      throw new BadRequestException("Not in preview mode");
+    }
+    if (!auth.realRoles.includes("admin") && !auth.realRoles.includes("manager")) {
+      throw new ForbiddenException("Only admin or manager can exit preview");
+    }
+
+    if (auth.preview.sessionId) {
+      await this.previewSessions.update(
+        { id: auth.preview.sessionId, ended_at: IsNull() },
+        { ended_at: new Date() },
+      );
+    }
+
+    const user = await this.users.findOne({ where: { id: auth.realUserId } });
+    if (!user) throw new UnauthorizedException("Admin user not found");
+    return this.issueSession(user);
+  }
+
+  private async loadPreviewProfile(preview: JwtPreviewClaim): Promise<AuthProfile> {
+    if (preview.panel === "courier" && preview.courierId) {
+      const courier = await this.couriers.findOne({
+        where: { id: preview.courierId },
+        select: ["id", "full_name", "whatsapp_phone", "courier_status"],
+      });
+      if (!courier) return {};
+      return {
+        courierId: courier.id,
+        name: courier.full_name,
+        phone: courier.whatsapp_phone,
+        courierStatus: courier.courier_status,
+      };
+    }
+
+    if (preview.customerId) {
+      const customer = await this.customers.findOne({
+        where: { id: preview.customerId },
+        select: [
+          "id",
+          "name",
+          "phone",
+          "business_name",
+          "business_niche",
+          "customer_type",
+          "logo_url",
+        ],
+      });
+      if (!customer) return {};
+      return {
+        customerId: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        businessName: customer.business_name,
+        businessNiche: customer.business_niche,
+        customerType: customer.customer_type,
+        logoUrl: customer.logo_url,
+      };
+    }
+
+    return {};
   }
 
   async changePassword(

@@ -22,6 +22,7 @@ import {
 import { nestListJobs } from "@/lib/nest-jobs";
 import { reclassifyCourier, approveCourier, getIdPhotoSignedUrl, deleteCourier } from "@/lib/courier-intake.functions";
 import { ProvisionAccountButton } from "@/components/ProvisionAccountButton";
+import { ViewPanelButton } from "@/components/ViewPanelButton";
 import {
   ArrowRight, MessageCircle, Save, Pencil, Wand2, X, Plus, Loader2, ShieldCheck, IdCard, Trash2, Copy, Pause, Play,
 } from "lucide-react";
@@ -501,6 +502,7 @@ function CourierProfile() {
       actions={
         <>
           <Button asChild variant="outline"><Link to="/couriers-admin"><ArrowRight className="size-4" /> חזרה</Link></Button>
+          <ViewPanelButton panel="courier" entityId={id} label="צפה בפאנל" />
           <EditCourierDialog courier={c} />
           {c.courier_status === "ממתין לאישור" && <ApproveButton id={id} />}
           <PauseCourierButton id={id} isPaused={!!(c as any).is_paused} status={c.courier_status} />

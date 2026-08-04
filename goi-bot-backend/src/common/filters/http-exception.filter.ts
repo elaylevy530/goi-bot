@@ -28,13 +28,24 @@ export class AppHttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();
+      const bodyObj =
+        typeof body === "object" && body !== null
+          ? (body as { code?: string; message?: string | string[] })
+          : null;
       const message =
         typeof body === "string"
           ? body
-          : ((body as { message?: string | string[] }).message ?? exception.message);
+          : (bodyObj?.message ?? exception.message);
+      const code =
+        bodyObj?.code ??
+        (status === 401
+          ? "unauthorized"
+          : status === 403
+            ? "forbidden"
+            : "bad_request");
       response.status(status).json({
         error: {
-          code: status === 401 ? "unauthorized" : status === 403 ? "forbidden" : "bad_request",
+          code,
           message: Array.isArray(message) ? message.join(", ") : message,
         },
       });

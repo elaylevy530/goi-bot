@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { fetchNestSession } from "@/lib/nest-auth";
+import { fetchNestSession, isPreviewSession } from "@/lib/nest-auth";
 
 export const Route = createFileRoute("/courier")({
   ssr: false,
@@ -7,7 +7,14 @@ export const Route = createFileRoute("/courier")({
     const session = await fetchNestSession();
     if (!session) throw redirect({ to: "/courier-login" });
 
-    if (!session.roles.includes("courier") || !session.profile?.courierId) {
+    const previewCourier = isPreviewSession(session, "courier");
+    const courierId =
+      session.profile?.courierId ?? session.preview?.courierId ?? null;
+
+    if (
+      (!session.roles.includes("courier") || !courierId) &&
+      !previewCourier
+    ) {
       throw redirect({ to: "/join" });
     }
 
@@ -18,7 +25,8 @@ export const Route = createFileRoute("/courier")({
 
     return {
       user: session,
-      courierId: session.profile.courierId,
+      courierId: courierId!,
+      preview: session.preview ?? null,
     };
   },
   component: () => <Outlet />,
