@@ -7,6 +7,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { PaymentBanner } from "@/components/PaymentGate";
 import { BusinessLogo } from "@/components/BusinessLogo";
+import { cn } from "@/lib/utils";
 import {
   nestListMyNotifications,
   nestMarkAllNotificationsRead,
@@ -62,42 +63,42 @@ function NotificationsBell({ businessId }: { businessId?: string }) {
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="relative size-10 grid place-items-center rounded-full bg-white/70 backdrop-blur border border-black/5 text-[#101418] hover:bg-white transition"
+          className="relative size-10 grid place-items-center rounded-pill bg-muted text-text-strong hover:bg-surface border border-border transition"
           aria-label="התראות"
         >
           <Bell className="size-[18px]" strokeWidth={2} />
           {unread > 0 && (
-            <span className="absolute -top-0.5 -left-0.5 min-w-4 h-4 px-1 grid place-items-center rounded-full bg-[#35AD29] text-[#101418] text-[10px] font-black">
+            <span className="absolute -top-0.5 -left-0.5 min-w-4 h-4 px-1 grid place-items-center rounded-pill bg-primary text-primary-foreground text-[10px] font-black">
               {unread > 9 ? "9+" : unread}
             </span>
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent dir="rtl" align="end" className="w-80 p-0 rounded-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <div className="font-bold text-sm">התראות</div>
+      <PopoverContent dir="rtl" align="end" className="w-80 p-0 rounded-card overflow-hidden shadow-card">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="font-bold text-sm text-text-strong">התראות</div>
           {unread > 0 && (
-            <button onClick={() => markAll.mutate()} className="text-xs text-[#101418] font-bold underline">
+            <button onClick={() => markAll.mutate()} className="text-xs text-text-strong font-bold underline">
               סמן הכל
             </button>
           )}
         </div>
         <div className="max-h-96 overflow-y-auto">
           {items.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">אין התראות חדשות</div>
+            <div className="p-8 text-center text-xs text-text-muted">אין התראות חדשות</div>
           ) : (items as NestBusinessNotification[]).map((n) => (
             <Link
               key={n.id}
               to={(n.link as never) || "/business/dashboard"}
-              className={`block px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${!n.read_at ? "bg-[#ECFDF5]" : ""}`}
+              className={`block px-4 py-3 border-b border-border/60 hover:bg-muted ${!n.read_at ? "bg-success-bg" : ""}`}
             >
-              <div className="text-xs font-bold text-[#101418]">{n.title}</div>
-              {n.body && <div className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.body}</div>}
-              <div className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString("he-IL")}</div>
+              <div className="text-xs font-bold text-text-strong">{n.title}</div>
+              {n.body && <div className="text-xs text-text-muted line-clamp-2 mt-0.5">{n.body}</div>}
+              <div className="text-[10px] text-text-muted mt-1">{new Date(n.created_at).toLocaleString("he-IL")}</div>
             </Link>
           ))}
         </div>
-        <Link to="/business/notifications" className="block text-center text-xs font-bold text-[#101418] py-3 border-t border-slate-100 hover:bg-slate-50">
+        <Link to="/business/notifications" className="block text-center text-xs font-bold text-text-strong py-3 border-t border-border hover:bg-muted">
           כל ההתראות
         </Link>
       </PopoverContent>
@@ -157,15 +158,17 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
   const hideHeader = HIDE_HEADER_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
   return (
-    <div dir="rtl" className="rtl-panel min-h-screen bg-[#f5f6f8] text-[#101418] pb-24">
+    <div dir="rtl" className="rtl-panel min-h-screen bg-bg text-text-strong pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       {!hideHeader && (
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-black/5">
+        <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-border pt-[env(safe-area-inset-top)]">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-            <Link to="/business/dashboard" className="flex items-center gap-2 shrink-0 min-w-0" aria-label="בית">
-              <BusinessLogo path={logoPath} name={displayName} size={32} />
+            <Link to="/business/dashboard" className="flex items-center gap-2.5 shrink-0 min-w-0" aria-label="בית">
+              <BusinessLogo path={logoPath} name={displayName} size={34} />
               <div className="min-w-0">
-                <div className="text-[10px] text-slate-500 font-semibold leading-none">Goi · עסקים</div>
-                <div className="text-[13px] font-black truncate leading-tight mt-0.5 max-w-[180px]">{displayName}</div>
+                <div className="text-[10px] text-text-muted font-semibold leading-none tracking-wide">Goi · עסקים</div>
+                <div className="text-[13px] font-black truncate leading-tight mt-0.5 max-w-[180px] text-text-strong">
+                  {displayName}
+                </div>
               </div>
             </Link>
             <div className="flex items-center gap-2">
@@ -175,7 +178,7 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
                   type="button"
                   onClick={goBack}
                   aria-label="חזרה"
-                  className="size-10 grid place-items-center rounded-full bg-white/70 backdrop-blur border border-black/5 text-[#101418] hover:bg-white transition"
+                  className="size-10 grid place-items-center rounded-pill bg-muted text-text-strong hover:bg-surface border border-border transition"
                 >
                   <ArrowRight className="size-5" />
                 </button>
@@ -184,8 +187,8 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
           </div>
           {(title || subtitle) && (
             <div className="max-w-3xl mx-auto px-4 pb-3 pt-1 text-right">
-              {title && <h1 className="text-xl font-black text-[#101418] truncate">{title}</h1>}
-              {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+              {title && <h1 className="text-xl font-black text-text-strong truncate">{title}</h1>}
+              {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
             </div>
           )}
           {headerExtra && <div className="max-w-3xl mx-auto px-4 pb-3">{headerExtra}</div>}
@@ -194,32 +197,48 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
 
       <PaymentBanner />
 
-      <main>{children}</main>
+      <main className="relative">{children}</main>
 
-      {/* Bottom bar — 5 tabs, center is bold */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-black/5 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)] pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-5 h-[72px] max-w-md mx-auto">
+      {/* Bottom bar — 5 tabs; center FAB is primary create action */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-30 bg-surface/95 backdrop-blur border-t border-border shadow-bottom-bar pb-[env(safe-area-inset-bottom)]"
+        aria-label="ניווט עסקי"
+      >
+        <div className="grid grid-cols-5 h-[72px] max-w-md mx-auto px-1">
           {NAV.map((item) => {
             const { to, label, icon: Icon } = item;
             const highlight = "highlight" in item && item.highlight;
             const active =
               pathname === to ||
               (to === "/business/dashboard" && (pathname === "/business" || pathname === "/business/")) ||
-              pathname.startsWith(to + "/");
+              (to !== "/business/dashboard" && pathname.startsWith(to + "/")) ||
+              pathname === to;
             if (highlight) {
               return (
                 <button
                   key={to}
+                  type="button"
                   onClick={() => navigate({ to })}
                   className="flex flex-col items-center justify-end pb-1.5 relative"
                   aria-label={label}
+                  aria-current={active ? "page" : undefined}
                 >
-                  <div className={`absolute -top-4 size-12 rounded-full grid place-items-center shadow-lg ring-4 ring-white transition ${
-                    active ? "bg-[#2d9623] text-white" : "bg-[#35AD29] text-white"
-                  }`}>
+                  <div
+                    className={cn(
+                      "absolute -top-5 size-[52px] rounded-pill grid place-items-center shadow-fab ring-[5px] ring-bg transition active:scale-95",
+                      active
+                        ? "bg-primary text-primary-foreground scale-105"
+                        : "bg-primary text-primary-foreground",
+                    )}
+                  >
                     <Icon className="size-5" strokeWidth={2.6} />
                   </div>
-                  <span className={`text-[11px] mt-10 ${active ? "font-black text-[#35AD29]" : "font-bold text-[#101418]/70"}`}>
+                  <span
+                    className={cn(
+                      "text-[11px] mt-11 transition",
+                      active ? "font-black text-primary" : "font-bold text-text-muted",
+                    )}
+                  >
                     {label}
                   </span>
                 </button>
@@ -229,17 +248,21 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
               <Link
                 key={to}
                 to={to}
-                className={`flex flex-col items-center justify-center gap-1 transition ${
-                  active ? "text-[#35AD29]" : "text-[#101418]/50"
-                }`}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 transition",
+                  active ? "text-primary" : "text-text-muted",
+                )}
               >
-                <div className={`relative ${active ? "scale-110" : ""} transition-transform`}>
+                <div className={cn("relative transition-transform", active && "scale-110")}>
                   <Icon className="size-[22px]" strokeWidth={active ? 2.3 : 1.8} />
                   {active && (
-                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-1 rounded-full bg-[#35AD29]" />
+                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-1 rounded-pill bg-primary" />
                   )}
                 </div>
-                <span className={`text-[11px] ${active ? "font-black" : "font-semibold"}`}>{label}</span>
+                <span className={cn("text-[11px]", active ? "font-black" : "font-semibold")}>
+                  {label}
+                </span>
               </Link>
             );
           })}

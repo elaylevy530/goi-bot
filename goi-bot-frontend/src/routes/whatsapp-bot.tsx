@@ -45,6 +45,7 @@ import svcGift from "@/assets/svc-gift.jpg";
 import svcStore from "@/assets/svc-store.jpg";
 import svcSmallMove from "@/assets/svc-small-move.jpg";
 import svcHomeMove from "@/assets/svc-home-move.jpg";
+import { partnersUrl } from "@/lib/partners-redirect";
 
 const SITE_URL = "https://goi-bot.lovable.app";
 
@@ -142,7 +143,7 @@ function Nav({ onStart }: { onStart: () => void }) {
     ["איך זה עובד", "#how"],
     ["שירותים", "#services"],
     ["שאלות", "#faq"],
-    ["לשליחים ומובילים", "/couriers", true],
+    ["לשליחים ומובילים", partnersUrl("/"), true],
     ["לעסקים", "/for-business", true],
     ["בלוג", "/blog"],
   ];
@@ -180,9 +181,9 @@ function Nav({ onStart }: { onStart: () => void }) {
             <a href="#how" className="hover:text-black transition">איך זה עובד</a>
             <a href="#services" className="hover:text-black transition">שירותים</a>
             <a href="#faq" className="hover:text-black transition">שאלות</a>
-            <Link to="/couriers" className="hover:text-black transition font-semibold" style={{ color: INK }}>
+            <a href={partnersUrl("/")} className="hover:text-black transition font-semibold" style={{ color: INK }}>
               לשליחים ומובילים
-            </Link>
+            </a>
             <Link to="/for-business" className="hover:text-black transition font-semibold" style={{ color: INK }}>
               לעסקים
             </Link>
@@ -2886,14 +2887,14 @@ function Footer() {
               </div>
             </div>
           </div>
-          <Link
-            to="/join"
+          <a
+            href={partnersUrl("/join")}
             className="group inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full font-bold text-[13.5px] shadow-[0_12px_28px_-12px_rgba(18,140,126,0.6)] hover:scale-[1.03] active:scale-[0.98] transition shrink-0 w-full sm:w-auto"
             style={{ background: WA_GREEN, color: "white" }}
           >
             <WhatsAppIcon className="w-4 h-4" />
             הצטרף אלינו
-          </Link>
+          </a>
 
         </div>
       </div>
@@ -2961,7 +2962,7 @@ function Footer() {
             title="שותפים"
             links={[
               ["אזור לקוחות פרטיים", "/customer-login"],
-              ["שליח או מוביל?", "/couriers"],
+              ["שליח או מוביל?", partnersUrl("/")],
               ["התחברות שליח", "/courier-login"],
               ["כניסת עסקים", "/business-login"],
               ["ניהול", "/admin-login"],

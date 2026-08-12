@@ -9,7 +9,7 @@ import { nestGetJob } from "@/lib/nest-jobs";
 
 export type NestConversation = {
   id: string;
-  kind: "courier_support" | "business_support" | "courier_business";
+  kind: "courier_support" | "business_support" | "courier_business" | "guest_support";
   courier_id: string | null;
   business_id: string | null;
   job_id: string | null;
@@ -19,6 +19,7 @@ export type NestConversation = {
   unread_courier: number;
   unread_business: number;
   unread_admin: number;
+  unread_guest?: number;
   created_at?: string;
   updated_at?: string;
 };
@@ -27,7 +28,7 @@ export type NestChatMessage = {
   id: string;
   conversation_id: string;
   sender_user_id: string;
-  sender_role: "courier" | "business" | "admin";
+  sender_role: "courier" | "business" | "admin" | "guest";
   body: string | null;
   attachment_url: string | null;
   attachment_mime: string | null;
@@ -41,7 +42,14 @@ export type NestChatMessage = {
 export type EnrichedConversation = NestConversation & {
   courier?: { full_name: string | null } | null;
   business?: { name: string | null } | null;
-  job?: { id: string; pickup_address?: string | null; dropoff_address?: string | null } | null;
+  job?: {
+    id: string;
+    job_number?: string | null;
+    pickup_address?: string | null;
+    dropoff_address?: string | null;
+    guest_name?: string | null;
+    guest_phone?: string | null;
+  } | null;
 };
 
 function token() {
@@ -126,8 +134,11 @@ export async function nestListConversationsEnriched(): Promise<EnrichedConversat
     job: c.job_id
       ? {
           id: c.job_id,
+          job_number: (jobById.get(c.job_id)?.job_number as string | null | undefined) ?? null,
           pickup_address: (jobById.get(c.job_id)?.pickup_address as string | null | undefined) ?? null,
           dropoff_address: (jobById.get(c.job_id)?.dropoff_address as string | null | undefined) ?? null,
+          guest_name: (jobById.get(c.job_id)?.guest_name as string | null | undefined) ?? null,
+          guest_phone: (jobById.get(c.job_id)?.guest_phone as string | null | undefined) ?? null,
         }
       : null,
   }));

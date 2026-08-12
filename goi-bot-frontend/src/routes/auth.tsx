@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Truck, Building2, User, ShieldCheck, Loader2, UserPlus, KeyRound } from "lucide-react";
+import { Truck, Building2, ShieldCheck, Loader2, UserPlus, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { AuthShell, AuthField, AuthInput } from "@/components/AuthShell";
 import {
@@ -11,10 +11,9 @@ import {
   fetchNestSession,
   nestHomePath,
   nestLoginWithPhone,
-  nestRegisterCustomer,
 } from "@/lib/nest-auth";
 
-type Role = "courier" | "business" | "customer";
+type Role = "courier" | "business";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "התחברות — Goi" }] }),
@@ -26,7 +25,9 @@ export const Route = createFileRoute("/auth")({
     if (roles.includes("admin") || roles.includes("manager")) {
       throw redirect({ to: "/dashboard" });
     }
-    if (roles.includes("courier")) throw redirect({ to: "/courier/new-jobs" });
+    if (roles.includes("courier")) {
+      throw redirect({ to: "/courier/new-jobs" });
+    }
     if (roles.includes("business")) {
       const niche = session.profile?.businessNiche ?? "manual_dispatch";
       if (niche === "restaurant") throw redirect({ to: "/restaurant" });
@@ -41,9 +42,8 @@ export const Route = createFileRoute("/auth")({
 });
 
 const ROLES: { key: Role; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: "courier", label: "שליח / מוביל", icon: Truck },
+  { key: "courier", label: "שליח", icon: Truck },
   { key: "business", label: "לקוח עסקי", icon: Building2 },
-  { key: "customer", label: "לקוח פרטי", icon: User },
 ];
 
 function authErrorMessage(err: unknown, fallback: string): string {
@@ -54,9 +54,8 @@ function authErrorMessage(err: unknown, fallback: string): string {
 
 function AuthPage() {
   const [role, setRole] = useState<Role>("courier");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
 
-  const roleIcon = { courier: <Truck className="size-8" />, business: <Building2 className="size-8" />, customer: <User className="size-8" /> }[role];
+  const roleIcon = { courier: <Truck className="size-8" />, business: <Building2 className="size-8" /> }[role];
 
   return (
     <AuthShell
@@ -73,18 +72,15 @@ function AuthPage() {
         </Link>
       }
     >
-      {/* Role segmented picker */}
-      <div className="grid grid-cols-3 gap-1.5 mb-6 rounded-2xl bg-slate-100 p-1.5">
+      {/* Role segmented picker — courier + business only */}
+      <div className="grid grid-cols-2 gap-1.5 mb-6 rounded-2xl bg-slate-100 p-1.5">
         {ROLES.map(({ key, label, icon: Icon }) => {
           const active = role === key;
           return (
             <button
               key={key}
               type="button"
-              onClick={() => {
-                setRole(key);
-                setMode("signin");
-              }}
+              onClick={() => setRole(key)}
               className={
                 "flex flex-col items-center justify-center gap-1 py-2.5 px-1 rounded-xl transition text-[11px] sm:text-xs font-bold leading-tight text-center " +
                 (active
@@ -102,7 +98,6 @@ function AuthPage() {
 
       {role === "courier" && <CourierForm />}
       {role === "business" && <BusinessForm />}
-      {role === "customer" && <CustomerBlock mode={mode} setMode={setMode} />}
     </AuthShell>
   );
 }
@@ -119,9 +114,9 @@ function CourierForm() {
     if (!phone.trim() || !password) return;
     setLoading(true);
     try {
-      const session = await nestLoginWithPhone(phone, password, "courier");
+      await nestLoginWithPhone(phone, password, "courier");
       toast.success("ברוך הבא!");
-      navigate({ to: nestHomePath(session), replace: true });
+      navigate({ to: "/courier/new-jobs", replace: true });
     } catch (err) {
       toast.error(authErrorMessage(err, "טלפון או סיסמה שגויים"));
     } finally {
@@ -139,7 +134,10 @@ function CourierForm() {
         label="סיסמה"
         htmlFor="c-pwd"
         action={
-          <Link to="/courier-reset-password" className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1">
+          <Link
+            to="/courier-reset-password"
+            className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
+          >
             <KeyRound className="size-3" />
             שכחתי סיסמה
           </Link>
@@ -208,109 +206,3 @@ function BusinessForm() {
   );
 }
 
-/* ---------- Customer ---------- */
-function CustomerBlock({ mode, setMode }: { mode: "signin" | "signup"; setMode: (m: "signin" | "signup") => void }) {
-  return (
-    <div>
-      <div className="grid grid-cols-2 w-full rounded-2xl bg-slate-100 p-1 mb-5">
-        <button type="button" onClick={() => setMode("signin")}
-          className={"rounded-xl py-2 text-sm font-semibold transition " +
-            (mode === "signin" ? "bg-background text-primary shadow-sm" : "text-muted-foreground")}>
-          התחברות
-        </button>
-        <button type="button" onClick={() => setMode("signup")}
-          className={"rounded-xl py-2 text-sm font-semibold transition " +
-            (mode === "signup" ? "bg-background text-primary shadow-sm" : "text-muted-foreground")}>
-          חשבון חדש
-        </button>
-      </div>
-      {mode === "signin" ? <CustomerSignIn /> : <CustomerSignUp />}
-    </div>
-  );
-}
-
-function CustomerSignIn() {
-  const navigate = useNavigate();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const session = await nestLoginWithPhone(phone, password, "customer");
-      toast.success("ברוך הבא!");
-      navigate({ to: nestHomePath(session), replace: true });
-    } catch (err) {
-      toast.error(authErrorMessage(err, "טלפון או סיסמה שגויים"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-5">
-      <AuthField label="מספר טלפון" htmlFor="p-phone" prefix="+972">
-        <AuthInput id="p-phone" type="tel" inputMode="tel" dir="ltr" required
-          value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="50-000-0000" />
-      </AuthField>
-      <AuthField label="סיסמה" htmlFor="p-pwd">
-        <AuthInput id="p-pwd" type="password" required value={password}
-          onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-      </AuthField>
-      <Button type="submit" disabled={loading}
-        className="w-full h-14 rounded-2xl text-base font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition">
-        {loading && <Loader2 className="size-4 animate-spin" />} כניסה למערכת
-      </Button>
-    </form>
-  );
-}
-
-function CustomerSignUp() {
-  const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.length < 6) return toast.error("הסיסמה חייבת להכיל לפחות 6 תווים");
-    setLoading(true);
-    try {
-      const session = await nestRegisterCustomer({
-        full_name: name,
-        phone,
-        password,
-      });
-      toast.success("ברוך הבא ל-Goi!");
-      navigate({ to: nestHomePath(session), replace: true });
-    } catch (err) {
-      toast.error(authErrorMessage(err, "יצירת החשבון נכשלה"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-5">
-      <AuthField label="שם מלא" htmlFor="s-name">
-        <AuthInput id="s-name" required value={name}
-          onChange={(e) => setName(e.target.value)} placeholder="ישראל ישראלי" />
-      </AuthField>
-      <AuthField label="טלפון" htmlFor="s-phone" prefix="+972">
-        <AuthInput id="s-phone" type="tel" inputMode="tel" dir="ltr" required
-          value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="50-000-0000" />
-      </AuthField>
-      <AuthField label="סיסמה (לפחות 6 תווים)" htmlFor="s-pwd">
-        <AuthInput id="s-pwd" type="password" required minLength={6}
-          value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-      </AuthField>
-      <Button type="submit" disabled={loading}
-        className="w-full h-14 rounded-2xl text-base font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition">
-        {loading && <Loader2 className="size-4 animate-spin" />} פתיחת חשבון
-      </Button>
-    </form>
-  );
-}

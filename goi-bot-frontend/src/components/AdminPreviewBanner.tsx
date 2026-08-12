@@ -71,7 +71,7 @@ export function AdminPreviewBanner() {
   return (
     <div
       dir="rtl"
-      className="sticky top-0 z-[100] bg-amber-500 text-[#101418] shadow-md"
+      className="sticky top-0 z-[100] bg-warning text-warning-foreground shadow-md"
       role="status"
     >
       <div className="max-w-6xl mx-auto px-3 py-2 flex items-center justify-between gap-3 text-sm">
@@ -85,7 +85,7 @@ export function AdminPreviewBanner() {
           type="button"
           onClick={() => void exit()}
           disabled={exiting}
-          className="inline-flex items-center gap-1.5 shrink-0 rounded-md bg-[#101418] text-white px-3 py-1.5 text-xs font-bold hover:bg-black/90 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 shrink-0 rounded-md bg-text-strong text-primary-foreground px-3 py-1.5 text-xs font-bold hover:bg-navy/90 disabled:opacity-60"
         >
           {exiting ? (
             <Loader2 className="size-3.5 animate-spin" />

@@ -14,6 +14,7 @@ import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeJob } from "@/lib/geocode-job.functions";
+import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 
 export const Route = createFileRoute("/business/new-shift")({
   head: () => ({ meta: [{ title: "שליח למשמרת — Goi" }] }),
@@ -25,6 +26,7 @@ function NewShiftPage() {
   const navigate = useNavigate();
   const { data: me } = useMyBusiness();
   const geocode = useServerFn(geocodeJob);
+  const dispatch = useServerFn(dispatchJobToCouriers);
   const [f, setF] = useState({
     date: "",
     start_time: "",
@@ -59,6 +61,14 @@ function NewShiftPage() {
       };
       const data = await nestCreateJob(payload);
       geocode({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
+      try {
+        const res = await dispatch({ data: { jobId: data.id } });
+        if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
+        else toast.message("המשמרת נוצרה — אין שליחים תואמים כרגע");
+      } catch (e) {
+        console.error("dispatch", e);
+        toast.error("שיגור נכשל: " + (e as Error).message);
+      }
       return data;
     },
     onSuccess: (data) => {

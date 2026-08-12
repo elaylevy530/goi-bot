@@ -54,7 +54,10 @@ function CredentialsCard({ courier }: { courier: any }) {
   const pwd: string | null = courier.last_temp_password ?? null;
   const setAt: string | null = courier.password_set_at ?? null;
   const hasAccount = !!courier.user_id;
-  const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/courier-login` : "/courier-login";
+  const loginUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/courier-login`
+      : "/courier-login";
 
   const copy = async (text: string, label = "הועתק") => {
     await navigator.clipboard.writeText(text);

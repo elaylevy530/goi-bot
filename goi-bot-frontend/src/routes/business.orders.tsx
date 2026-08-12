@@ -12,6 +12,9 @@ import { Search, Eye, Package, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "./business.dashboard";
 import type { JobStatus } from "@/lib/constants";
+import { useServerFn } from "@tanstack/react-start";
+import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
+import { geocodeJob } from "@/lib/geocode-job.functions";
 
 export const Route = createFileRoute("/business/orders")({
   head: () => ({ meta: [{ title: "המשלוחים שלי — Goi" }] }),
@@ -33,6 +36,8 @@ function OrdersPage() {
   const { data: me } = useMyBusiness();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const dispatchFn = useServerFn(dispatchJobToCouriers);
+  const geocodeFn = useServerFn(geocodeJob);
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -52,10 +57,19 @@ function OrdersPage() {
         recipient_tracking_token,
         ...rest
       } = full as any;
-      return nestCreateJob({ ...rest, customer_id: me.id, status: "נשלחה לשליחים" });
+      const data = await nestCreateJob({ ...rest, customer_id: me.id, status: "נשלחה לשליחים" });
+      geocodeFn({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
+      if ((data as any).pricing_type !== "quote_request") {
+        try {
+          await dispatchFn({ data: { jobId: data.id } });
+        } catch (e) {
+          console.error("dispatch", e);
+        }
+      }
+      return data;
     },
     onSuccess: (data) => {
-      toast.success("משלוח חדש נוצר ✅");
+      toast.success("משלוח חדש נוצר ונשלח לשליחים ✅");
       qc.invalidateQueries({ queryKey: ["business-orders"] });
       navigate({ to: "/business/order/$id", params: { id: data.id } });
     },

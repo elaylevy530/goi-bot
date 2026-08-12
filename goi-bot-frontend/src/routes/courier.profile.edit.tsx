@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { nestSignedFileUrlResolved, nestUploadFile } from "@/lib/nest-files";
-import { Loader2, Save, Camera, User, Bike, FileText, ShieldAlert, ChevronRight } from "lucide-react";
+import { Loader2, Save, Camera, User, Bike, FileText, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/courier/profile/edit")({
@@ -37,56 +37,57 @@ function useAvatarUrl(courierId?: string, avatarPath?: string | null) {
   });
 }
 
+/**
+ * Payload must match Nest `UpdateCourierSelfDto` exactly
+ * (`forbidNonWhitelisted: true` on ValidationPipe).
+ * Fields without DB columns (bio, birth_date, address, emergency_*) are not shown.
+ */
 function EditProfilePage() {
   const { data: me } = useMyCourier();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Personal
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [idNumber, setIdNumber] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [address, setAddress] = useState("");
-  const [cityRes, setCityRes] = useState("");
-  const [bio, setBio] = useState("");
-  // Work
   const [baseCity, setBaseCity] = useState("");
   const [workingAreas, setWorkingAreas] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [jobTypes, setJobTypes] = useState("");
   const [experience, setExperience] = useState("");
   const [notes, setNotes] = useState("");
-  // Emergency
-  const [ecName, setEcName] = useState("");
-  const [ecPhone, setEcPhone] = useState("");
-  // Files
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [idFile, setIdFile] = useState<File | null>(null);
 
-  const avatarPath = (me as any)?.avatar_url as string | null | undefined;
+  const avatarPath = (me as { avatar_url?: string | null } | undefined)?.avatar_url;
   const { data: signedAvatarUrl } = useAvatarUrl(me?.id, avatarPath);
 
   useEffect(() => {
     if (!me) return;
-    setFullName(me.full_name ?? "");
-    setPhone(me.whatsapp_phone ?? "");
-    setEmail((me as any).email ?? "");
-    setIdNumber((me as any).id_number ?? "");
-    setBirthDate(((me as any).birth_date ?? "") as string);
-    setAddress((me as any).address ?? "");
-    setCityRes((me as any).city_of_residence ?? "");
-    setBio((me as any).bio ?? "");
-    setBaseCity(me.base_city ?? "");
-    setWorkingAreas(((me.working_areas as string[]) ?? []).join(", "));
-    setVehicle(me.vehicle_type ?? "");
-    setJobTypes(((me.job_types as string[]) ?? []).join(", "));
-    setExperience(me.experience ?? "");
-    setNotes(me.notes ?? "");
-    setEcName((me as any).emergency_contact_name ?? "");
-    setEcPhone((me as any).emergency_contact_phone ?? "");
+    const row = me as {
+      full_name?: string | null;
+      whatsapp_phone?: string | null;
+      email?: string | null;
+      id_number?: string | null;
+      base_city?: string | null;
+      working_areas?: string[] | null;
+      vehicle_type?: string | null;
+      job_types?: string[] | null;
+      courier_experience_duration?: string | null;
+      notes?: string | null;
+    };
+    setFullName(row.full_name ?? "");
+    setPhone(row.whatsapp_phone ?? "");
+    setEmail(row.email ?? "");
+    setIdNumber(row.id_number ?? "");
+    setBaseCity(row.base_city ?? "");
+    setWorkingAreas((row.working_areas ?? []).join(", "));
+    setVehicle(row.vehicle_type ?? "");
+    setJobTypes((row.job_types ?? []).join(", "));
+    setExperience(row.courier_experience_duration ?? "");
+    setNotes(row.notes ?? "");
   }, [me]);
 
   const onPickAvatar = (f: File | null) => {
@@ -109,22 +110,16 @@ function EditProfilePage() {
         newAvatarPath = uploaded.path;
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         full_name: fullName,
         email: email || null,
         id_number: idNumber || null,
-        birth_date: birthDate || null,
-        address: address || null,
-        city_of_residence: cityRes || null,
-        bio: bio || null,
-        base_city: baseCity,
+        base_city: baseCity || null,
         working_areas: workingAreas.split(",").map((s) => s.trim()).filter(Boolean),
-        vehicle_type: (vehicle || null),
+        vehicle_type: vehicle || null,
         job_types: jobTypes.split(",").map((s) => s.trim()).filter(Boolean),
-        experience,
-        notes,
-        emergency_contact_name: ecName || null,
-        emergency_contact_phone: ecPhone || null,
+        courier_experience_duration: experience.trim().slice(0, 60) || null,
+        notes: notes || null,
       };
       if (newAvatarPath) payload.avatar_url = newAvatarPath;
 
@@ -154,7 +149,7 @@ function EditProfilePage() {
 
   const displayAvatar = avatarPreview || signedAvatarUrl;
 
-  const SectionTitle = ({ icon: Icon, title }: { icon: any; title: string }) => (
+  const SectionTitle = ({ icon: Icon, title }: { icon: typeof User; title: string }) => (
     <div className="flex items-center gap-2 justify-end pb-1 border-b border-slate-100">
       <h2 className="font-extrabold text-slate-900">{title}</h2>
       <span className="size-7 grid place-items-center rounded-lg bg-emerald-50">
@@ -178,7 +173,6 @@ function EditProfilePage() {
             חזרה
           </Button>
         </div>
-        {/* Avatar hero */}
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-5">
             <div className="flex flex-col items-center gap-3">
@@ -214,7 +208,6 @@ function EditProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Personal */}
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-5 space-y-3">
             <SectionTitle icon={User} title="פרטים אישיים" />
@@ -224,17 +217,10 @@ function EditProfilePage() {
               <Input value={phone} disabled className="text-end" dir="ltr" />
             </div>
             <div><Label className="text-end block mb-1">אימייל</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="text-end" dir="ltr" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-end block mb-1">תעודת זהות</Label><Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className="text-end" dir="ltr" inputMode="numeric" /></div>
-              <div><Label className="text-end block mb-1">תאריך לידה</Label><Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="text-end" /></div>
-            </div>
-            <div><Label className="text-end block mb-1">כתובת מגורים</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} className="text-end" /></div>
-            <div><Label className="text-end block mb-1">עיר מגורים</Label><Input value={cityRes} onChange={(e) => setCityRes(e.target.value)} className="text-end" /></div>
-            <div><Label className="text-end block mb-1">קצת עליי</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} className="text-end" rows={3} placeholder="ספר על עצמך בקצרה..." /></div>
+            <div><Label className="text-end block mb-1">תעודת זהות</Label><Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className="text-end" dir="ltr" inputMode="numeric" /></div>
           </CardContent>
         </Card>
 
-        {/* Work */}
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-5 space-y-3">
             <SectionTitle icon={Bike} title="רכב ועבודה" />
@@ -242,27 +228,17 @@ function EditProfilePage() {
             <div><Label className="text-end block mb-1">אזורי עבודה</Label><Input value={workingAreas} onChange={(e) => setWorkingAreas(e.target.value)} className="text-end" placeholder="תל אביב, רמת גן" /></div>
             <div><Label className="text-end block mb-1">כלי עבודה</Label><Input value={vehicle} onChange={(e) => setVehicle(e.target.value)} className="text-end" placeholder="קטנוע / רכב / אופניים חשמליים" /></div>
             <div><Label className="text-end block mb-1">סוגי עבודות</Label><Input value={jobTypes} onChange={(e) => setJobTypes(e.target.value)} className="text-end" placeholder="אוכל, חבילות, מסמכים" /></div>
-            <div><Label className="text-end block mb-1">ניסיון</Label><Textarea value={experience} onChange={(e) => setExperience(e.target.value)} className="text-end" rows={3} /></div>
+            <div><Label className="text-end block mb-1">ניסיון</Label><Input value={experience} onChange={(e) => setExperience(e.target.value)} className="text-end" placeholder="לדוגמה: שנתיים" maxLength={60} /></div>
             <div><Label className="text-end block mb-1">הערות</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="text-end" rows={2} /></div>
           </CardContent>
         </Card>
 
-        {/* Emergency */}
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardContent className="p-5 space-y-3">
-            <SectionTitle icon={ShieldAlert} title="איש קשר לחירום" />
-            <div><Label className="text-end block mb-1">שם</Label><Input value={ecName} onChange={(e) => setEcName(e.target.value)} className="text-end" /></div>
-            <div><Label className="text-end block mb-1">טלפון</Label><Input value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} className="text-end" dir="ltr" inputMode="tel" /></div>
-          </CardContent>
-        </Card>
-
-        {/* Documents */}
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-5 space-y-3">
             <SectionTitle icon={FileText} title="מסמכים" />
             <div>
               <Label className="text-end block mb-1">סטטוס חשבונית/קבלה <span className="text-xs text-amber-600">(שינוי דורש אישור)</span></Label>
-              <Input value={me?.invoice_status ?? "—"} disabled className="text-end" />
+              <Input value={String((me as { invoice_status?: string | null } | undefined)?.invoice_status ?? "—")} disabled className="text-end" />
             </div>
             <div>
               <Label className="text-end block mb-1">תעודת זהות <span className="text-xs text-amber-600">(טעון לאישור)</span></Label>
@@ -275,7 +251,6 @@ function EditProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Sticky save */}
         <div className="sticky bottom-20 lg:bottom-4 z-10 px-1">
           <Button
             className="w-full h-12 text-base font-bold bg-[#35AD29] hover:bg-[#2d9623] text-white shadow-lg rounded-2xl"

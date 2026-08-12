@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AdminPreviewBanner } from "@/components/AdminPreviewBanner";
 import { registerServiceWorker } from "@/lib/pwa";
 import { InstallBanner, UpdateBanner } from "@/components/InstallApp";
+import { consumeTokenHandoffFromUrl } from "@/lib/token-handoff";
 
 function NotFoundComponent() {
   return (
@@ -182,6 +183,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
+    consumeTokenHandoffFromUrl();
     registerServiceWorker();
     const onError = (e: ErrorEvent) => {
       // eslint-disable-next-line no-console

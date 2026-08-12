@@ -32,9 +32,51 @@ export function nestListWithdrawals() { return apiFetch<Record<string, unknown>[
 export function nestCreateWithdrawal(body: Record<string, unknown>) {
   return apiFetch("/api/accounts/withdrawals", { method: "POST", ...options(), body: JSON.stringify(body) });
 }
+export function nestUpdateWithdrawal(id: string, body: Record<string, unknown>) {
+  return apiFetch(`/api/accounts/withdrawals/${id}`, {
+    method: "PATCH",
+    ...options(),
+    body: JSON.stringify(body),
+  });
+}
 
 export function nestListAreas() { return apiFetch<Record<string, unknown>[]>("/api/platform/areas", options()); }
+export function nestCreateArea(name: string) {
+  return apiFetch("/api/platform/areas", { method: "POST", ...options(), body: JSON.stringify({ name }) });
+}
+export function nestDeleteArea(id: string) {
+  return apiFetch(`/api/platform/areas/${id}`, { method: "DELETE", ...options() });
+}
+
+export function nestListTags() {
+  return apiFetch<Record<string, unknown>[]>("/api/platform/tags", options());
+}
+export function nestCreateTag(name: string) {
+  return apiFetch("/api/platform/tags", { method: "POST", ...options(), body: JSON.stringify({ name }) });
+}
+export function nestDeleteTag(id: string) {
+  return apiFetch(`/api/platform/tags/${id}`, { method: "DELETE", ...options() });
+}
+
+export function nestListClassificationRules() {
+  return apiFetch<Record<string, unknown>[]>("/api/platform/classification-rules", options());
+}
+export function nestUpdateClassificationRule(id: string, body: Record<string, unknown>) {
+  return apiFetch(`/api/platform/classification-rules/${id}`, {
+    method: "PATCH",
+    ...options(),
+    body: JSON.stringify(body),
+  });
+}
+
 export function nestGetExpressPricing() { return apiFetch<Record<string, unknown>[]>("/api/pricing/express-active", options()); }
+export function nestUpdateExpressPricingRule(id: string, body: Record<string, unknown>) {
+  return apiFetch(`/api/pricing/express/${id}`, {
+    method: "PATCH",
+    ...options(),
+    body: JSON.stringify(body),
+  });
+}
 export function nestGetPricing() { return apiFetch<Record<string, unknown>>("/api/pricing/active", options()); }
 export function nestUpdatePricing(body: Record<string, unknown>) {
   return apiFetch("/api/pricing/active", { method: "POST", ...options(), body: JSON.stringify(body) });
@@ -128,74 +170,124 @@ export function nestListCustomerJobs(customerId: string) {
   return apiFetch<Record<string, unknown>[]>(`/api/accounts/customers/${customerId}/jobs`, options());
 }
 
-/** Tables not yet on Nest — reads return empty; writes throw. */
-export function nestListSavedContacts(): Promise<Record<string, unknown>[]> {
-  return Promise.resolve([]);
+export function nestListSavedContacts() {
+  return apiFetch<Record<string, unknown>[]>("/api/accounts/customers/me/contacts", options());
 }
 
-export function nestUpsertSavedContact(_body: Record<string, unknown>) {
-  throw new Error("TODO Nest: POST /api/accounts/customers/me/contacts");
+export function nestUpsertSavedContact(body: Record<string, unknown>) {
+  return apiFetch("/api/accounts/customers/me/contacts", {
+    method: "POST",
+    ...options(),
+    body: JSON.stringify(body),
+  });
 }
 
-export function nestDeleteSavedContact(_id: string) {
-  throw new Error("TODO Nest: DELETE /api/accounts/customers/me/contacts/:id");
+export function nestDeleteSavedContact(id: string) {
+  return apiFetch(`/api/accounts/customers/me/contacts/${id}`, { method: "DELETE", ...options() });
 }
 
-export function nestListTeamMembers(): Promise<Record<string, unknown>[]> {
-  return Promise.resolve([]);
+export function nestListTeamMembers() {
+  return apiFetch<Record<string, unknown>[]>("/api/accounts/customers/me/team-members", options());
 }
 
-export function nestInviteTeamMember(_body: Record<string, unknown>) {
-  throw new Error("TODO Nest: POST /api/accounts/customers/me/team-members");
+export function nestInviteTeamMember(body: Record<string, unknown>) {
+  return apiFetch("/api/accounts/customers/me/team-members", {
+    method: "POST",
+    ...options(),
+    body: JSON.stringify(body),
+  });
 }
 
-export function nestUpdateTeamMemberRole(_id: string, _role: string) {
-  throw new Error("TODO Nest: PATCH /api/accounts/customers/me/team-members/:id");
+export function nestUpdateTeamMemberRole(id: string, role: string) {
+  return apiFetch(`/api/accounts/customers/me/team-members/${id}`, {
+    method: "PATCH",
+    ...options(),
+    body: JSON.stringify({ role }),
+  });
 }
 
-export function nestDeleteTeamMember(_id: string) {
-  throw new Error("TODO Nest: DELETE /api/accounts/customers/me/team-members/:id");
+export function nestDeleteTeamMember(id: string) {
+  return apiFetch(`/api/accounts/customers/me/team-members/${id}`, { method: "DELETE", ...options() });
 }
 
-export function nestListRecurringOrders(): Promise<Record<string, unknown>[]> {
-  return Promise.resolve([]);
+export function nestListRecurringOrders() {
+  return apiFetch<Record<string, unknown>[]>("/api/accounts/customers/me/recurring-orders", options());
 }
 
-export function nestSaveRecurringOrder(_body: Record<string, unknown>, _id?: string) {
-  throw new Error("TODO Nest: POST/PATCH /api/accounts/customers/me/recurring-orders");
+export function nestSaveRecurringOrder(body: Record<string, unknown>, id?: string) {
+  if (id) {
+    return apiFetch(`/api/accounts/customers/me/recurring-orders/${id}`, {
+      method: "PATCH",
+      ...options(),
+      body: JSON.stringify(body),
+    });
+  }
+  return apiFetch("/api/accounts/customers/me/recurring-orders", {
+    method: "POST",
+    ...options(),
+    body: JSON.stringify(body),
+  });
 }
 
-export function nestDeleteRecurringOrder(_id: string) {
-  throw new Error("TODO Nest: DELETE /api/accounts/customers/me/recurring-orders/:id");
+export function nestDeleteRecurringOrder(id: string) {
+  return apiFetch(`/api/accounts/customers/me/recurring-orders/${id}`, { method: "DELETE", ...options() });
 }
 
-export function nestListWalletTransactions(): Promise<Record<string, unknown>[]> {
-  return Promise.resolve([]);
+export function nestToggleRecurringOrderActive(id: string, active: boolean) {
+  return apiFetch(`/api/accounts/customers/me/recurring-orders/${id}`, {
+    method: "PATCH",
+    ...options(),
+    body: JSON.stringify({ active }),
+  });
 }
 
-export function nestRechargeWallet(_body: Record<string, unknown>) {
-  throw new Error("TODO Nest: POST /api/payments/wallet/recharge");
+export function nestListWalletTransactions() {
+  return apiFetch<Record<string, unknown>[]>("/api/payments/wallet/transactions", options());
 }
 
-export function nestToggleRecurringOrderActive(_id: string, _active: boolean) {
-  throw new Error("TODO Nest: PATCH /api/accounts/customers/me/recurring-orders/:id");
+export function nestRechargeWallet(body: Record<string, unknown>) {
+  return apiFetch("/api/payments/wallet/recharge", {
+    method: "POST",
+    ...options(),
+    body: JSON.stringify(body),
+  });
 }
 
-/** Admin / missing endpoints — reads empty; writes throw. */
-export function nestListCourierTags(_courierId: string): Promise<Record<string, unknown>[]> {
-  return Promise.resolve([]);
+export function nestListCourierTags(courierId: string) {
+  return apiFetch<Record<string, unknown>[]>(`/api/accounts/couriers/${courierId}/tags`, options());
 }
 
-export function nestListAllTags(): Promise<Record<string, unknown>[]> {
-  return Promise.resolve([]);
+export function nestListAllTags() {
+  return nestListTags();
 }
 
-export function nestAddCourierTag(_courierId: string, _tagId: string) {
-  throw new Error("TODO Nest: POST /api/accounts/couriers/:id/tags");
+export function nestAddCourierTag(courierId: string, tagId: string) {
+  return apiFetch(`/api/accounts/couriers/${courierId}/tags`, {
+    method: "POST",
+    ...options(),
+    body: JSON.stringify({ tag_id: tagId }),
+  });
 }
 
-export function nestRemoveCourierTag(_courierId: string, _tagId: string) {
-  throw new Error("TODO Nest: DELETE /api/accounts/couriers/:id/tags/:tagId");
+export function nestRemoveCourierTag(courierId: string, tagId: string) {
+  return apiFetch(`/api/accounts/couriers/${courierId}/tags/${tagId}`, {
+    method: "DELETE",
+    ...options(),
+  });
+}
+
+export function nestSendWhatsapp(body: {
+  phone: string;
+  message: string;
+  courier_id?: string;
+  job_id?: string;
+  log_only?: boolean;
+}) {
+  return apiFetch("/api/whatsapp/send", {
+    method: "POST",
+    ...options(),
+    body: JSON.stringify(body),
+  });
 }
 
 export function nestListCourierWhatsappMessages(_courierId: string): Promise<Record<string, unknown>[]> {

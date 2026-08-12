@@ -10,7 +10,10 @@ export async function sendJobToWhatsAppGroup(..._args: unknown[]) {
   return { ok: false as const, skipped: "owned_by_nest_dispatch" };
 }
 
-/** Job-taken group notice is not yet implemented on Nest. */
+/** Job-taken group notice is owned by Nest dispatch/WhatsApp worker. */
 export async function sendJobTakenToWhatsAppGroup(..._args: unknown[]) {
-  throw new Error("TODO Nest: WhatsApp group job-taken notice");
+  console.warn(
+    "sendJobTakenToWhatsAppGroup: no-op — Nest WhatsApp dispatch owns job-taken notices",
+  );
+  return { ok: false as const, skipped: "owned_by_nest_dispatch" };
 }

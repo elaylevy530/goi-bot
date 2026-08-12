@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  MapPin, Clock, Loader2, Info, HandCoins, Layers, Plus, Minus, Crosshair, Package, Route as RouteIcon,
-  ChevronRight, ChevronLeft, ChevronsRight, List, X, Store, ChevronsLeft, Coins, Navigation2, Timer, AlarmClock,
+  Loader2, Layers, Plus, Minus, Crosshair,
+  ChevronRight, ChevronLeft, Timer,
 } from "lucide-react";
 
 import { useMyCourier } from "@/components/CourierShell";
@@ -61,7 +61,7 @@ export type MapJob = {
 };
 
 
-/** Compact live countdown chip for accepting an offer.
+/** Compact live countdown for accepting an offer.
  *  Uses `expiresAt` when set, otherwise a synthetic 10-minute window. */
 const SYNTHETIC_ACCEPT_WINDOW_SEC = 10 * 60;
 function AcceptTimerChip({ expiresAt }: { expiresAt?: string | null }) {
@@ -81,64 +81,20 @@ function AcceptTimerChip({ expiresAt }: { expiresAt?: string | null }) {
   const expired = secLeft === 0;
   return (
     <span
-      className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] font-black tabular-nums ring-1 ${
+      className={`inline-flex items-center gap-1 text-[11px] font-bold tabular-nums ${
         expired
-          ? "bg-slate-200 text-slate-600 ring-slate-300"
+          ? "text-slate-400"
           : urgent
-          ? "bg-rose-600 text-white ring-rose-700 animate-pulse"
-          : "bg-rose-50 text-rose-700 ring-rose-300"
+          ? "text-rose-600 animate-pulse"
+          : "text-slate-500"
       }`}
       aria-label="זמן לאישור המשלוח"
     >
-      <Timer className="size-2.5" />
+      <Timer className="size-3" />
       {mm}:{ss}
     </span>
   );
 }
-
-/** Small rotating "social pressure" pill — mimics other couriers seeing the offer.
- *  Purely presentational to nudge acceptance. */
-const PRESSURE_MESSAGES = [
-  { icon: "👀", text: "שליח נוסף צופה עכשיו" },
-  { icon: "⚡", text: "2 שליחים ראו את ההצעה" },
-  { icon: "🔥", text: "הצעה מבוקשת באזור" },
-  { icon: "🏁", text: "שליח קרוב שוקל לקחת" },
-  { icon: "💰", text: "תשלום מיידי עם סיום" },
-];
-function PressurePill({ jobId }: { jobId: string }) {
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-  useEffect(() => {
-    // reset on job change
-    setIdx(Math.floor(Math.random() * PRESSURE_MESSAGES.length));
-    setVisible(true);
-    const t = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setIdx((i) => (i + 1 + Math.floor(Math.random() * (PRESSURE_MESSAGES.length - 1))) % PRESSURE_MESSAGES.length);
-        setVisible(true);
-      }, 260);
-    }, 4500);
-    return () => clearInterval(t);
-  }, [jobId]);
-  const m = PRESSURE_MESSAGES[idx];
-  return (
-    <div
-      dir="rtl"
-      className={`pointer-events-none flex justify-center mb-1.5 transition-all duration-300 ${
-        visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
-      }`}
-    >
-      <div className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-slate-900/90 text-white text-[11px] font-bold shadow-lg backdrop-blur ring-1 ring-white/10">
-        <span aria-hidden>{m.icon}</span>
-        <span>{m.text}</span>
-      </div>
-    </div>
-  );
-}
-
-
-
 
 function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
@@ -197,14 +153,6 @@ type Props = {
   onDetails?: (job: MapJob) => void;
   claiming?: boolean;
 };
-
-function deliveryKindLabel(job: Pick<MapJob, "job_type" | "package_type" | "item_category" | "number_of_packages">) {
-  const qty = Number(job.number_of_packages ?? 0);
-  const baseType = job.job_type ?? "משלוח";
-  const category = job.item_category ?? job.package_type ?? null;
-  const label = qty > 0 ? `${qty} × ${baseType}` : baseType;
-  return category && category !== baseType ? `${label} · ${category}` : label;
-}
 
 export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming }: Props) {
 
@@ -339,8 +287,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   }, [scoredJobs, activeId]);
 
   const active = useMemo(() => visibleJobs.find(j => j.id === activeId) ?? null, [visibleJobs, activeId]);
-
-  const [showList, setShowList] = useState(false);
 
   const activeIdx = useMemo(
     () => scoredJobs.findIndex((s) => s.job.id === activeId),
@@ -497,30 +443,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     }
   }, [active, myPos]);
 
-  const distanceKm = active
-    && active.pickup_lat != null && active.pickup_lng != null
-    && active.dropoff_lat != null && active.dropoff_lng != null
-    ? haversineKm(
-        { lat: Number(active.pickup_lat), lng: Number(active.pickup_lng) },
-        { lat: Number(active.dropoff_lat), lng: Number(active.dropoff_lng) },
-      )
-    : null;
-
-  const FilterChip = ({ id, label, icon: Icon }: { id: typeof filter; label: string; icon?: any }) => (
-    <button
-      type="button"
-      onClick={() => setFilter(id)}
-      className={`h-9 rounded-full text-[12px] font-bold flex items-center justify-center gap-1 transition px-1 ${
-        filter === id
-          ? "bg-[#35AD29] text-white shadow-md"
-          : "bg-white border border-slate-200 text-slate-700 shadow-sm"
-      }`}
-    >
-      {Icon && <Icon className="size-3.5 shrink-0" />}
-      <span className="truncate">{label}</span>
-    </button>
-  );
-
   const zoomBy = (delta: number) => {
     const m = mapRef.current; if (!m) return;
     m.setZoom((m.getZoom() ?? 13) + delta);
@@ -530,8 +452,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     const cur = m.getMapTypeId();
     m.setMapTypeId(cur === "roadmap" ? "hybrid" : "roadmap");
   };
-
-  const isQuote = active?.__kind === "quote";
 
   return (
     // Mobile: fills the full-bleed shell viewport minus the bottom tab bar. Desktop: card.
@@ -550,8 +470,8 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
           />
         )}
 
-        {/* Floating right rail */}
-        <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
+        {/* Floating right rail — offset below status card overlay */}
+        <div className="absolute top-[6.75rem] right-3 flex flex-col gap-2 z-10">
           <button onClick={cycleMapType} className="size-10 rounded-2xl bg-white shadow-md flex items-center justify-center text-slate-700 active:scale-95" aria-label="שכבות">
             <Layers className="size-4" />
           </button>
@@ -574,27 +494,21 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
           </div>
         </div>
 
-        {/* Floating Gett-style offer carousel — swipeable, with visible arrows */}
+        {/* Floating offer carousel — swipeable, with visible arrows */}
         {scoredJobs.length > 0 && active && (() => {
-          const renderCard = (j: MapJob) => {
+          const renderCard = (j: MapJob, distToPickupKm: number | null) => {
             const businessName = j.customer_name?.trim() || "לקוח פרטי";
-            const pickupAddr = [j.pickup_address, j.pickup_area].filter(Boolean).join(", ") || "כתובת איסוף";
-            const dropoffAddr = [j.dropoff_address, j.dropoff_area].filter(Boolean).join(", ") || "כתובת מסירה";
-            const pickupTime = j.job_time || (j.job_date ? j.job_date : "מיידי");
-            const packages = Number(j.number_of_packages ?? 0);
+            const customerAddr =
+              [j.dropoff_address, j.dropoff_area].filter(Boolean).join(", ")
+              || [j.pickup_address, j.pickup_area].filter(Boolean).join(", ")
+              || "—";
             const jIsQuote = j.__kind === "quote";
             const jIsMove = j.service_category === "small_move" || j.service_category === "big_move" || t.kind === "mover";
-            const jobWord = jIsMove ? "הובלה" : "משלוח";
-            // Distance is strictly pickup (business) → dropoff.
-            const jDistanceKm =
-              j.pickup_lat != null && j.pickup_lng != null
-              && j.dropoff_lat != null && j.dropoff_lng != null
-                ? haversineKm(
-                    { lat: Number(j.pickup_lat), lng: Number(j.pickup_lng) },
-                    { lat: Number(j.dropoff_lat), lng: Number(j.dropoff_lng) },
-                  )
+            const paymentType = j.requires_cash ? "מזומן" : "אשראי";
+            const distLabel =
+              distToPickupKm != null && Number.isFinite(distToPickupKm)
+                ? `${distToPickupKm < 10 ? distToPickupKm.toFixed(1) : distToPickupKm.toFixed(0)} ק״מ ממך`
                 : null;
-
 
             // Offer expiry lives at __raw.offer.expires_at for offers,
             // and __raw.quote_deadline_at for quote jobs.
@@ -610,170 +524,96 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 key={j.id}
                 data-job-id={j.id}
                 dir="rtl"
-                className="snap-center shrink-0 w-full rounded-2xl overflow-hidden border border-slate-200 shadow-[0_18px_44px_-14px_rgba(15,23,42,0.35)] bg-white text-slate-900 relative"
+                className="snap-center shrink-0 w-full rounded-[18px] overflow-hidden border border-slate-200/80 shadow-[0_12px_32px_-16px_rgba(15,23,42,0.28)] bg-white text-slate-900"
               >
-                {/* Colored header band */}
-                <div className="relative overflow-hidden bg-gradient-to-l from-[#0b3b2e] via-[#12604a] to-[#1c8a5b] text-white px-3 pt-2.5 pb-2.5">
-                  <div aria-hidden className="pointer-events-none absolute -top-14 -left-10 size-36 rounded-full bg-emerald-300/25 blur-3xl" />
-                  <div aria-hidden className="pointer-events-none absolute -bottom-16 -right-10 size-36 rounded-full bg-sky-400/20 blur-3xl" />
-
-                  <div className="relative flex items-start gap-2.5">
-                    <div className="rounded-xl bg-white/15 ring-1 ring-white/25 p-0.5 backdrop-blur">
-                      <BusinessLogo path={j.customer_logo_path} name={businessName} size={34} />
-                    </div>
-                    <div className="flex-1 min-w-0 text-end">
-                      <div className="flex items-center gap-1 justify-end min-w-0">
-                        <h3 className="font-extrabold text-white text-[13px] truncate">{businessName}</h3>
-                        <span className="text-[10px] font-mono text-emerald-100/80 shrink-0">#{j.job_number}</span>
-                      </div>
-                      <div className="text-[10px] text-emerald-50/90 font-semibold mt-0.5">
-                        {jobWord} · {j.requires_cash ? "מזומן" : "אשראי"}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-end rounded-xl bg-white/95 text-slate-900 ring-1 ring-white/40 px-2 py-1 shadow-md">
-                      {jIsQuote ? (
-                        <>
-                          <div className="text-xl font-extrabold text-amber-600 leading-none">₪?</div>
-                          <div className="text-[9px] text-amber-700 font-semibold mt-0.5">הצעת מחיר</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="leading-none">
-                            <span className="text-xl font-extrabold text-[#0f7a3e]">
-                              {Number(j.payment ?? 0).toFixed(0)}
-                            </span>
-                            <span className="text-sm font-extrabold text-[#0f7a3e] mr-0.5">₪</span>
-                          </div>
-                          <div className="text-[9px] text-slate-500 font-semibold mt-0.5">תשלום</div>
-                        </>
+                {/* Header: logo + name/distance + price */}
+                <div className="px-4 pt-3.5 pb-3 flex items-start gap-3">
+                  <BusinessLogo path={j.customer_logo_path} name={businessName} size={44} />
+                  <div className="flex-1 min-w-0 text-right">
+                    <h3 className="font-bold text-slate-900 text-[15px] leading-tight truncate">{businessName}</h3>
+                    <div className="mt-1 flex items-center justify-end gap-2 flex-wrap">
+                      {distLabel && (
+                        <span className="text-[12px] text-slate-500 font-medium">{distLabel}</span>
                       )}
+                      <AcceptTimerChip expiresAt={offerExpiresAt} />
                     </div>
+                  </div>
+                  <div className="shrink-0 text-left min-w-[4.5rem]">
+                    {jIsQuote ? (
+                      <>
+                        <div className="text-[22px] font-extrabold text-amber-600 leading-none tracking-tight">₪?</div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-1">הצעת מחיר</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="leading-none">
+                          <span className="text-[22px] font-extrabold text-[#35AD29] tracking-tight">
+                            {Number(j.payment ?? 0).toFixed(0)}
+                          </span>
+                          <span className="text-[14px] font-extrabold text-[#35AD29] mr-0.5">₪</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-1">
+                          {jIsMove ? "מחיר ההובלה" : "מחיר המשלוח"}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Meta chips (timer inline, no dedicated row) */}
-                <div className="px-3 pt-2 pb-2 flex items-center gap-1 flex-wrap bg-white">
-                  <AcceptTimerChip expiresAt={offerExpiresAt} />
-                  {jDistanceKm != null && (
-                    <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-slate-100 ring-1 ring-slate-200 text-slate-700 text-[10px] font-bold">
-                      <RouteIcon className="size-2.5" />
-                      {jDistanceKm.toFixed(1)} ק״מ
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-slate-100 ring-1 ring-slate-200 text-slate-700 text-[10px] font-bold">
-                    <Clock className="size-2.5" />
-                    {pickupTime}
-                  </span>
-                  {j.delivery_deadline && (
-                    <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-rose-50 ring-1 ring-rose-200 text-rose-700 text-[10px] font-bold">
-                      <AlarmClock className="size-2.5" />
-                      מסירה עד {new Date(j.delivery_deadline).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  )}
-                  {packages > 0 && (
-                    <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-slate-100 ring-1 ring-slate-200 text-slate-700 text-[10px] font-bold">
-                      <Package className="size-2.5" />
-                      {jIsMove ? `${packages} פריטים` : packages}
-                    </span>
-                  )}
-                  {jIsMove && j.item_category && (
-                    <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-indigo-50 ring-1 ring-indigo-200 text-indigo-700 text-[10px] font-bold">
-                      <Package className="size-2.5" />
-                      {j.item_category}
-                    </span>
-                  )}
-                  {jIsMove && j.dropoff_floor != null && String(j.dropoff_floor) !== "" && (
-                    <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-violet-50 ring-1 ring-violet-200 text-violet-700 text-[10px] font-bold">
-                      <Layers className="size-2.5" />
-                      קומה {j.dropoff_floor}
-                    </span>
-                  )}
-                  {j.vehicle_required && (
-                    <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full bg-slate-100 ring-1 ring-slate-200 text-slate-700 text-[10px] font-bold">
-                      <Store className="size-2.5" />
-                      {j.vehicle_required}
-                    </span>
-                  )}
-                  <span className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] font-bold ring-1 ${j.requires_cash ? "bg-amber-50 text-amber-700 ring-amber-200" : "bg-sky-50 text-sky-700 ring-sky-200"}`}>
-                    <Coins className="size-2.5" />
-                    {j.requires_cash ? "מזומן" : "אשראי"}
-                  </span>
-                </div>
+                <div className="mx-4 border-t border-slate-100" />
 
-
-                {/* Route */}
-                <div className="mx-3 mb-2 rounded-xl bg-slate-50 border border-slate-200 px-2.5 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="shrink-0 size-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                      <MapPin className="size-3 text-slate-500" />
-                    </div>
-                    <div className="flex-1 min-w-0 text-end">
-                      <div className="text-[9px] text-slate-500 font-semibold leading-none">איסוף</div>
-                      <div className="text-[12px] font-extrabold text-slate-900 truncate">{pickupAddr}</div>
-                    </div>
+                {/* Quiet details */}
+                <div className="px-4 py-3 space-y-1.5 text-right">
+                  <div className="text-[13px] text-slate-700 leading-snug">
+                    <span className="text-slate-500">כתובת הלקוח: </span>
+                    <span className="font-semibold text-slate-900">{customerAddr}</span>
                   </div>
-                  <div className="mr-3 my-0.5 h-2 border-r-2 border-dashed border-slate-300" />
-                  <div className="flex items-center gap-2">
-                    <div className="shrink-0 size-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                      <Navigation2 className="size-3 text-[#0f7a3e]" />
-                    </div>
-                    <div className="flex-1 min-w-0 text-end">
-                      <div className="text-[9px] text-slate-500 font-semibold leading-none">מסירה</div>
-                      <div className="text-[12px] font-extrabold text-slate-900 truncate">{dropoffAddr}</div>
-                    </div>
+                  <div className="text-[13px] text-slate-700 leading-snug">
+                    <span className="text-slate-500">סוג התשלום: </span>
+                    <span className="font-semibold text-slate-900">{paymentType}</span>
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="px-2.5 pb-2.5 flex items-stretch gap-2 bg-white">
+                {/* Primary outline CTA + de-emphasized secondary actions */}
+                <div className="px-4 pb-3.5 space-y-2">
                   {jIsQuote ? (
                     <Button
-                      className="flex-1 bg-[#35AD29] hover:bg-[#2d9623] text-white h-12 rounded-xl font-extrabold text-[14px] shadow-lg shadow-emerald-200"
+                      variant="outline"
+                      className="w-full h-12 rounded-xl border-[1.5px] border-[#35AD29] text-[#35AD29] bg-white hover:bg-[#ecf8ea] hover:text-[#2d9623] font-bold text-[15px]"
                       onClick={() => onQuote(j)}
                     >
                       {jIsMove ? "אני מציע מחיר להובלה" : "אני מציע מחיר"}
                     </Button>
                   ) : (
                     <Button
-                      className="relative flex-1 overflow-hidden bg-gradient-to-l from-[#2d9623] via-[#35AD29] to-[#4ac93a] hover:brightness-110 text-white h-12 rounded-xl border-0 animate-claim-pulse px-2"
+                      variant="outline"
+                      className="w-full h-12 rounded-xl border-[1.5px] border-[#35AD29] text-[#35AD29] bg-white hover:bg-[#ecf8ea] hover:text-[#2d9623] font-bold text-[15px]"
                       disabled={claiming}
                       onClick={() => onClaim(j)}
                     >
-                      <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-                        <span className="absolute top-0 -left-1/3 h-full w-1/3 bg-gradient-to-r from-transparent via-white/45 to-transparent animate-claim-shine" />
-                      </span>
-                      <span className="relative z-10 flex items-center justify-center gap-1.5 w-full">
-                        <span className="text-[13px] font-black tracking-tight">
-                          {jIsMove ? "קח את ההובלה עכשיו" : "קח משלוח עכשיו והרווח כסף"}
-                        </span>
-                        {claiming ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <span className="inline-flex items-center text-white/95 animate-chevron-nudge">
-                            <ChevronsLeft className="size-4" />
-                          </span>
-                        )}
-                      </span>
+                      {claiming && <Loader2 className="size-4 animate-spin" />}
+                      {t.takeJob}
                     </Button>
                   )}
-                  {onDetails && (
-                    <Button
-                      variant="outline"
-                      className="h-12 rounded-xl font-bold bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-[12px] px-3"
-                      onClick={() => onDetails(j)}
+                  <div className="flex items-center justify-center gap-4">
+                    {onDetails && (
+                      <button
+                        type="button"
+                        className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 py-1"
+                        onClick={() => onDetails(j)}
+                      >
+                        פרטים
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-[12px] font-semibold text-rose-500/80 hover:text-rose-600 py-1"
+                      onClick={() => onDecline(j)}
+                      aria-label="דלג"
                     >
-                      <Info className="size-3.5" />
-                      פרטים
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    className="h-12 rounded-xl font-bold bg-white border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-[12px] px-3"
-                    onClick={() => onDecline(j)}
-                    aria-label="דלג"
-                  >
-                    דלג
-                  </Button>
+                      דלג
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -824,14 +664,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 </div>
               )}
 
-              {/* Social-pressure pill above the active card */}
-              {active && (
-                <div className="pointer-events-none">
-                  <PressurePill jobId={active.id} />
-                </div>
-              )}
-
-
               {/* Horizontal snap carousel — one card per viewport width */}
               <div
                 dir="rtl"
@@ -848,15 +680,23 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 className="pointer-events-auto flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
                 style={{ scrollbarWidth: "none" }}
               >
-                {scoredJobs.map((s) => renderCard(s.job))}
+                {scoredJobs.map((s) => renderCard(s.job, myPos ? s.distToPickup : null))}
               </div>
             </div>
           );
         })()}
 
         {scoredJobs.length === 0 && (
-          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:bottom-3 z-10 rounded-2xl bg-white/95 backdrop-blur border border-slate-200 shadow-md px-4 py-3 text-center text-slate-500 text-[13px]">
-            אין עבודות זמינות באזור כרגע. נסה שוב בעוד מעט.
+          <div
+            dir="rtl"
+            className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:bottom-3 z-10 rounded-[18px] bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] px-5 py-5 text-center"
+          >
+            <div className="text-[14px] font-bold text-slate-800">
+              {t.kind === "mover" ? "אין כרגע הובלות באזורכם" : "אין כרגע משלוחים באזורכם"}
+            </div>
+            <div className="text-[12px] text-slate-500 mt-1 leading-snug">
+              משכו למטה לרענון, או נסעו לאזור עמוס יותר.
+            </div>
           </div>
         )}
       </div>

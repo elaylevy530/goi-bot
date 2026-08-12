@@ -1,16 +1,15 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
+import { CourierAvatar } from "@/components/CourierAvatar";
 import { termsFor } from "@/lib/courier-kind";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   nestAddCourierDecline,
   nestClaimJob,
+  nestCourierActiveJobCount,
   nestListCourierDeclines,
   nestListCourierOffers,
   nestListCourierQuotes,
@@ -19,16 +18,13 @@ import {
   nestRespondOffer,
 } from "@/lib/nest-jobs";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
-import { Inbox, Loader2, MapPin, Clock, Truck, FileText, Tag, HandCoins, Power } from "lucide-react";
+import { Bell, Loader2, SearchX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
 import { isCourierApproved, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind } from "@/lib/courier-live-jobs";
-import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
-import { geocodeAddresses } from "@/lib/geocode.functions";
-import { ContactBlock } from "@/routes/courier.history";
-
-
+import { ContactBlock, ActiveJobs } from "@/routes/courier.history";
+import { CourierMenuButton } from "@/components/CourierSideDrawer";
 
 export const Route = createFileRoute("/courier/new-jobs")({
   head: () => ({ meta: [{ title: "עבודות חדשות — Goi" }] }),
@@ -38,12 +34,7 @@ export const Route = createFileRoute("/courier/new-jobs")({
   component: NewJobsPage,
 });
 
-const STATUSES = ["pending", "accepted", "declined", "expired"] as const;
-type Status = typeof STATUSES[number];
-
-const statusLabel: Record<string, string> = {
-  pending: "ממתין", accepted: "אישרת", declined: "דחית", expired: "פג תוקף",
-};
+type JobsTab = "available" | "active";
 
 function deliveryKindLabel(job: any) {
   const qty = Number(job?.number_of_packages ?? 0);
@@ -53,6 +44,12 @@ function deliveryKindLabel(job: any) {
   return category && category !== baseType ? `${label} · ${category}` : label;
 }
 
+function shortAddress(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "—";
+  return raw.split(",")[0]?.trim() || raw;
+}
+
 function NewJobsPage() {
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -60,14 +57,10 @@ function NewJobsPage() {
   const navigate = useNavigate();
   const { jobId: focusJobId } = Route.useSearch();
   const isApproved = isCourierApproved(me);
-
-
-
-  const [filter, setFilter] = useState<Status | "all">("pending");
+  const [tab, setTab] = useState<JobsTab>("available");
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
 
-  // Persisted declines from DB
   const { data: declinedRows = [] } = useQuery({
     queryKey: ["courier-job-declines", me?.id],
     enabled: isApproved,
@@ -78,28 +71,21 @@ function NewJobsPage() {
   });
   const declinedSet = useMemo(() => new Set(declinedRows.map((r: any) => r.job_id)), [declinedRows]);
 
-  // Existing offer_events flow (fixed price)
   const { data: offers = [], isLoading } = useQuery({
-    queryKey: ["new-jobs", me?.id, filter],
+    queryKey: ["new-jobs", me?.id, "pending"],
     enabled: isApproved,
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const data = await nestListCourierOffers(filter === "pending" || filter === "all" ? undefined : filter);
-      const rows = data.filter((offer: any) => {
-        const job = offer?.jobs;
-        return job ? jobMatchesKind(job, me) : false;
-      });
-      if (filter === "pending") {
-        return rows.filter((offer: any) => isLivePendingOffer(offer, me));
-      }
-      if (filter !== "all") {
-        return rows.filter((offer: any) => offer.response === filter);
-      }
-      return rows;
+      const data = await nestListCourierOffers("pending");
+      return data
+        .filter((offer: any) => {
+          const job = offer?.jobs;
+          return job ? jobMatchesKind(job, me) : false;
+        })
+        .filter((offer: any) => isLivePendingOffer(offer, me));
     },
   });
 
-  // Open quote requests visible to all couriers
   const { data: quoteJobs = [] } = useQuery({
     queryKey: ["courier-quote-requests", me?.id],
     enabled: isApproved,
@@ -110,7 +96,6 @@ function NewJobsPage() {
     },
   });
 
-  // My existing quotes for those jobs
   const quoteJobIds = useMemo(() => quoteJobs.map((j: any) => j.id), [quoteJobs]);
   const quoteJobIdsKey = quoteJobIds.join(",");
   const { data: myQuotes = [] } = useQuery({
@@ -119,8 +104,6 @@ function NewJobsPage() {
     queryFn: () => nestListCourierQuotes(quoteJobIds),
   });
 
-  // Open broadcast jobs (fixed price, no courier picked yet) — visible thanks to RLS policy.
-  // Live: a job stays visible to ALL eligible couriers until someone claims it.
   const { data: openJobs = [] } = useQuery({
     queryKey: ["courier-open-jobs", me?.id],
     enabled: isApproved,
@@ -131,32 +114,37 @@ function NewJobsPage() {
     },
   });
 
+  const { data: activeCount = 0 } = useQuery({
+    queryKey: ["courier-active-count", me?.id],
+    enabled: !!me?.id,
+    refetchInterval: 15_000,
+    queryFn: () => nestCourierActiveJobCount(),
+  });
+
   useEffect(() => {
     if (!me?.id) return;
     const timer = window.setInterval(() => {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
+      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
     }, 20_000);
     return () => window.clearInterval(timer);
   }, [me?.id, qc]);
 
   const quoteByJob = useMemo(() => {
     const map: Record<string, any> = {};
-    for (const q of myQuotes) map[q.job_id] = q;
+    for (const q of myQuotes) {
+      const jobId = String((q as { job_id?: unknown }).job_id ?? "");
+      if (jobId) map[jobId] = q;
+    }
     return map;
   }, [myQuotes]);
 
-  // Push notification deep link: /courier/new-jobs?jobId=<id>.
-  // Do NOT open the details dialog — the courier should see the offer card
-  // on the map first and decide from there. Just clear the query param.
   useEffect(() => {
     if (!focusJobId) return;
     navigate({ to: "/courier/new-jobs", search: {}, replace: true });
   }, [focusJobId, navigate]);
-
-
-
 
   const respond = useMutation({
     mutationFn: async ({ id, response, jobId }: { id: string; response: "accepted" | "declined"; jobId?: string }) => {
@@ -175,6 +163,7 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
+      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
       if (v.response === "accepted") navigate({ to: "/courier/active" });
     },
     onError: (e: Error) => {
@@ -209,13 +198,13 @@ function NewJobsPage() {
         void notifyJobTakenFn({ data: { jobId } });
       } catch {}
     },
-
     onSuccess: () => {
       toast.success("העבודה נלקחה ✓");
       setDetail(null);
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
+      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
       navigate({ to: "/courier/active" });
     },
     onError: (e: Error) => {
@@ -232,7 +221,7 @@ function NewJobsPage() {
   });
 
   const persistDecline = async (jobId: string) => {
-    if (!me?.id) return;
+    if (!me?.id) return false;
     try {
       await nestAddCourierDecline(jobId);
       qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
@@ -262,7 +251,6 @@ function NewJobsPage() {
     [openJobs, declinedSet],
   );
 
-  // Once I submitted a quote the job moves to "ההצעות שלי" — remove it from the map/list.
   const visibleQuoteJobs = useMemo(
     () => (quoteJobs as any[]).filter((j) => {
       if (declinedSet.has(j.id)) return false;
@@ -273,122 +261,177 @@ function NewJobsPage() {
     [quoteJobs, declinedSet, quoteByJob],
   );
 
+  type ListJob = {
+    id: string;
+    job_number?: string;
+    pickup_address?: string | null;
+    pickup_area?: string | null;
+    dropoff_address?: string | null;
+    dropoff_area?: string | null;
+    payment?: number | string | null;
+    pricing_type?: string | null;
+    job_type?: string | null;
+    item_category?: string | null;
+    package_type?: string | null;
+    number_of_packages?: number | null;
+    __kind: "open" | "quote" | "offer";
+    __raw: any;
+  };
 
-  // Build raw map jobs from all sources
-  const rawMapJobs: MapJob[] = useMemo(() => {
-    const out: MapJob[] = [];
+  const availableJobs: ListJob[] = useMemo(() => {
+    const out: ListJob[] = [];
     for (const j of visibleOpenJobs as any[]) {
-      out.push({ ...j, __kind: "open", __raw: j } as MapJob);
+      out.push({ ...j, __kind: "open", __raw: j });
     }
     for (const j of visibleQuoteJobs as any[]) {
-      out.push({ ...j, __kind: "quote", __raw: j } as MapJob);
+      out.push({ ...j, __kind: "quote", __raw: j });
     }
     for (const o of offers as any[]) {
       const j = o?.jobs;
-      if (j) out.push({ ...j, __kind: "offer", __raw: { offer: o, job: j } } as MapJob);
+      if (j) out.push({ ...j, __kind: "offer", __raw: { offer: o, job: j } });
     }
     return out;
   }, [visibleOpenJobs, visibleQuoteJobs, offers]);
 
-  // Geocode jobs that lack pickup/dropoff coords (client-cached, per id+role)
-  const [geoCache, setGeoCache] = useState<Record<string, { lat: number; lng: number } | null>>({});
-  useEffect(() => {
-    const needs: { id: string; address: string; role: "p" | "d"; jobId: string }[] = [];
-    for (const j of rawMapJobs) {
-      const pKey = `${j.id}:p`;
-      const dKey = `${j.id}:d`;
-      if ((j.pickup_lat == null || j.pickup_lng == null) && !(pKey in geoCache)) {
-        const addr = String(j.pickup_address ?? j.pickup_area ?? "").trim();
-        if (addr) needs.push({ id: pKey, address: addr, role: "p", jobId: j.id });
-      }
-      if ((j.dropoff_lat == null || j.dropoff_lng == null) && !(dKey in geoCache)) {
-        const addr = String(j.dropoff_address ?? j.dropoff_area ?? "").trim();
-        if (addr) needs.push({ id: dKey, address: addr, role: "d", jobId: j.id });
-      }
+  const openDetails = (job: ListJob) => {
+    if (job.__kind === "offer") {
+      const j = job.__raw?.job;
+      const offer = job.__raw?.offer;
+      setDetail({ ...j, offerId: offer?.id, isQuoteRequest: j?.pricing_type === "quote_request" });
+    } else if (job.__kind === "quote") {
+      setDetail({ ...job, isQuoteRequest: true, isOpenQuote: true });
+    } else {
+      setDetail({ ...job });
     }
-    if (!needs.length) return;
-    let cancelled = false;
-    geocodeAddresses({ data: { items: needs.map(n => ({ id: n.id, address: n.address })) } })
-      .then((res) => {
-        if (cancelled) return;
-        setGeoCache((prev) => {
-          const next = { ...prev };
-          for (const r of res) {
-            next[r.id] = r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null;
-          }
-          return next;
-        });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [rawMapJobs, geoCache]);
+  };
 
-  const mapJobs: MapJob[] = useMemo(() => {
-    return rawMapJobs
-      .map((j) => {
-        let out: MapJob = j;
-        if (out.pickup_lat == null || out.pickup_lng == null) {
-          const g = geoCache[`${j.id}:p`];
-          if (g) out = { ...out, pickup_lat: g.lat, pickup_lng: g.lng };
-        }
-        if (out.dropoff_lat == null || out.dropoff_lng == null) {
-          const g = geoCache[`${j.id}:d`];
-          if (g) out = { ...out, dropoff_lat: g.lat, dropoff_lng: g.lng };
-        }
-        if (out.pickup_lat == null || out.pickup_lng == null) return null;
-        return out;
-      })
-      .filter(Boolean) as MapJob[];
-  }, [rawMapJobs, geoCache]);
-
-  const handleMapClaim = (mj: MapJob) => {
-    if (mj.__kind === "offer") {
-      const offerId = mj.__raw?.offer?.id;
-      if (offerId) respond.mutate({ id: offerId, response: "accepted", jobId: mj.id });
-    } else {
-      claim.mutate(mj.id);
-    }
-  };
-  const handleMapDecline = (mj: MapJob) => {
-    if (mj.__kind === "offer") {
-      const offerId = mj.__raw?.offer?.id;
-      if (offerId) respond.mutate({ id: offerId, response: "declined" });
-    } else if (mj.__kind === "quote") {
-      declineQuoteJob(mj.id);
-    } else {
-      declineOpenJob(mj.id);
-    }
-  };
-  const handleMapQuote = (mj: MapJob) => {
-    setQuoteFor({ jobId: mj.id, jobNumber: mj.job_number });
-  };
-  const handleMapDetails = (mj: MapJob) => {
-    if (mj.__kind === "offer") {
-      const job = mj.__raw?.job;
-      const offer = mj.__raw?.offer;
-      setDetail({ ...job, offerId: offer?.id, isQuoteRequest: job?.pricing_type === "quote_request" });
-    } else if (mj.__kind === "quote") {
-      setDetail({ ...mj, isQuoteRequest: true, isOpenQuote: true });
-    } else {
-      setDetail({ ...mj });
-    }
-  };
+  const displayName = me?.full_name?.trim() || "שליח";
+  const availableCount = availableJobs.length;
 
   return (
     <CourierShell fullBleed>
-      <div className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden">
-        <AcceptJobsToggle me={me} />
-        <CourierJobsMap
-          jobs={mapJobs}
-          onClaim={handleMapClaim}
-          onDecline={handleMapDecline}
-          onQuote={handleMapQuote}
-          onDetails={handleMapDetails}
-          claiming={claim.isPending || respond.isPending}
-        />
+      <div dir="rtl" className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-bg">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6">
+          <div className="flex flex-col gap-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            {/* Header — Figma home-dashboard */}
+            <div className="flex items-center justify-between px-6 py-2">
+              <CourierMenuButton className="size-11 shadow-card border-0" />
+
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0 text-right">
+                  <p className="text-[13px] text-text-subtle leading-tight">שלום,</p>
+                  <p className="text-lg font-bold text-text-strong truncate leading-tight">{displayName}</p>
+                </div>
+                <CourierAvatar
+                  path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
+                  name={displayName}
+                  size={48}
+                />
+                <Link
+                  to="/courier/messages"
+                  aria-label="הודעות"
+                  className="size-11 grid place-items-center rounded-full bg-surface shadow-card text-text-strong active:bg-muted transition-colors shrink-0"
+                >
+                  <Bell className="size-5" strokeWidth={2} />
+                </Link>
+              </div>
+            </div>
+
+            {/* Status card — status toggle only (no cash toggle) */}
+            <div className="px-6">
+              <AcceptJobsToggle me={me} />
+            </div>
+
+            {/* Section title + tabs */}
+            <div className="px-6 pt-2">
+              <h2 className="text-lg font-bold text-text-strong text-right">
+                {t.kind === "mover" ? "הובלות באזורך" : "משלוחים באזורך"}
+              </h2>
+            </div>
+
+            <div className="px-6">
+              <div className="flex w-full rounded-[14px] bg-muted p-1">
+                <button
+                  type="button"
+                  onClick={() => setTab("active")}
+                  className={`flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-sm text-center transition-all ${
+                    tab === "active"
+                      ? "bg-surface font-bold text-primary shadow-card"
+                      : "font-semibold text-text-subtle"
+                  }`}
+                >
+                  {t.kind === "mover" ? `הובלות פעילות (${activeCount})` : `משלוחים פעילים (${activeCount})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("available")}
+                  className={`flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-sm text-center transition-all ${
+                    tab === "available"
+                      ? "bg-surface font-bold text-primary shadow-card"
+                      : "font-semibold text-text-subtle"
+                  }`}
+                >
+                  {t.kind === "mover" ? `הובלות זמינות (${availableCount})` : `משלוחים זמינים (${availableCount})`}
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 pb-4">
+              {tab === "active" ? (
+                <ActiveJobs />
+              ) : isLoading && availableCount === 0 ? (
+                <div className="flex justify-center py-16 text-text-muted">
+                  <Loader2 className="size-6 animate-spin" />
+                </div>
+              ) : availableCount === 0 ? (
+                <EmptyAvailableState kind={t.kind} />
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {availableJobs.map((job) => {
+                    const isQuote = job.__kind === "quote" || job.pricing_type === "quote_request";
+                    const payment = job.payment != null && !isQuote ? `${Number(job.payment).toFixed(0)} ₪` : null;
+                    return (
+                      <li key={`${job.__kind}-${job.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => openDetails(job)}
+                          className="w-full rounded-[20px] bg-surface shadow-card p-5 text-right active:bg-muted/60 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-base font-bold text-text-strong truncate">
+                                {deliveryKindLabel(job)}
+                              </p>
+                              <p className="mt-1 text-sm text-text-subtle">
+                                {shortAddress(job.pickup_address ?? job.pickup_area)}
+                                {" → "}
+                                {shortAddress(job.dropoff_address ?? job.dropoff_area)}
+                              </p>
+                              {job.job_number && (
+                                <p className="mt-1 text-xs text-text-muted">#{job.job_number}</p>
+                              )}
+                            </div>
+                            <div className="shrink-0 text-left">
+                              {payment ? (
+                                <p className="text-base font-extrabold text-primary">{payment}</p>
+                              ) : (
+                                <p className="text-xs font-bold text-warning-text bg-warning-bg rounded-pill px-2 py-1">
+                                  הצעת מחיר
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-
-
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent dir="rtl">
@@ -414,7 +457,6 @@ function NewJobsPage() {
                 phone={detail.recipient_phone}
               />
 
-
               <div><b>תאריך:</b> {detail.job_date ?? "—"} {detail.job_time ?? ""}</div>
               {detail.customer_name && <div><b>לקוח/עסק:</b> {detail.customer_name}</div>}
               {detail.payment != null && !detail.isQuoteRequest && <div><b>תשלום:</b> {Number(detail.payment).toFixed(0)} ₪</div>}
@@ -434,7 +476,7 @@ function NewJobsPage() {
             <DialogFooter className="flex-row-reverse gap-2 sm:gap-2">
               {detail.isOpenQuote ? (
                 <>
-                  <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number, quote: detail.existingQuote }); setDetail(null); }}>
+                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number, quote: detail.existingQuote }); setDetail(null); }}>
                     {detail.existingQuote ? "עדכן הצעה" : "הגש הצעת מחיר"}
                   </Button>
                   {!detail.existingQuote && (
@@ -444,11 +486,11 @@ function NewJobsPage() {
               ) : detail.offerId ? (
                 <>
                   {detail.isQuoteRequest ? (
-                    <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number }); setDetail(null); }}>
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number }); setDetail(null); }}>
                       הגש הצעת מחיר
                     </Button>
                   ) : (
-                    <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => respond.mutate({ id: detail.offerId, response: "accepted", jobId: detail.id })} disabled={respond.isPending}>
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => respond.mutate({ id: detail.offerId, response: "accepted", jobId: detail.id })} disabled={respond.isPending}>
                       {respond.isPending && <Loader2 className="size-3 animate-spin" />} {t.takeJob}
                     </Button>
                   )}
@@ -456,7 +498,7 @@ function NewJobsPage() {
                 </>
               ) : (
                 <>
-                  <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => claim.mutate(detail.id)} disabled={claim.isPending}>
+                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => claim.mutate(detail.id)} disabled={claim.isPending}>
                     {claim.isPending && <Loader2 className="size-3 animate-spin" />} {t.takeJob}
                   </Button>
                   <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => declineOpenJob(detail.id)}>דחה</Button>
@@ -481,6 +523,25 @@ function NewJobsPage() {
   );
 }
 
+function EmptyAvailableState({ kind }: { kind: "courier" | "mover" }) {
+  const noun = kind === "mover" ? "הובלות" : "משלוחים";
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 px-2 py-12 text-center">
+      <div className="rounded-full bg-info-bg p-4 text-primary">
+        <SearchX className="size-9" strokeWidth={2} aria-hidden />
+      </div>
+      <div className="flex flex-col gap-2 items-center max-w-[280px]">
+        <p className="text-xl font-bold text-text-strong">
+          {`אין כרגע ${noun} באזורכם`}
+        </p>
+        <p className="text-sm text-text-subtle">
+          משכו למטה לרענון, או נסעו לאזור עמוס יותר.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AcceptJobsToggle({ me }: { me: any }) {
   const qc = useQueryClient();
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
@@ -491,9 +552,7 @@ function AcceptJobsToggle({ me }: { me: any }) {
     setOn(approved && me.accepting_jobs !== false);
   }, [me, approved]);
 
-  // One-shot permission requests when the user first turns the toggle on.
   const requestPermissionsOnce = async () => {
-    // 1) GPS — prompts the OS location dialog once; browser caches the decision.
     if (typeof navigator !== "undefined" && navigator.geolocation) {
       try {
         await new Promise<void>((resolve) => {
@@ -505,7 +564,6 @@ function AcceptJobsToggle({ me }: { me: any }) {
         });
       } catch {}
     }
-    // 2) Push notifications — enablePushForCourier handles permission + subscription upsert.
     try {
       const { enablePushForCourier, pushSupported } = await import("@/lib/push/subscribe");
       if (pushSupported() && me?.id) {
@@ -534,49 +592,38 @@ function AcceptJobsToggle({ me }: { me: any }) {
 
   if (!me) return null;
 
-  // Floating pill overlay — sits on top of the map, doesn't consume vertical space.
+  const title = !approved
+    ? "סטטוס - לא פעיל"
+    : on
+      ? "סטטוס - פעיל"
+      : "סטטוס - לא פעיל";
+  const subtitle = !approved
+    ? "החשבון ממתין לאישור או מושהה"
+    : on
+      ? "תקבלו משלוחים והתראות"
+      : "הפעילו כדי לקבל משלוחים והתראות";
+
   return (
     <div
-      dir="rtl"
-      className="absolute top-[calc(env(safe-area-inset-top,0px)+0.75rem)] inset-x-3 z-20 pointer-events-none"
+      className={`w-full rounded-[20px] bg-surface shadow-card p-5 flex items-center justify-between gap-4 ${
+        !approved ? "opacity-70" : ""
+      }`}
     >
-      <button
-        type="button"
+      <Switch
+        checked={on}
         disabled={!approved || toggle.isPending}
-        onClick={() => {
+        onCheckedChange={(next) => {
           if (!approved) return;
-          const next = !on;
           setOn(next);
           toggle.mutate(next);
         }}
-        className={`pointer-events-auto w-full rounded-full backdrop-blur-md border shadow-lg px-4 py-2.5 flex items-center justify-between gap-3 transition ${
-          on
-            ? "bg-emerald-500/95 border-emerald-400 text-white shadow-emerald-200/60"
-            : "bg-white/95 border-slate-200 text-slate-700"
-        } ${!approved ? "opacity-60" : "active:scale-[0.99]"}`}
-      >
-        <span className="flex items-center gap-2 min-w-0">
-          <span className={`relative grid place-items-center size-8 rounded-full ${on ? "bg-white/25" : "bg-slate-100"}`}>
-            <Power className={`size-4 ${on ? "text-white" : "text-slate-500"}`} />
-            {on && <span className="absolute inset-0 rounded-full ring-2 ring-white/60 animate-ping" />}
-          </span>
-          <span className="text-right min-w-0">
-            <span className="block text-[13px] font-extrabold leading-tight truncate">
-              {on ? "מקבל עבודות" : approved ? "לחץ להפעלה" : "החשבון לא פעיל"}
-            </span>
-            <span className={`block text-[10.5px] leading-tight ${on ? "text-white/85" : "text-slate-500"}`}>
-              {on ? "מקבל התראות בזמן אמת" : "הצעות חדשות יופיעו כאן"}
-            </span>
-          </span>
-        </span>
-        <span className={`shrink-0 text-[11px] font-extrabold px-2 py-1 rounded-full ${
-          on ? "bg-white text-emerald-700" : "bg-slate-100 text-slate-500"
-        }`}>
-          {on ? "פעיל" : "כבוי"}
-        </span>
-      </button>
+        aria-label={title}
+        className="shrink-0 h-8 w-[3.25rem] [&>span]:size-6 data-[state=checked]:[&>span]:translate-x-[1.35rem] data-[state=checked]:bg-primary"
+      />
+      <div className="min-w-0 flex-1 text-right">
+        <div className="text-base font-bold text-text-strong leading-tight truncate">{title}</div>
+        <div className="text-[13px] text-text-subtle mt-0.5 leading-snug">{subtitle}</div>
+      </div>
     </div>
   );
 }
-
-

@@ -3024,10 +3024,10 @@ function InstallSection() {
               <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                 <InstallAppButton className="h-14 gap-2 rounded-full bg-white px-8 text-[15.5px] font-bold shadow-xl hover:bg-white/95 !text-[color:var(--brand)]" />
                 <Link
-                  to="/customer-login"
+                  to="/business-login"
                   className="inline-flex items-center justify-center gap-2 h-14 px-8 rounded-full border-2 border-white/40 text-white font-bold text-[15px] hover:bg-white/10 transition"
                 >
-                  כניסה לחשבון קיים
+                  כניסת עסקים
                 </Link>
               </div>
               <style>{`:root { --brand: ${BRAND}; }`}</style>
@@ -3206,13 +3206,12 @@ function Footer() {
             ]}
           />
           <FooterCol
-            title="שותפים"
+            title="כניסה לאפליקציה"
             links={[
-              ["אזור לקוחות פרטיים", "/customer-login"],
-              ["שליח או מוביל?", "/couriers"],
               ["התחברות שליח", "/courier-login"],
               ["כניסת עסקים", "/business-login"],
               ["ניהול", "/admin-login"],
+              ["הרשמה כשליח", "/join"],
             ]}
           />
         </div>

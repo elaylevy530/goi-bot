@@ -45,6 +45,14 @@ export function nestListCouriers(params?: { status?: string; limit?: number }) {
   });
 }
 
+export function nestCreateCourier(body: Record<string, unknown>) {
+  return apiFetch<NestCourierProfile>("/api/accounts/couriers", {
+    method: "POST",
+    accessToken: token(),
+    body: JSON.stringify(body),
+  });
+}
+
 export function nestGetCourier(id: string) {
   return apiFetch<NestCourierProfile>(`/api/accounts/couriers/${id}`, { accessToken: token() });
 }

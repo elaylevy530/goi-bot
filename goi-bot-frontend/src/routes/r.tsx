@@ -1,28 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { JoinPage } from "@/components/JoinPage";
+import { partnersUrl, redirectToPartnersWithSession } from "@/lib/partners-redirect";
+import { getNestAccessToken } from "@/lib/nest-auth";
 
-// Short, mobile-friendly link to share with couriers.
-// Renders the exact same registration page as /join.
 export const Route = createFileRoute("/r")({
   ssr: false,
-  head: () => ({
-    meta: [
-      { title: "הרשמה לשליחים — Goi" },
-      { name: "description", content: "הצטרף לבוט עבודות לשליחים של Goi וקבל משלוחים ישירות בוואטסאפ" },
-      { property: "og:title", content: "הרשמה לשליחים — Goi" },
-      { property: "og:description", content: "מלא את הטופס ב-2 דקות והתחל לקבל משלוחים בוואטסאפ" },
-      { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://goi-bot.lovable.app/r" },
-      { property: "og:image", content: "https://goi-bot.lovable.app/og-join.jpg" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "הרשמה לשליחים — Goi" },
-      { name: "twitter:description", content: "מלא את הטופס ב-2 דקות והתחל לקבל משלוחים בוואטסאפ" },
-      { name: "twitter:image", content: "https://goi-bot.lovable.app/og-join.jpg" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1" },
-    ],
-    links: [
-      { rel: "canonical", href: "https://goi-bot.lovable.app/r" },
-    ],
-  }),
-  component: JoinPage,
+  beforeLoad: () => {
+    if (typeof window !== "undefined") {
+      if (getNestAccessToken()) {
+        redirectToPartnersWithSession("/join");
+      } else {
+        window.location.replace(partnersUrl("/join"));
+      }
+    }
+  },
+  component: PartnersRedirectPage,
 });
+
+function PartnersRedirectPage() {
+  const href = partnersUrl("/join");
+  return (
+    <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 bg-background">
+      <div className="max-w-md text-center space-y-3">
+        <p className="text-sm text-muted-foreground">העמוד הועבר לאפליקציית השותפים (goi-partners).</p>
+        <a href={href} className="text-primary font-bold underline">המשך לאפליקציית השותפים</a>
+      </div>
+    </div>
+  );
+}

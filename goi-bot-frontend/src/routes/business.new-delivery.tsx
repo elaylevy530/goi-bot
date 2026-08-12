@@ -69,11 +69,22 @@ function FieldError({ message }: { message?: string }) {
 
 const fieldInputClass = (hasError: boolean) =>
   cn(
-    "w-full rounded-xl border bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm focus:outline-none focus:ring-2",
+    "w-full rounded-xl border bg-muted pr-9 pl-3 py-2.5 text-sm text-text-strong focus:outline-none focus:ring-2",
     hasError
       ? "border-destructive/50 focus:ring-destructive/30"
-      : "border-transparent focus:ring-[#35AD29]/30",
+      : "border-transparent focus:ring-primary/30",
   );
+
+function SectionLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
+  return (
+    <div className="flex items-baseline justify-between mb-2 px-0.5">
+      <label className="block text-[11px] font-bold text-text-muted uppercase tracking-wide">
+        {children}
+      </label>
+      {hint ? <span className="text-[11px] text-text-muted/80">{hint}</span> : null}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/business/new-delivery")({
   head: () => ({ meta: [{ title: "משלוח חדש — Goi" }] }),
@@ -510,7 +521,7 @@ function NewDeliveryPage() {
         />
       )}
 
-      <div className="fixed inset-0 bottom-[88px] flex flex-col bg-[#f5f6f8] z-20 pb-[env(safe-area-inset-bottom)]">
+      <div className="fixed inset-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex flex-col bg-bg z-20">
         {/* Map on top */}
         <div className={`flex-1 relative ${expanded ? "min-h-[96px]" : "min-h-[240px]"}`}>
           <OrderMap pickup={pickup} dropoff={dropoff} className="absolute inset-0" />
@@ -519,48 +530,44 @@ function NewDeliveryPage() {
             type="button"
             onClick={() => navigate({ to: "/business/account" })}
             aria-label="תפריט"
-            className="absolute top-3 right-3 z-10 size-10 rounded-full bg-white shadow-lg ring-1 ring-black/10 grid place-items-center hover:bg-[#f5f6f8] active:scale-95 transition"
+            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 size-10 rounded-pill bg-surface shadow-card ring-1 ring-black/10 grid place-items-center hover:bg-muted active:scale-95 transition"
           >
-            <Menu className="size-5 text-[#101418]" strokeWidth={2.4} />
+            <Menu className="size-5 text-text-strong" strokeWidth={2.4} />
           </button>
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="absolute top-[max(1rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 pointer-events-none">
             <div dir="ltr" className="inline-flex items-baseline gap-1.5">
-              <span
-                className="text-[26px] font-black italic tracking-tight leading-none"
-                style={{ color: "#101418", textShadow: "0 2px 0 rgba(0,0,0,0.12)" }}
-              >
+              <span className="font-wordmark text-[26px] font-black italic tracking-tight leading-none text-navy drop-shadow-sm">
                 GOI
               </span>
-              <span className="text-[10px] font-black text-[#35AD29] leading-none uppercase tracking-wide">
+              <span className="text-[10px] font-black text-primary leading-none uppercase tracking-wide">
                 Business
               </span>
             </div>
           </div>
 
-
-
           {!pickup && !dropoff && (
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="bg-white/95 backdrop-blur rounded-full px-4 py-2 text-xs font-semibold text-[#101418]/70 shadow-lg ring-1 ring-black/5">
-                בחר כתובת איסוף ומסירה למטה
+              <div className="bg-surface/95 backdrop-blur rounded-pill px-4 py-2 text-xs font-semibold text-text-muted shadow-card ring-1 ring-black/5">
+                בחרו כתובת איסוף ומסירה למטה
               </div>
             </div>
           )}
           {distanceKm && (
-            <div className="absolute bottom-3 left-3 bg-[#101418] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
+            <div className="absolute bottom-3 left-3 bg-navy text-white text-xs font-bold px-3 py-1.5 rounded-pill shadow-card">
               {distanceKm.toFixed(1)} ק"מ
             </div>
           )}
         </div>
 
-        {/* Bottom sheet */}
+        {/* Bottom sheet — wizard body + sticky CTA */}
         <div
-          className={`relative z-10 flex flex-col flex-shrink-0 bg-white rounded-t-3xl shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)] overflow-hidden transition-[height,max-height] duration-300 ${
-            expanded ? "h-[74vh] max-h-[calc(100%-120px)]" : "max-h-[260px]"
-          }`}
+          className={cn(
+            "relative z-10 flex flex-col flex-shrink-0 bg-surface rounded-t-[1.5rem] shadow-bottom-bar overflow-hidden transition-[height,max-height] duration-300",
+            expanded ? "h-[74vh] max-h-[calc(100%-120px)]" : "max-h-[260px]",
+          )}
         >
-          <div className="w-full flex justify-center pt-2 pb-1" aria-hidden>
-            <div className="w-10 h-1 bg-black/15 rounded-full" />
+          <div className="w-full flex justify-center pt-2.5 pb-1" aria-hidden>
+            <div className="w-10 h-1 bg-black/12 rounded-pill" />
           </div>
 
           {/* Address inputs — fixed at top only when collapsed */}
@@ -602,7 +609,7 @@ function NewDeliveryPage() {
                     <button
                       type="button"
                       onClick={() => { setUseBusinessAddress(true); clearFieldError("pickup"); }}
-                      className="text-[11px] font-medium text-[#35AD29]/80 hover:text-[#35AD29] hover:underline px-1"
+                      className="text-[11px] font-medium text-primary/80 hover:text-primary hover:underline px-1"
                     >
                       השתמש בכתובת העסק
                     </button>
@@ -610,7 +617,7 @@ function NewDeliveryPage() {
                     <button
                       type="button"
                       onClick={() => navigate({ to: "/business/profile" })}
-                      className="text-[11px] font-medium text-[#101418]/50 hover:text-[#35AD29] hover:underline px-1"
+                      className="text-[11px] font-medium text-text-muted hover:text-primary hover:underline px-1"
                     >
                       שמור כתובת קבועה בפרופיל
                     </button>
@@ -641,11 +648,11 @@ function NewDeliveryPage() {
 
           {/* Expanded body — everything scrolls together */}
           {expanded && (
-            <div ref={sheetBodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-4 space-y-4">
+            <div ref={sheetBodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-4 space-y-5">
 
               {Object.keys(fieldErrors).length > 0 && (
                 <div
-                  className="flex items-start gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-2.5 text-[12px] font-medium text-destructive"
+                  className="flex items-start gap-2 rounded-card bg-danger-bg border border-destructive/20 px-3 py-2.5 text-[12px] font-medium text-danger-text"
                   role="alert"
                 >
                   <AlertCircle className="size-4 shrink-0 mt-0.5" />
@@ -655,6 +662,7 @@ function NewDeliveryPage() {
 
               {/* Addresses (scroll with body) */}
               <div className="space-y-2">
+                <SectionLabel>כתובות</SectionLabel>
                 {useBusinessAddress && businessPickupAddress ? (
                   <div data-field="pickup">
                     <BusinessPickupCard
@@ -691,7 +699,7 @@ function NewDeliveryPage() {
                       <button
                         type="button"
                         onClick={() => { setUseBusinessAddress(true); clearFieldError("pickup"); }}
-                        className="text-[11px] font-medium text-[#35AD29]/80 hover:text-[#35AD29] hover:underline px-1"
+                        className="text-[11px] font-medium text-primary/80 hover:text-primary hover:underline px-1"
                       >
                         השתמש בכתובת העסק
                       </button>
@@ -699,7 +707,7 @@ function NewDeliveryPage() {
                       <button
                         type="button"
                         onClick={() => navigate({ to: "/business/profile" })}
-                        className="text-[11px] font-medium text-[#101418]/50 hover:text-[#35AD29] hover:underline px-1"
+                        className="text-[11px] font-medium text-text-muted hover:text-primary hover:underline px-1"
                       >
                         שמור כתובת קבועה בפרופיל
                       </button>
@@ -732,16 +740,14 @@ function NewDeliveryPage() {
 
               {/* Pickup contact + readiness */}
               <div>
-                <label className="block text-[11px] font-bold text-[#101418]/60 uppercase mb-2 px-0.5">
-                  פרטי איסוף
-                </label>
+                <SectionLabel>פרטי איסוף</SectionLabel>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <div data-field="pickupContactName">
                       <div className="relative">
                         <User className={cn(
                           "absolute right-3 top-1/2 -translate-y-1/2 size-4",
-                          fieldErrors.pickupContactName ? "text-destructive" : "text-[#101418]/40",
+                          fieldErrors.pickupContactName ? "text-destructive" : "text-text-muted",
                         )} />
                         <input
                           type="text"
@@ -761,7 +767,7 @@ function NewDeliveryPage() {
                       <div className="relative">
                         <Phone className={cn(
                           "absolute right-3 top-1/2 -translate-y-1/2 size-4",
-                          fieldErrors.pickupContactPhone ? "text-destructive" : "text-[#101418]/40",
+                          fieldErrors.pickupContactPhone ? "text-destructive" : "text-text-muted",
                         )} />
                         <input
                           type="tel"
@@ -779,13 +785,13 @@ function NewDeliveryPage() {
                     </div>
                   </div>
                   <div className="relative">
-                    <StickyNote className="absolute right-3 top-3 size-4 text-[#101418]/40" />
+                    <StickyNote className="absolute right-3 top-3 size-4 text-text-muted" />
                     <textarea
                       value={pickupInstructions}
                       onChange={(e) => setPickupInstructions(e.target.value)}
                       placeholder="הוראות איסוף (כניסה, קומה, חניה, למי לפנות…)"
                       rows={2}
-                      className="w-full rounded-xl border border-transparent bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
+                      className="w-full rounded-xl border border-transparent bg-muted pr-9 pl-3 py-2.5 text-sm text-text-strong resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -796,9 +802,12 @@ function NewDeliveryPage() {
                         clearFieldError("pickupReadyTime");
                       }}
                       aria-pressed={pickupReadyNow}
-                      className={`flex-1 py-2 rounded-xl text-[11px] font-black transition ${
-                        pickupReadyNow ? "bg-[#35AD29] text-white shadow-sm" : "bg-[#F5F3EF] text-[#101418]/70"
-                      }`}
+                      className={cn(
+                        "flex-1 py-2 rounded-pill text-[11px] font-black transition",
+                        pickupReadyNow
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-muted text-text-muted",
+                      )}
                     >
                       מוכן לאיסוף עכשיו
                     </button>
@@ -806,9 +815,12 @@ function NewDeliveryPage() {
                       type="button"
                       onClick={() => setPickupReadyNow(false)}
                       aria-pressed={!pickupReadyNow}
-                      className={`flex-1 py-2 rounded-xl text-[11px] font-black transition ${
-                        !pickupReadyNow ? "bg-[#101418] text-white shadow-sm" : "bg-[#F5F3EF] text-[#101418]/70"
-                      }`}
+                      className={cn(
+                        "flex-1 py-2 rounded-pill text-[11px] font-black transition",
+                        !pickupReadyNow
+                          ? "bg-navy text-white shadow-sm"
+                          : "bg-muted text-text-muted",
+                      )}
                     >
                       יהיה מוכן בשעה…
                     </button>
@@ -817,11 +829,11 @@ function NewDeliveryPage() {
                     <div data-field="pickupReadyTime">
                       <div
                         className={cn(
-                          "flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2 border",
+                          "flex items-center gap-2 bg-muted rounded-xl px-3 py-2 border",
                           fieldErrors.pickupReadyTime ? "border-destructive/50" : "border-transparent",
                         )}
                       >
-                        <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">מוכן ב־</span>
+                        <span className="text-[11px] font-bold text-text-muted shrink-0">מוכן ב־</span>
                         <input
                           type="time"
                           value={pickupReadyTime}
@@ -830,7 +842,7 @@ function NewDeliveryPage() {
                             clearFieldError("pickupReadyTime");
                           }}
                           aria-invalid={!!fieldErrors.pickupReadyTime}
-                          className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
+                          className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-text-strong text-left"
                           dir="ltr"
                         />
                       </div>
@@ -840,19 +852,9 @@ function NewDeliveryPage() {
                 </div>
               </div>
 
-
-
-
-
               {/* Delivery type — horizontally scrollable realistic tiles */}
-
               <div>
-                <div className="flex items-baseline justify-between mb-2 px-0.5">
-                  <label className="block text-[11px] font-bold text-[#101418]/60 uppercase">
-                    מה שולחים?
-                  </label>
-                  <span className="text-[11px] text-[#101418]/40">גררו הצידה →</span>
-                </div>
+                <SectionLabel hint="גררו הצידה ←">מה שולחים?</SectionLabel>
                 <div
                   className="-mx-4 px-4 pt-2 flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory scroll-px-4"
                   style={{ scrollbarWidth: "none" }}
@@ -867,15 +869,16 @@ function NewDeliveryPage() {
                         type="button"
                         onClick={() => setDeliveryType(t.label)}
                         aria-pressed={on}
-                        className={`group relative snap-start shrink-0 w-[76px] rounded-2xl px-1 pt-1.5 pb-2 text-center transition-all active:scale-[0.94] ${
+                        className={cn(
+                          "group relative snap-start shrink-0 w-[76px] rounded-card px-1 pt-1.5 pb-2 text-center transition-all active:scale-[0.94] border-2",
                           on
-                            ? `bg-[#F5F3EF] border-2 ${tone.ring.replace("ring-", "border-")} shadow-[0_4px_12px_-4px_rgba(53,173,41,0.4)]`
-                            : "bg-transparent border-2 border-transparent opacity-80 hover:opacity-100"
-                        }`}
+                            ? `bg-muted ${tone.ring.replace("ring-", "border-")} shadow-card`
+                            : "bg-transparent border-transparent opacity-80 hover:opacity-100",
+                        )}
                       >
                         <div className="relative w-full aspect-square grid place-items-center">
                           <div
-                            className={`absolute inset-2 rounded-full blur-xl transition-opacity ${on ? "opacity-50" : "opacity-25"}`}
+                            className={`absolute inset-2 rounded-pill blur-xl transition-opacity ${on ? "opacity-50" : "opacity-25"}`}
                             style={{ background: tone.glow }}
                             aria-hidden
                           />
@@ -885,10 +888,16 @@ function NewDeliveryPage() {
                             loading="lazy"
                             width={72}
                             height={72}
-                            className={`relative w-full h-full object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] transition-transform duration-200 ${on ? "scale-105" : "group-hover:scale-105"}`}
+                            className={cn(
+                              "relative w-full h-full object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] transition-transform duration-200",
+                              on ? "scale-105" : "group-hover:scale-105",
+                            )}
                           />
                         </div>
-                        <div className={`text-[10.5px] font-bold leading-tight mt-0.5 line-clamp-1 ${on ? "text-[#101418]" : "text-[#101418]/70"}`}>
+                        <div className={cn(
+                          "text-[10.5px] font-bold leading-tight mt-0.5 line-clamp-1",
+                          on ? "text-text-strong" : "text-text-muted",
+                        )}>
                           {t.label}
                         </div>
                       </button>
@@ -902,17 +911,12 @@ function NewDeliveryPage() {
 
               {/* Timing — segmented pill row */}
               <div>
-                <div className="flex items-baseline justify-between mb-2 px-0.5">
-                  <label className="block text-[11px] font-bold text-[#101418]/60 uppercase">
-                    מתי להזמין שליח?
-                  </label>
-                  {timing !== "scheduled" && (
-                    <span className="text-[11px] font-bold text-[#35AD29]">
-                      {TIMING_LABELS[timing]?.label}
-                    </span>
-                  )}
-                </div>
-                <div className="relative flex items-center gap-1 p-1 rounded-full bg-[#F5F3EF]">
+                <SectionLabel
+                  hint={timing !== "scheduled" ? TIMING_LABELS[timing]?.label : undefined}
+                >
+                  מתי להזמין שליח?
+                </SectionLabel>
+                <div className="relative flex items-center gap-1 p-1 rounded-pill bg-muted">
                   {timings.map((t) => {
                     const on = timing === t;
                     const info = TIMING_LABELS[t];
@@ -925,11 +929,12 @@ function NewDeliveryPage() {
                           if (t !== "scheduled") clearFieldError("scheduledAt");
                         }}
                         aria-pressed={on}
-                        className={`flex-1 relative inline-flex items-center justify-center gap-1.5 py-2 px-2 rounded-full text-xs font-black transition-all ${
+                        className={cn(
+                          "flex-1 relative inline-flex items-center justify-center gap-1.5 py-2 px-2 rounded-pill text-xs font-black transition-all",
                           on
-                            ? "bg-[#35AD29] text-white shadow-[0_4px_12px_-4px_rgba(53,173,41,0.55)]"
-                            : "text-[#101418]/60 hover:text-[#101418]"
-                        }`}
+                            ? "bg-primary text-primary-foreground shadow-fab"
+                            : "text-text-muted hover:text-text-strong",
+                        )}
                       >
                         <img
                           src={TIMING_ICONS[t]}
@@ -938,7 +943,7 @@ function NewDeliveryPage() {
                           loading="lazy"
                           width={20}
                           height={20}
-                          className={`size-5 object-contain transition ${on ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]" : ""}`}
+                          className={cn("size-5 object-contain transition", on && "drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]")}
                         />
                         <span className="leading-none">{info.label}</span>
                       </button>
@@ -946,17 +951,17 @@ function NewDeliveryPage() {
                   })}
                 </div>
                 {(timing === "today" || timing === "within_hour") && (
-                  <div className="mt-2 flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2">
-                    <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">שעת איסוף</span>
+                  <div className="mt-2 flex items-center gap-2 bg-muted rounded-xl px-3 py-2">
+                    <span className="text-[11px] font-bold text-text-muted shrink-0">שעת איסוף</span>
                     <input
                       type="time"
                       value={todayTime}
                       onChange={(e) => setTodayTime(e.target.value)}
-                      className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
+                      className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-text-strong text-left"
                       dir="ltr"
                     />
                     {!todayTime && (
-                      <span className="text-[10px] text-[#101418]/40">אופציונלי</span>
+                      <span className="text-[10px] text-text-muted">אופציונלי</span>
                     )}
                   </div>
                 )}
@@ -964,11 +969,11 @@ function NewDeliveryPage() {
                   <div className="mt-2" data-field="scheduledAt">
                     <div
                       className={cn(
-                        "flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2 border",
+                        "flex items-center gap-2 bg-muted rounded-xl px-3 py-2 border",
                         fieldErrors.scheduledAt ? "border-destructive/50" : "border-transparent",
                       )}
                     >
-                      <span className="text-[11px] font-bold text-[#101418]/60 shrink-0">תאריך ושעה</span>
+                      <span className="text-[11px] font-bold text-text-muted shrink-0">תאריך ושעה</span>
                       <input
                         type="datetime-local"
                         value={scheduledAt}
@@ -977,7 +982,7 @@ function NewDeliveryPage() {
                           clearFieldError("scheduledAt");
                         }}
                         aria-invalid={!!fieldErrors.scheduledAt}
-                        className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-[#101418] text-left"
+                        className="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-text-strong text-left"
                         dir="ltr"
                       />
                     </div>
@@ -988,9 +993,7 @@ function NewDeliveryPage() {
 
               {/* Vehicle required */}
               <div>
-                <label className="block text-[11px] font-bold text-[#101418]/60 uppercase mb-2 px-0.5">
-                  איזה רכב צריך?
-                </label>
+                <SectionLabel>איזה רכב צריך?</SectionLabel>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { key: "אופנוע", label: "אופנוע", Icon: Bike },
@@ -1004,11 +1007,12 @@ function NewDeliveryPage() {
                         type="button"
                         onClick={() => setVehicle(key)}
                         aria-pressed={on}
-                        className={`inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition ${
+                        className={cn(
+                          "inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition",
                           on
-                            ? "bg-[#101418] text-white shadow-sm"
-                            : "bg-[#F5F3EF] text-[#101418]/70 hover:text-[#101418]"
-                        }`}
+                            ? "bg-navy text-white shadow-sm"
+                            : "bg-muted text-text-muted hover:text-text-strong",
+                        )}
                       >
                         <Icon className="size-4" strokeWidth={2.2} />
                         {label}
@@ -1020,19 +1024,18 @@ function NewDeliveryPage() {
 
               {/* Dropoff address details */}
               <div>
-                <label className="block text-[11px] font-bold text-[#101418]/60 uppercase mb-2 px-0.5">
-                  פרטי היעד
-                </label>
+                <SectionLabel>פרטי היעד</SectionLabel>
                 <div className="space-y-1.5">
                   <button
                     type="button"
                     onClick={() => setDropoffGround((v) => !v)}
                     aria-pressed={dropoffGround}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition ${
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-[11px] font-bold border transition",
                       dropoffGround
-                        ? "bg-[#101418] text-white border-[#101418]"
-                        : "bg-white text-[#101418]/70 border-black/10"
-                    }`}
+                        ? "bg-navy text-white border-navy"
+                        : "bg-surface text-text-muted border-black/10",
+                    )}
                   >
                     <Building2 className="size-3.5" strokeWidth={2.4} />
                     קומת קרקע / כניסה ישירה
@@ -1045,7 +1048,7 @@ function NewDeliveryPage() {
                         value={dropoffFloor}
                         onChange={(e) => setDropoffFloor(e.target.value)}
                         placeholder="קומה"
-                        className="rounded-xl border-0 bg-[#F5F3EF] px-3 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
+                        className="rounded-xl border-0 bg-muted px-3 py-2.5 text-sm text-center text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                       <input
                         type="text"
@@ -1053,30 +1056,24 @@ function NewDeliveryPage() {
                         value={dropoffApt}
                         onChange={(e) => setDropoffApt(e.target.value)}
                         placeholder="דירה"
-                        className="rounded-xl border-0 bg-[#F5F3EF] px-3 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
+                        className="rounded-xl border-0 bg-muted px-3 py-2.5 text-sm text-center text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                       <input
                         type="text"
                         value={dropoffEntry}
                         onChange={(e) => setDropoffEntry(e.target.value)}
                         placeholder="כניסה/קוד"
-                        className="rounded-xl border-0 bg-[#F5F3EF] px-3 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
+                        className="rounded-xl border-0 bg-muted px-3 py-2.5 text-sm text-center text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
                   )}
                 </div>
               </div>
 
-
-
-
-
               {/* Attributes */}
               {category.attributes.length > 0 && (
                 <div>
-                  <label className="block text-[11px] font-bold text-[#101418]/60 uppercase mb-2">
-                    מאפיינים
-                  </label>
+                  <SectionLabel>מאפיינים</SectionLabel>
                   <div className="flex flex-wrap gap-1.5">
                     {category.attributes.map((a) => {
                       const on = attributes.has(a.key);
@@ -1085,11 +1082,12 @@ function NewDeliveryPage() {
                           key={a.key}
                           type="button"
                           onClick={() => toggleAttr(a.key)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                          className={cn(
+                            "px-3 py-1.5 rounded-pill text-xs font-bold border transition",
                             on
-                              ? "bg-[#101418] text-white border-[#101418]"
-                              : "bg-white text-[#101418]/70 border-black/10"
-                          }`}
+                              ? "bg-navy text-white border-navy"
+                              : "bg-surface text-text-muted border-black/10",
+                          )}
                         >
                           {a.label}
                         </button>
@@ -1100,45 +1098,47 @@ function NewDeliveryPage() {
               )}
 
               {/* Recipient */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative">
-                  <User className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-[#101418]/40" />
-                  <input
-                    type="text"
-                    value={recipientName}
-                    onChange={(e) => setRecipientName(e.target.value)}
-                    placeholder="שם הנמען"
-                    className="w-full rounded-xl border-0 bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
-                  />
-                </div>
-                <div className="relative">
-                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-[#101418]/40" />
-                  <input
-                    type="tel"
-                    value={recipientPhone}
-                    onChange={(e) => setRecipientPhone(e.target.value)}
-                    placeholder="טלפון נמען"
-                    className="w-full rounded-xl border-0 bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
-                  />
+              <div>
+                <SectionLabel>פרטי נמען</SectionLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <User className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-text-muted" />
+                    <input
+                      type="text"
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      placeholder="שם הנמען"
+                      className="w-full rounded-xl border-0 bg-muted pr-9 pl-3 py-2.5 text-sm text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-text-muted" />
+                    <input
+                      type="tel"
+                      value={recipientPhone}
+                      onChange={(e) => setRecipientPhone(e.target.value)}
+                      placeholder="טלפון נמען"
+                      className="w-full rounded-xl border-0 bg-muted pr-9 pl-3 py-2.5 text-sm text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Notes */}
               <div className="relative">
-                <StickyNote className="absolute right-3 top-3 size-4 text-[#101418]/40" />
+                <StickyNote className="absolute right-3 top-3 size-4 text-text-muted" />
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="הערות לשליח (קומה, קוד כניסה, ליצור קשר…)"
                   rows={2}
-                  className="w-full rounded-xl border-0 bg-[#F5F3EF] pr-9 pl-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#35AD29]/30"
+                  className="w-full rounded-xl border-0 bg-muted pr-9 pl-3 py-2.5 text-sm text-text-strong resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
 
-
               {/* Pricing */}
               <div>
-                <label className="block text-[11px] font-bold text-[#101418]/60 uppercase mb-1.5">מחיר</label>
+                <SectionLabel>מחיר</SectionLabel>
                 <div className="grid grid-cols-3 gap-1.5 mb-2">
                   {[
                     { key: "fixed_price", label: "מחיר קבוע" },
@@ -1156,9 +1156,10 @@ function NewDeliveryPage() {
                           clearFieldError("basePrice");
                           clearFieldError("pricePerKm");
                         }}
-                        className={`py-2 rounded-xl text-[11px] font-bold transition ${
-                          on ? "bg-[#101418] text-white" : "bg-[#F5F3EF] text-[#101418]/70"
-                        }`}
+                        className={cn(
+                          "py-2 rounded-xl text-[11px] font-bold transition",
+                          on ? "bg-navy text-white" : "bg-muted text-text-muted",
+                        )}
                       >
                         {opt.label}
                       </button>
@@ -1170,11 +1171,11 @@ function NewDeliveryPage() {
                   <div data-field="offeredPrice">
                     <div
                       className={cn(
-                        "flex items-center gap-2 bg-[#F5F3EF] rounded-xl px-3 py-2.5 border",
+                        "flex items-center gap-2 bg-muted rounded-xl px-3 py-2.5 border",
                         fieldErrors.offeredPrice ? "border-destructive/50" : "border-transparent",
                       )}
                     >
-                      <span className="text-lg font-black text-[#101418]/40">₪</span>
+                      <span className="text-lg font-black text-text-muted">₪</span>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -1185,7 +1186,7 @@ function NewDeliveryPage() {
                         }}
                         placeholder={String(suggestedPrice)}
                         aria-invalid={!!fieldErrors.offeredPrice}
-                        className="flex-1 bg-transparent border-0 outline-none text-lg font-black text-[#101418]"
+                        className="flex-1 bg-transparent border-0 outline-none text-lg font-black text-text-strong"
                       />
                       <button
                         type="button"
@@ -1193,7 +1194,7 @@ function NewDeliveryPage() {
                           setOfferedPrice(String(suggestedPrice));
                           clearFieldError("offeredPrice");
                         }}
-                        className="text-[11px] font-bold text-[#101418]/60 bg-white px-2 py-1 rounded-lg shadow-sm"
+                        className="text-[11px] font-bold text-text-muted bg-surface px-2 py-1 rounded-lg shadow-card"
                       >
                         מוצע: ₪{suggestedPrice}
                       </button>
@@ -1203,18 +1204,18 @@ function NewDeliveryPage() {
                 )}
 
                 {pricingModel === "distance_based" && (
-                  <div className="bg-[#F5F3EF] rounded-xl p-3 space-y-2">
+                  <div className="bg-muted rounded-card p-3 space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <div data-field="basePrice">
                         <div
                           className={cn(
-                            "bg-white rounded-lg px-3 py-2 border",
+                            "bg-surface rounded-lg px-3 py-2 border",
                             fieldErrors.basePrice ? "border-destructive/50" : "border-transparent",
                           )}
                         >
-                          <div className="text-[10px] font-bold text-[#101418]/50 mb-0.5">מחיר בסיס</div>
+                          <div className="text-[10px] font-bold text-text-muted mb-0.5">מחיר בסיס</div>
                           <div className="flex items-center gap-1">
-                            <span className="text-sm font-black text-[#101418]/40">₪</span>
+                            <span className="text-sm font-black text-text-muted">₪</span>
                             <input
                               type="number"
                               inputMode="numeric"
@@ -1224,7 +1225,7 @@ function NewDeliveryPage() {
                                 clearFieldError("basePrice");
                               }}
                               aria-invalid={!!fieldErrors.basePrice}
-                              className="w-full bg-transparent border-0 outline-none text-base font-black text-[#101418]"
+                              className="w-full bg-transparent border-0 outline-none text-base font-black text-text-strong"
                             />
                           </div>
                         </div>
@@ -1233,13 +1234,13 @@ function NewDeliveryPage() {
                       <div data-field="pricePerKm">
                         <div
                           className={cn(
-                            "bg-white rounded-lg px-3 py-2 border",
+                            "bg-surface rounded-lg px-3 py-2 border",
                             fieldErrors.pricePerKm ? "border-destructive/50" : "border-transparent",
                           )}
                         >
-                          <div className="text-[10px] font-bold text-[#101418]/50 mb-0.5">₪ לק״מ</div>
+                          <div className="text-[10px] font-bold text-text-muted mb-0.5">₪ לק״מ</div>
                           <div className="flex items-center gap-1">
-                            <span className="text-sm font-black text-[#101418]/40">₪</span>
+                            <span className="text-sm font-black text-text-muted">₪</span>
                             <input
                               type="number"
                               inputMode="decimal"
@@ -1250,37 +1251,34 @@ function NewDeliveryPage() {
                                 clearFieldError("pricePerKm");
                               }}
                               aria-invalid={!!fieldErrors.pricePerKm}
-                              className="w-full bg-transparent border-0 outline-none text-base font-black text-[#101418]"
+                              className="w-full bg-transparent border-0 outline-none text-base font-black text-text-strong"
                             />
                           </div>
                         </div>
                         <FieldError message={fieldErrors.pricePerKm} />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#101418]/70">
+                    <div className="flex items-center justify-between px-1 text-[11px] font-bold text-text-muted">
                       <span>
                         {distanceKm ? `${distanceKm.toFixed(1)} ק״מ` : "מרחק יחושב לפי הכתובות"}
                       </span>
-                      <span className="text-[#35AD29]">≈ ₪{distancePrice}</span>
+                      <span className="text-primary">≈ ₪{distancePrice}</span>
                     </div>
                   </div>
                 )}
 
                 {pricingModel === "quote_request" && (
-                  <div className="bg-[#F5F3EF] rounded-xl px-3 py-2.5 text-xs text-[#101418]/70">
-                    שליחים ישלחו הצעות מחיר ותוכל לבחור מתוכן.
+                  <div className="bg-muted rounded-card px-3 py-2.5 text-xs text-text-muted">
+                    שליחים ישלחו הצעות מחיר ותוכלו לבחור מתוכן.
                   </div>
                 )}
               </div>
 
-
-
             </div>
           )}
 
-
-          {/* CTA footer */}
-          <div className="flex-shrink-0 bg-white pt-2.5 pb-4 px-4 border-t border-black/5 shadow-[0_-10px_20px_rgba(0,0,0,0.04)]">
+          {/* Sticky CTA — sheet footer (above business bottom tabs) */}
+          <div className="flex-shrink-0 bg-surface/95 backdrop-blur pt-2.5 pb-3 px-4 border-t border-black/5 shadow-bottom-bar">
             {expanded && Object.keys(fieldErrors).length > 0 && (
               <p className="mb-2 text-center text-[11px] font-medium text-destructive">
                 יש שדות שדורשים תיקון — ראו את ההערות האדומות למעלה
@@ -1290,7 +1288,7 @@ function NewDeliveryPage() {
               type="button"
               onClick={attemptSubmit}
               disabled={submit.isPending}
-              className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#35AD29] hover:bg-[#2d9623] disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-black transition shadow-[0_8px_20px_-6px_rgba(53,173,41,0.55)] active:scale-[0.98]"
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-pill bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground text-base font-black transition shadow-fab active:scale-[0.98]"
             >
               {submit.isPending ? (
                 <Loader2 className="size-5 animate-spin" />
@@ -1333,10 +1331,10 @@ function BusinessExtraStops({
   return (
     <div className="space-y-2">
       {stops.map((s, i) => (
-        <div key={i} className="space-y-1.5 rounded-2xl bg-black/[0.03] p-2">
+        <div key={i} className="space-y-1.5 rounded-card bg-muted/70 p-2">
           <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-bold text-[#101418]/60">יעד נוסף {i + 2}</span>
-            <button type="button" onClick={() => remove(i)} className="text-[11px] font-bold text-[#B00020]">הסר</button>
+            <span className="text-[11px] font-bold text-text-muted">יעד נוסף {i + 2}</span>
+            <button type="button" onClick={() => remove(i)} className="text-[11px] font-bold text-danger-text">הסר</button>
           </div>
           <AddressAutocomplete
             label={`יעד ${i + 2}`}
@@ -1350,12 +1348,12 @@ function BusinessExtraStops({
             <input
               type="text" value={s.name} onChange={(e) => update(i, { name: e.target.value })}
               placeholder="שם הנמען"
-              className="w-full rounded-xl bg-white border border-black/10 px-3 py-2 text-xs font-semibold"
+              className="w-full rounded-xl bg-surface border border-black/10 px-3 py-2 text-xs font-semibold text-text-strong"
             />
             <input
               type="tel" value={s.phone} onChange={(e) => update(i, { phone: e.target.value })}
               placeholder="טלפון"
-              className="w-full rounded-xl bg-white border border-black/10 px-3 py-2 text-xs font-semibold"
+              className="w-full rounded-xl bg-surface border border-black/10 px-3 py-2 text-xs font-semibold text-text-strong"
             />
           </div>
         </div>
@@ -1363,7 +1361,7 @@ function BusinessExtraStops({
       <button
         type="button"
         onClick={add}
-        className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-black/20 text-[12px] font-bold text-[#101418]/70 hover:bg-black/5"
+        className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-black/15 text-[12px] font-bold text-text-muted hover:bg-muted transition"
       >
         <Plus className="size-3.5" /> {stops.length === 0 ? "אותו שליח, כמה יעדים" : "הוסף עוד יעד"}
       </button>
@@ -1384,21 +1382,21 @@ function BusinessPickupCard({
     <div>
       <div
         className={cn(
-          "rounded-2xl bg-[#F5F3EF]/70 px-3 py-2.5 flex items-center gap-3 border",
-          error ? "border-destructive/50" : "border-[#35AD29]/15",
+          "rounded-card bg-muted/80 px-3 py-2.5 flex items-center gap-3 border",
+          error ? "border-destructive/50" : "border-primary/20",
         )}
       >
-        <div className="size-8 rounded-full bg-[#35AD29]/10 flex items-center justify-center shrink-0">
-          <Building2 className="size-4 text-[#35AD29]" />
+        <div className="size-8 rounded-pill bg-primary/10 flex items-center justify-center shrink-0">
+          <Building2 className="size-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-medium text-[#101418]/50 tracking-wide">איסוף מכתובת העסק</div>
-          <div className="text-sm font-semibold text-[#101418] truncate" title={address}>{address}</div>
+          <div className="text-[10px] font-medium text-text-muted tracking-wide">איסוף מכתובת העסק</div>
+          <div className="text-sm font-semibold text-text-strong truncate" title={address}>{address}</div>
         </div>
         <button
           type="button"
           onClick={onChangeAddress}
-          className="text-[11px] font-medium text-[#101418]/50 hover:text-[#101418] hover:underline shrink-0"
+          className="text-[11px] font-medium text-text-muted hover:text-text-strong hover:underline shrink-0"
         >
           כתובת אחרת
         </button>

@@ -12,8 +12,10 @@ type QueueItem = {
   template_params?: string[] | null;
 };
 
+/** Enqueue is Nest-owned; shell callers should use Nest WhatsApp send/dispatch. */
 export async function enqueueWhatsApp(_item: QueueItem) {
-  throw new Error("TODO Nest: notification queue enqueue is owned by the Nest worker.");
+  console.warn("enqueueWhatsApp: no-op — use Nest /api/whatsapp/send or dispatchJob");
+  return { ok: false as const, skipped: "owned_by_nest" };
 }
 
 export async function drainNotificationQueue(maxItems = 25): Promise<{ processed: number; sent: number; failed: number; dead: number }> {

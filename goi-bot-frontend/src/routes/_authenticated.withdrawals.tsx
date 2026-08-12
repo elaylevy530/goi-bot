@@ -14,7 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WithdrawalStatusBadge } from "@/components/StatusBadges";
-import { nestCreateWithdrawal, nestListWithdrawals } from "@/lib/nest-domain";
+import { nestCreateWithdrawal, nestListWithdrawals, nestUpdateWithdrawal } from "@/lib/nest-domain";
 import { nestListCouriers } from "@/lib/nest-accounts";
 import { PAYMENT_METHODS, WITHDRAWAL_STATUSES, type WithdrawalStatus } from "@/lib/constants";
 import { Plus, CheckCircle2, XCircle, Wallet, Loader2 } from "lucide-react";
@@ -120,7 +120,11 @@ function MarkPaidDialog({ id }: { id: string }) {
 
   const mut = useMutation({
     mutationFn: async () => {
-      throw new Error("TODO Nest: withdrawal status update endpoint is not available");
+      await nestUpdateWithdrawal(id, {
+        status: "שולמה",
+        reference_number: ref || undefined,
+        receipt_url: receipt || undefined,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["withdrawals"] });
@@ -128,6 +132,7 @@ function MarkPaidDialog({ id }: { id: string }) {
       toast.success("סומן כשולם");
       setOpen(false);
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -162,13 +167,14 @@ function WithdrawalsPage() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status, reason }: { id: string; status: WithdrawalStatus; reason?: string }) => {
-      throw new Error("TODO Nest: withdrawal status update endpoint is not available");
+      await nestUpdateWithdrawal(id, { status, reason });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["withdrawals"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("עודכן");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const typedRows = rows as any[];

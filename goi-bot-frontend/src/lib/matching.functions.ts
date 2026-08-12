@@ -20,6 +20,12 @@ export const findMatchingCouriers = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data, context }) => {
     assertNestAdmin(context);
-    await nestServerFetch(`/api/jobs/${data.job_id}`, { accessToken: context.accessToken });
-    throw new Error("TODO Nest: expose the courier-matching endpoint.");
+    return nestServerFetch<{ matches: CourierMatch[] }>(
+      `/api/jobs/${data.job_id}/match-couriers`,
+      {
+        method: "POST",
+        accessToken: context.accessToken,
+        body: { limit: data.limit },
+      },
+    );
   });

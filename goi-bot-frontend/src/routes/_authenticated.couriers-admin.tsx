@@ -19,11 +19,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CourierStatusBadge } from "@/components/StatusBadges";
-import { nestListCouriers, nestUpdateCourier } from "@/lib/nest-accounts";
+import { nestCreateCourier, nestListCouriers, nestUpdateCourier } from "@/lib/nest-accounts";
+import { nestProvisionCourier } from "@/lib/nest-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { reclassifyCourier, deleteCourier, approveCourier } from "@/lib/courier-intake.functions";
 import { sendApprovalPendingBroadcast } from "@/lib/admin-broadcast.functions";
 import { pushNotifyCouriers } from "@/lib/push-notify.functions";
+import { partnersUrl } from "@/lib/partners-redirect";
 
 import {
   COURIER_STATUSES, VEHICLE_TYPES, JOB_TYPES, AVAILABILITY, INVOICE_STATUS,
@@ -38,7 +40,7 @@ import {
 
 // Public registration URL — always use the published domain so couriers
 // don't hit the Lovable preview auth wall when opened from the editor.
-const PUBLIC_JOIN_URL = "https://goi-bot.lovable.app/r";
+const PUBLIC_JOIN_URL = partnersUrl("/join");
 
 function PendingBroadcastButton() {
   const fn = useServerFn(sendApprovalPendingBroadcast);
@@ -144,12 +146,38 @@ function NewCourierDialog() {
 
   const mut = useMutation({
     mutationFn: async () => {
-      throw new Error("Manual courier create — use Nest admin endpoint when available");
+      if (!form.full_name.trim() || !form.whatsapp_phone.trim()) {
+        throw new Error("שם ומספר וואטסאפ הם שדות חובה");
+      }
+      const created = await nestCreateCourier({
+        full_name: form.full_name.trim(),
+        whatsapp_phone: form.whatsapp_phone.trim(),
+        base_city: form.base_city || null,
+        gender: form.gender || null,
+        vehicle_type: form.vehicle_type || null,
+        invoice_status: form.invoice_status || null,
+        courier_experience_duration: form.experience?.trim().slice(0, 60) || null,
+        courier_status: form.courier_status,
+        lead_source: form.lead_source || "ידני",
+        notes: form.notes || null,
+      });
+      // Best-effort login provisioning (temp password) — row create already succeeded
+      try {
+        await nestProvisionCourier(created.id);
+      } catch (e) {
+        console.warn("provision after create failed", e);
+      }
+      try {
+        await reclassify({ data: { id: created.id } });
+      } catch {
+        // tagging is best-effort
+      }
+      return created;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["couriers"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("שליח נוסף ותויג");
+      toast.success("שליח נוסף");
       setOpen(false);
       setForm(empty);
     },
@@ -553,7 +581,7 @@ function CouriersPage() {
           missingLabel="ללא אזורי עבודה — לחץ להצגה"
           onMissingClick={() => setFIncomplete("no_areas")}
           onItemClick={(name) => setFAreas((prev) => prev.includes(name) ? prev : [...prev, name])}
-          accent="bg-sky-500"
+          accent="bg-info"
         />
         <BreakdownCard
           title={`סוגי ${kindJobs} שמוכנים לבצע`}
@@ -563,7 +591,7 @@ function CouriersPage() {
           total={stats.total}
           emptyMsg={`אין נתונים על סוגי ${kindJobs}`}
           onItemClick={(name) => setFJobTypes((prev) => prev.includes(name) ? prev : [...prev, name])}
-          accent="bg-emerald-500"
+          accent="bg-primary"
         />
       </div>
 
@@ -812,7 +840,10 @@ function CourierActions({
         courierIds: [c.id],
         title: "🚚 Goi — בדיקת התראה",
         body: "📍 תל אביב → רמת גן\n₪45 · 6.2 ק\"מ",
-        url: "/courier/new-jobs",
+        url:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/courier/new-jobs`
+            : "/courier/new-jobs",
         tag: `goi-test-${c.id}`,
       } });
       if ((r?.sent ?? 0) > 0) {
@@ -897,17 +928,17 @@ function KpiCard({
 }) {
   const toneCls =
     tone === "primary" ? "bg-primary/10 text-primary"
-    : tone === "success" ? "bg-emerald-100 text-emerald-700"
-    : tone === "warning" ? "bg-amber-100 text-amber-700"
-    : tone === "info" ? "bg-sky-100 text-sky-700"
-    : "bg-muted text-foreground/70";
+    : tone === "success" ? "bg-success-bg text-success-text"
+    : tone === "warning" ? "bg-warning-bg text-warning-text"
+    : tone === "info" ? "bg-info-bg text-info-text"
+    : "bg-muted text-text-muted";
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden rounded-card shadow-card border-border/60 bg-surface">
       <CardContent className="p-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl lg:text-3xl font-bold mt-1 tabular-nums">{value}</div>
-          {sub && <div className="text-[11px] text-muted-foreground mt-1 truncate">{sub}</div>}
+        <div className="min-w-0 text-right">
+          <div className="text-xs text-text-muted">{label}</div>
+          <div className="text-2xl lg:text-3xl font-bold mt-1 tabular-nums text-text-strong">{value}</div>
+          {sub && <div className="text-[11px] text-text-muted mt-1 truncate">{sub}</div>}
         </div>
         <div className={`size-10 rounded-lg grid place-items-center shrink-0 ${toneCls}`}>
           <Icon className="size-5" />

@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { fetchNestSession, isPreviewSession } from "@/lib/nest-auth";
+import { CourierMenuProvider } from "@/components/CourierSideDrawer";
 
 export const Route = createFileRoute("/courier")({
   ssr: false,
@@ -29,5 +30,13 @@ export const Route = createFileRoute("/courier")({
       preview: session.preview ?? null,
     };
   },
-  component: () => <Outlet />,
+  component: CourierLayout,
 });
+
+function CourierLayout() {
+  return (
+    <CourierMenuProvider>
+      <Outlet />
+    </CourierMenuProvider>
+  );
+}

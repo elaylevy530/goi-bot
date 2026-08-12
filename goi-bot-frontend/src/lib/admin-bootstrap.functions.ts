@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
 /**
- * Nest owns role assignment. Bootstrap is intentionally disabled until Nest
- * exposes a one-time, transaction-safe initial-admin endpoint.
+ * Nest owns role assignment. One-time bootstrap is intentionally unavailable
+ * from the shell — provision admins via Nest/ops tooling.
  */
 export const claimFirstAdmin = createServerFn({ method: "POST" })
   .inputValidator((input: { userId: string }) => input)
   .handler(async () => {
-    throw new Error("TODO Nest: expose a one-time initial-admin bootstrap endpoint.");
+    throw new Error("Bootstrap admin is not available from the shell. Use Nest ops provisioning.");
   });

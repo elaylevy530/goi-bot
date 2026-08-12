@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { nestGetExpressPricing } from "@/lib/nest-domain";
+import { nestGetExpressPricing, nestUpdateExpressPricingRule } from "@/lib/nest-domain";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,7 +63,17 @@ function RuleCard({ rule, onSaved }: { rule: Rule; onSaved: () => void }) {
 
   const save = useMutation({
     mutationFn: async () => {
-      throw new Error("TODO Nest: express pricing rule updates require a per-rule endpoint");
+      await nestUpdateExpressPricingRule(local.id, {
+        display_name: local.display_name,
+        payment_mode: local.payment_mode,
+        deposit_percent: local.deposit_percent,
+        min_price: local.min_price,
+        base_price: local.base_price,
+        price_per_km: local.price_per_km,
+        allow_customer_quote: local.allow_customer_quote,
+        allow_customer_fixed_price: local.allow_customer_fixed_price,
+        notes: local.notes,
+      });
     },
     onSuccess: () => { toast.success("נשמר"); onSaved(); },
     onError: (e: any) => toast.error(e?.message ?? "שמירה נכשלה"),

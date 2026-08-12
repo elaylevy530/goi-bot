@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -6,25 +6,23 @@ import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   nestListCourierActiveJobs, nestCourierUpdateProgress, nestListJobStatusLogs,
 } from "@/lib/nest-jobs";
-import { nestListMyCourierOutcomes, nestListMyDeclinedOffers } from "@/lib/nest-domain";
+import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import {
-  CheckCircle2, ChevronDown, ClipboardCheck, Clock, History as HistoryIcon,
+  CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Clock, History as HistoryIcon,
   Info, MapPin, MessageCircle, Navigation, Package, Phone, Star, Truck, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { CourierReports } from "@/components/courier/CourierReports";
 import { BusinessLogo } from "@/components/BusinessLogo";
 
 
 export const Route = createFileRoute("/courier/history")({
-  head: () => ({ meta: [{ title: "העבודות שלי — Goi" }] }),
+  head: () => ({ meta: [{ title: "היסטוריית משלוחים — Goi" }] }),
   component: HistoryPage,
 });
 
@@ -776,168 +774,192 @@ export function ContactBlock({ label, address, name, phone }: { label: string; a
 }
 
 
-// ============ History (compact cards, not table) ============
+// ============ History (Figma delivery-history-v2) ============
+
+type HistoryFilter = "all" | "completed" | "cancelled";
+
+type HistoryRow = {
+  id: string;
+  status: "completed" | "cancelled";
+  at: Date | null;
+  pickup: string;
+  dropoff: string;
+  netProfit: number | null;
+};
+
+function formatHistoryWhen(at: Date | null): string {
+  if (!at || Number.isNaN(at.getTime())) return "—";
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startThat = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  const dayDiff = Math.round((startToday.getTime() - startThat.getTime()) / 86_400_000);
+  const time = at.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  if (dayDiff === 0) return `היום, ${time}`;
+  if (dayDiff === 1) return `אתמול, ${time}`;
+  const date = at.toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+  return `${date}, ${time}`;
+}
+
 export function PastJobs() {
   const { data: me } = useMyCourier();
+  const [filter, setFilter] = useState<HistoryFilter>("all");
 
-  const { data: outcomes = [] } = useQuery({
+  const { data: outcomes = [], isLoading } = useQuery({
     queryKey: ["history-outcomes", me?.id],
     enabled: !!me?.id,
     refetchInterval: 60_000,
     queryFn: () => nestListMyCourierOutcomes(),
   });
 
-  const { data: declined = [] } = useQuery({
-    queryKey: ["history-declined", me?.id],
-    enabled: !!me?.id,
-    refetchInterval: 60_000,
-    queryFn: () => nestListMyDeclinedOffers(),
-  });
+  const rows: HistoryRow[] = useMemo(() => {
+    return (outcomes as any[])
+      .map((o) => {
+        const cancelled = !!o.was_cancelled;
+        const completed = !!o.delivered_at && !cancelled;
+        if (!completed && !cancelled) return null;
+        const atRaw = o.delivered_at || o.cancelled_at || o.created_at || o.jobs?.job_date;
+        const at = atRaw ? new Date(atRaw) : null;
+        const payment = Number(o.jobs?.payment ?? 0);
+        const tip = Number(o.tip_amount ?? 0);
+        return {
+          id: String(o.id),
+          status: cancelled ? ("cancelled" as const) : ("completed" as const),
+          at,
+          pickup: String(o.jobs?.pickup_address ?? o.jobs?.pickup_area ?? "—"),
+          dropoff: String(o.jobs?.dropoff_address ?? o.jobs?.dropoff_area ?? "—"),
+          netProfit: cancelled ? null : payment + tip,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b!.at?.getTime() ?? 0) - (a!.at?.getTime() ?? 0)) as HistoryRow[];
+  }, [outcomes]);
 
-  const [tab, setTab] = useState<"done" | "declined">("done");
+  const visible = useMemo(() => {
+    if (filter === "completed") return rows.filter((r) => r.status === "completed");
+    if (filter === "cancelled") return rows.filter((r) => r.status === "cancelled");
+    return rows;
+  }, [rows, filter]);
 
-  if (outcomes.length === 0 && declined.length === 0) {
-    return (
-      <Card className="rounded-2xl"><CardContent className="py-14 text-center text-slate-500">
-        <HistoryIcon className="size-10 mx-auto mb-3 opacity-50" /> אין עבודות בהיסטוריה
-      </CardContent></Card>
-    );
-  }
-
-  // stats
-  const doneCount = outcomes.filter((o: any) => o.delivered_at && !o.was_cancelled).length;
-  const totalEarned = outcomes.reduce((s: number, o: any) => s + (o.delivered_at && !o.was_cancelled ? Number(o.jobs?.payment ?? 0) : 0), 0);
-  const totalTips = outcomes.reduce((s: number, o: any) => s + Number(o.tip_amount ?? 0), 0);
-  const avgRating = (() => {
-    const rated = outcomes.filter((o: any) => o.customer_rating != null);
-    return rated.length ? (rated.reduce((s: number, o: any) => s + Number(o.customer_rating), 0) / rated.length) : null;
-  })();
+  const tabs: { key: HistoryFilter; label: string }[] = [
+    { key: "cancelled", label: "בוטלו" },
+    { key: "completed", label: "הושלמו" },
+    { key: "all", label: "הכל" },
+  ];
 
   return (
-    <div className="space-y-3">
-      {/* Stats strip */}
-      <div className="grid grid-cols-4 gap-2">
-        <StatCard label="הושלמו" value={doneCount} />
-        <StatCard label="הרווחת" value={`${totalEarned.toFixed(0)} ₪`} />
-        <StatCard label="טיפים" value={`${totalTips.toFixed(0)} ₪`} />
-        <StatCard label="דירוג" value={avgRating ? avgRating.toFixed(1) : "—"} icon={avgRating ? <Star className="size-3 fill-amber-400 text-amber-400" /> : undefined} />
+    <div className="flex flex-col gap-4">
+      <div className="flex w-full rounded-[14px] bg-border-strong/60 p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setFilter(tab.key)}
+            className={cn(
+              "flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-[13px] text-center transition-all",
+              filter === tab.key
+                ? "bg-surface font-bold text-primary shadow-card"
+                : "font-semibold text-text-subtle",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <div className="flex gap-1.5">
-        <button
-          onClick={() => setTab("done")}
-          className={cn("flex-1 rounded-full px-3 py-2 text-xs font-bold transition", tab === "done" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700")}
-        >בוצעו ({outcomes.length})</button>
-        <button
-          onClick={() => setTab("declined")}
-          className={cn("flex-1 rounded-full px-3 py-2 text-xs font-bold transition", tab === "declined" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700")}
-        >נדחו / לא נענו ({declined.length})</button>
-      </div>
-
-      {tab === "done" && (
-        <div className="space-y-2">
-          {outcomes.map((o: any) => (
-            <Card key={o.id} className="rounded-xl border-slate-200 shadow-none">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-end shrink-0">
-                    <div className="text-base font-extrabold text-[#35AD29] leading-none">{Number(o.jobs?.payment ?? 0).toFixed(0)} ₪</div>
-                    {o.tip_amount > 0 && <div className="text-[10px] text-amber-600 font-semibold mt-0.5">+{Number(o.tip_amount).toFixed(0)} טיפ</div>}
-                  </div>
-                  <div className="flex-1 text-end min-w-0">
-                    <div className="flex items-center justify-end gap-2 mb-0.5">
-                      {o.was_cancelled ? (
-                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px] gap-1"><XCircle className="size-3" /> בוטלה</Badge>
-                      ) : o.delivered_at ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] gap-1"><CheckCircle2 className="size-3" /> הושלמה</Badge>
-                      ) : <Badge variant="outline" className="text-[10px]">פתוח</Badge>}
-                      {o.customer_rating != null && (
-                        <span className="flex items-center gap-0.5 text-amber-600 text-[11px] font-bold">
-                          <Star className="size-3 fill-amber-400 text-amber-400" />{o.customer_rating}
-                        </span>
-                      )}
-                      {o.was_late && <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-[10px]">איחור</Badge>}
-                    </div>
-                    <div className="flex items-center justify-end gap-1.5 text-xs text-slate-700 min-w-0">
-                      <span className="truncate">{o.jobs?.pickup_area ?? "—"}</span>
-                      <span className="text-slate-300 shrink-0">←</span>
-                      <span className="truncate font-semibold">{o.jobs?.dropoff_area ?? "—"}</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
-                      {o.delivered_at ? new Date(o.delivered_at).toLocaleDateString("he-IL") : o.jobs?.job_date ?? "—"}
-                      {" · "}{o.jobs?.job_type}
-                      {o.jobs?.customer_name && <> · {o.jobs.customer_name}</>}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {isLoading ? (
+        <div className="py-16 text-center text-text-muted text-sm">טוען…</div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-surface py-14 text-center text-text-muted">
+          <HistoryIcon className="size-10 mx-auto mb-3 opacity-50" />
+          אין עבודות בהיסטוריה
         </div>
-      )}
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {visible.map((row) => (
+            <li
+              key={row.id}
+              className="rounded-2xl border border-border bg-surface p-4 flex flex-col gap-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={cn(
+                    "rounded-lg px-2 py-1 text-[11px] font-semibold",
+                    row.status === "completed"
+                      ? "bg-success-bg text-success-text"
+                      : "bg-danger-bg text-danger-text",
+                  )}
+                >
+                  {row.status === "completed" ? "הושלם" : "בוטל"}
+                </span>
+                <span className="text-xs text-text-subtle">{formatHistoryWhen(row.at)}</span>
+              </div>
 
-      {tab === "declined" && (
-        <div className="space-y-2">
-          {declined.length === 0 && (
-            <Card className="rounded-xl"><CardContent className="py-8 text-center text-sm text-slate-500">לא דחית/פספסת אף הצעה</CardContent></Card>
-          )}
-          {declined.map((d: any) => (
-            <Card key={d.id} className="rounded-xl border-slate-200 shadow-none opacity-80">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-end shrink-0">
-                    <div className="text-base font-bold text-slate-500 leading-none">{Number(d.jobs?.payment ?? 0).toFixed(0)} ₪</div>
-                  </div>
-                  <div className="flex-1 text-end min-w-0">
-                    <div className="flex items-center justify-end gap-2 mb-0.5">
-                      <Badge variant="outline" className="text-[10px]">
-                        {d.response === "declined" ? "נדחתה על ידך" : d.response === "expired" ? "פג תוקף" : "ללא תגובה"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-end gap-1.5 text-xs text-slate-700 min-w-0">
-                      <span className="truncate">{d.jobs?.pickup_area ?? "—"}</span>
-                      <span className="text-slate-300 shrink-0">←</span>
-                      <span className="truncate font-semibold">{d.jobs?.dropoff_area ?? "—"}</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
-                      {d.responded_at ? new Date(d.responded_at).toLocaleDateString("he-IL") : "—"} · {d.jobs?.job_type}
-                    </div>
-                  </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-[13px] text-text-subtle text-right leading-snug">
+                    {row.pickup}
+                  </p>
+                  <span className="size-1.5 rounded-full bg-primary shrink-0" aria-hidden />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-[13px] text-text-subtle text-right leading-snug">
+                    {row.dropoff}
+                  </p>
+                  <span className="size-1.5 rounded-full bg-primary/40 shrink-0" aria-hidden />
+                </div>
+              </div>
+
+              {row.netProfit != null && (
+                <div className="flex items-center justify-between border-t border-border pt-2.5">
+                  <p className="text-[15px] font-bold text-text-strong">
+                    ₪ {row.netProfit.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-text-subtle">רווח נקי</p>
+                </div>
+              )}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
 }
 
-function StatCard({ label, value, icon }: { label: string; value: any; icon?: React.ReactNode }) {
-  return (
-    <Card className="rounded-xl border-slate-200 shadow-none">
-      <CardContent className="p-2.5 text-center">
-        <div className="text-[10px] text-slate-500 mb-0.5">{label}</div>
-        <div className="text-sm font-extrabold text-slate-900 flex items-center justify-center gap-1">
-          {icon}{value}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function HistoryPage() {
   const t = useCourierTerms();
+  const navigate = useNavigate();
+  const title = t.kind === "mover" ? "היסטוריית הובלות" : "היסטוריית משלוחים";
+
   return (
-    <CourierShell title={t.myJobs} subtitle={t.myJobsSub}>
-      <Tabs defaultValue="history" dir="rtl" className="w-full">
-        <TabsList className="grid grid-cols-2 w-full mb-4 h-11 rounded-xl bg-slate-100 p-1">
-          <TabsTrigger value="history" className="rounded-lg text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">היסטוריה</TabsTrigger>
-          <TabsTrigger value="reports" className="rounded-lg text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">דוחות</TabsTrigger>
-        </TabsList>
-        <TabsContent value="history"><PastJobs /></TabsContent>
-        <TabsContent value="reports"><CourierReports /></TabsContent>
-      </Tabs>
+    <CourierShell fullBleed>
+      <div dir="rtl" className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-bg">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6">
+          <div className="flex flex-col gap-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div className="flex items-center justify-between px-6 py-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined" && window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    navigate({ to: "/courier/new-jobs" });
+                  }
+                }}
+                aria-label="חזרה"
+                className="size-10 grid place-items-center rounded-full text-text-strong active:bg-muted transition-colors"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+              <h1 className="text-xl font-bold text-text-strong text-center">{title}</h1>
+              <div className="size-10" aria-hidden />
+            </div>
+
+            <div className="px-6 pb-4">
+              <PastJobs />
+            </div>
+          </div>
+        </div>
+      </div>
     </CourierShell>
   );
 }

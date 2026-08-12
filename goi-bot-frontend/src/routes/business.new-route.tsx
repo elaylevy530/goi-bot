@@ -13,6 +13,7 @@ import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeJob } from "@/lib/geocode-job.functions";
+import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 
 export const Route = createFileRoute("/business/new-route")({
   head: () => ({ meta: [{ title: "קו חלוקה — Goi" }] }),
@@ -24,6 +25,7 @@ function NewRoutePage() {
   const navigate = useNavigate();
   const { data: me } = useMyBusiness();
   const geocode = useServerFn(geocodeJob);
+  const dispatch = useServerFn(dispatchJobToCouriers);
   const [f, setF] = useState({
     pickup_address: "",
     distribution_area: "",
@@ -56,6 +58,14 @@ function NewRoutePage() {
         pricing_type: "fixed_price",
       });
       geocode({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
+      try {
+        const res = await dispatch({ data: { jobId: data.id } });
+        if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
+        else toast.message("הקו נוצר — אין שליחים תואמים כרגע");
+      } catch (e) {
+        console.error("dispatch", e);
+        toast.error("שיגור נכשל: " + (e as Error).message);
+      }
       return data;
     },
     onSuccess: (data) => {

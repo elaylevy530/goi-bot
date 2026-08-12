@@ -14,12 +14,12 @@ export const Route = createFileRoute("/_authenticated/quote-requests")({
 });
 
 const QSTAT: Record<string, { label: string; cls: string }> = {
-  pending: { label: "ממתין", cls: "bg-slate-100 text-slate-700" },
-  shortlisted: { label: "הוצג למזמין", cls: "bg-amber-100 text-amber-800" },
-  selected: { label: "נבחרה", cls: "bg-emerald-100 text-emerald-800" },
-  rejected: { label: "נדחתה", cls: "bg-rose-100 text-rose-800" },
-  expired: { label: "פג תוקף", cls: "bg-slate-100 text-slate-500" },
-  cancelled: { label: "בוטלה", cls: "bg-slate-100 text-slate-500" },
+  pending: { label: "ממתין", cls: "bg-muted text-text-muted border-border" },
+  shortlisted: { label: "הוצג למזמין", cls: "bg-warning-bg text-warning-text border-warning/30" },
+  selected: { label: "נבחרה", cls: "bg-success-bg text-success-text border-primary/20" },
+  rejected: { label: "נדחתה", cls: "bg-danger-bg text-danger-text border-destructive/20" },
+  expired: { label: "פג תוקף", cls: "bg-muted text-text-muted border-border" },
+  cancelled: { label: "בוטלה", cls: "bg-muted text-text-muted border-border" },
 };
 
 function QuoteRequestsPage() {
@@ -81,7 +81,7 @@ function QuoteRequestsPage() {
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{j.status}</Badge>
-                    {j.selected_quote_id && <Badge className="bg-emerald-100 text-emerald-800">נבחרה הצעה</Badge>}
+                    {j.selected_quote_id && <Badge className="bg-success-bg text-success-text border-primary/20" variant="outline">נבחרה הצעה</Badge>}
                     {!isClosed && (
                       <Button size="sm" variant="outline" onClick={() => cancelJob.mutate(j.id)}>
                         <XCircle className="size-3" /> בטל בקשה

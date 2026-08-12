@@ -1,12 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
-import { nestListJobs } from "@/lib/nest-jobs";
-import { getCategory, SERVICE_TYPE_LABELS } from "@/config/businessCategories";
+import { SegmentedControl } from "@/components/SegmentedControl";
+import { ListEmptyState } from "@/components/ListEmptyState";
+import { nestListJobs, type NestJob } from "@/lib/nest-jobs";
+import { playBeep } from "@/lib/offer-alert";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
-  Activity, Plus, MapPin, Clock, Wallet, Users, Bookmark,
-  Repeat, ArrowLeft, TrendingUp, Package, CheckCircle2,
-  Building2, Tag, type LucideIcon,
+  Plus, MapPin, Clock, Package,
+  type LucideIcon,
 } from "lucide-react";
 
 export const Route = createFileRoute("/business/dashboard")({
@@ -15,7 +19,7 @@ export const Route = createFileRoute("/business/dashboard")({
   component: BusinessDashboard,
 });
 
-// Kept as an export so other business.* pages can still import EmptyState from here.
+/** Kept for other business.* pages that import EmptyState from here. */
 export function EmptyState({ icon: Icon, title, desc, action, ctaLabel, ctaTo }: {
   icon: LucideIcon;
   title: string;
@@ -25,252 +29,305 @@ export function EmptyState({ icon: Icon, title, desc, action, ctaLabel, ctaTo }:
   ctaTo?: string;
 }) {
   return (
-    <div className="text-center py-10 px-4">
-      <div className="mx-auto size-16 rounded-2xl bg-[#35AD29]/15 grid place-items-center mb-4">
-        <Icon className="size-7 text-[#101418]" />
-      </div>
-      <div className="font-black text-[#101418]">{title}</div>
-      {desc && <div className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">{desc}</div>}
-      {action && <div className="mt-4">{action}</div>}
-      {ctaLabel && ctaTo && (
-        <div className="mt-4">
+    <ListEmptyState
+      title={title}
+      description={desc}
+      icon={<Icon className="size-6" />}
+      action={
+        action ??
+        (ctaLabel && ctaTo ? (
           <Link
             to={ctaTo as never}
-            className="inline-flex items-center gap-2 h-11 px-5 rounded-2xl bg-[#35AD29] text-[#101418] font-black shadow-[0_8px_24px_-8px_rgba(53,173,41,0.35)]"
+            className="inline-flex items-center gap-2 h-11 px-5 rounded-pill bg-primary text-primary-foreground font-black shadow-fab"
           >
             {ctaLabel}
           </Link>
-        </div>
-      )}
-    </div>
+        ) : undefined)
+      }
+    />
   );
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  "טיוטה": "bg-black/5 text-[#101418]/70",
-  "נשלחה לשליחים": "bg-[#E4F0FF] text-[#0B5FCC]",
-  "ממתינה לתגובות": "bg-[#E4F0FF] text-[#0B5FCC]",
-  "יש שליחים שאישרו": "bg-[#F1E7FF] text-[#5B21B6]",
-  "נבחר שליח": "bg-[#F1E7FF] text-[#5B21B6]",
-  "פעילה": "bg-[#FFF3D6] text-[#8A6100]",
-  "הושלמה": "bg-[#E6F7EF] text-[#0E7A4A]",
-  "בוטלה": "bg-red-50 text-red-700",
+type OpsTab = "waiting" | "active" | "done";
+
+const WAITING_STATUSES = new Set([
+  "טיוטה",
+  "נשלחה לשליחים",
+  "ממתינה לתגובות",
+  "יש שליחים שאישרו",
+]);
+const ACTIVE_STATUSES = new Set(["נבחר שליח", "פעילה"]);
+const DONE_STATUSES = new Set(["הושלמה"]);
+
+const STATUS_PILL: Record<string, string> = {
+  "טיוטה": "bg-muted text-text-muted",
+  "נשלחה לשליחים": "bg-info-bg text-info-text",
+  "ממתינה לתגובות": "bg-warning-bg text-warning-text",
+  "יש שליחים שאישרו": "bg-warning-bg text-warning-text",
+  "נבחר שליח": "bg-success-bg text-success-text",
+  "פעילה": "bg-success-bg text-success-text",
+  "הושלמה": "bg-success-bg text-success-text",
+  "בוטלה": "bg-danger-bg text-danger-text",
+  "תקועה": "bg-danger-bg text-danger-text",
 };
+
+const CLAIM_STATUSES = new Set(["נבחר שליח", "פעילה"]);
+const POLL_MS = 12_000;
+
+function tabForStatus(status: string): OpsTab | null {
+  if (WAITING_STATUSES.has(status)) return "waiting";
+  if (ACTIVE_STATUSES.has(status)) return "active";
+  if (DONE_STATUSES.has(status)) return "done";
+  return null;
+}
+
+function statusToastMessage(prev: string, next: string, jobNumber?: string): string | null {
+  const label = jobNumber ? `#${jobNumber}` : "משלוח";
+  if (prev !== next && CLAIM_STATUSES.has(next) && !CLAIM_STATUSES.has(prev)) {
+    return `${label} — שליח שובץ ✓`;
+  }
+  if (next === "הושלמה" && prev !== "הושלמה") {
+    return `${label} — המשלוח הושלם`;
+  }
+  if (next === "יש שליחים שאישרו" && prev !== next) {
+    return `${label} — יש שליחים שאישרו`;
+  }
+  if (next === "ממתינה לתגובות" && prev === "נשלחה לשליחים") {
+    return `${label} — ממתין לתגובות שליחים`;
+  }
+  return null;
+}
 
 function BusinessDashboard() {
   const { data: me } = useMyBusiness();
+  const [tab, setTab] = useState<OpsTab>("waiting");
+  const prevStatusesRef = useRef<Map<string, string> | null>(null);
+  const primedRef = useRef(false);
 
-  const { data: orders } = useQuery({
+  const { data: orders, isLoading } = useQuery({
     queryKey: ["biz-dashboard-orders", me?.id],
     enabled: !!me?.id,
+    refetchInterval: POLL_MS,
+    refetchIntervalInBackground: true,
     queryFn: async () => {
-      const jobs = await nestListJobs({ limit: 20 });
-      return jobs.slice(0, 20);
+      const jobs = await nestListJobs({ limit: 50 });
+      return jobs;
     },
   });
 
-  const { data: walletBalance = 0 } = useQuery({
-    queryKey: ["biz-wallet-balance", me?.id],
-    enabled: false,
-    queryFn: async () => 0,
-  });
-
   const all = orders ?? [];
-  const active = all.filter((o) => !["הושלמה", "בוטלה"].includes(o.status));
-  const completed = all.filter((o) => o.status === "הושלמה");
-  const now = new Date();
-  const todayOrders = all.filter((o) => {
-    const d = new Date(o.created_at);
-    return d.toDateString() === now.toDateString();
-  });
-  const spentThisMonth = completed
-    .filter((o) => {
-      const d = new Date(o.created_at);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    })
-    .reduce((s, o) => s + Number(o.customer_price ?? 0), 0);
 
-  const displayName = (me as { business_name?: string; name?: string } | null)?.business_name || (me as { name?: string } | null)?.name || "העסק שלי";
-  const categoryKey = (me as { business_category?: string } | null)?.business_category ?? null;
-  const category = getCategory(categoryKey);
-  const svc = SERVICE_TYPE_LABELS[category.serviceType];
-  const hasCategory = !!categoryKey;
+  // Toast + short chime when job status transitions between polls
+  useEffect(() => {
+    if (!orders) return;
+    const nextMap = new Map(orders.map((j) => [j.id, j.status]));
+    const prev = prevStatusesRef.current;
+    if (!primedRef.current) {
+      primedRef.current = true;
+      prevStatusesRef.current = nextMap;
+      return;
+    }
+    if (prev) {
+      for (const job of orders) {
+        const old = prev.get(job.id);
+        if (!old || old === job.status) continue;
+        const msg = statusToastMessage(old, job.status, job.job_number);
+        if (!msg) continue;
+        const claimed = CLAIM_STATUSES.has(job.status) && !CLAIM_STATUSES.has(old);
+        if (claimed) {
+          toast.success(msg);
+          try { playBeep(); } catch { /* ignore */ }
+        } else if (job.status === "הושלמה") {
+          toast.success(msg);
+        } else {
+          toast.message(msg);
+        }
+      }
+    }
+    prevStatusesRef.current = nextMap;
+  }, [orders]);
+
+  const waiting = useMemo(
+    () => all.filter((o) => WAITING_STATUSES.has(o.status)),
+    [all],
+  );
+  const active = useMemo(
+    () => all.filter((o) => ACTIVE_STATUSES.has(o.status)),
+    [all],
+  );
+  const done = useMemo(
+    () => all.filter((o) => DONE_STATUSES.has(o.status)).slice(0, 20),
+    [all],
+  );
+
+  const list =
+    tab === "waiting" ? waiting : tab === "active" ? active : done;
+
+  const displayName =
+    (me as { business_name?: string; name?: string } | null)?.business_name ||
+    (me as { name?: string } | null)?.name ||
+    "העסק שלי";
 
   return (
     <BusinessShell>
-      <div className="max-w-3xl mx-auto px-4 pt-6 pb-8 space-y-6">
-        {/* Hero */}
-        <section className="rounded-3xl bg-gradient-to-br from-[#101418] to-[#2a2f36] text-white p-6 relative overflow-hidden">
-          <div className="absolute -left-10 -bottom-10 size-40 rounded-full bg-[#35AD29]/10 blur-2xl" />
-          <div className="relative">
-            <div className="text-[11px] font-bold text-white/60 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <Building2 className="size-3.5" /> Goi · פאנל עסקים
-            </div>
-            <h2 className="text-2xl font-black leading-tight">{displayName}</h2>
-            <p className="text-sm text-white/70 mt-1">מרכז השליטה שלך במשלוחים</p>
+      <div className="max-w-3xl mx-auto px-4 pt-4 pb-8 space-y-4">
+        <div className="flex items-start justify-between gap-3 text-right">
+          <div className="min-w-0">
+            <h1 className="text-xl font-black text-text-strong">לוח משלוחים</h1>
+            <p className="mt-0.5 text-xs text-text-muted truncate">{displayName}</p>
+          </div>
+          <Link
+            to="/business/new-delivery"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-pill bg-primary text-primary-foreground text-sm font-black shadow-fab active:scale-[0.98] transition shrink-0"
+          >
+            <Plus className="size-4" strokeWidth={2.6} />
+            הזמן
+          </Link>
+        </div>
 
-            {/* Category badge (read-only — chosen at signup) */}
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur border border-white/10 px-3 py-1.5 text-[12px] text-white">
-              <Tag className="size-3.5 text-[#35AD29]" />
-              {hasCategory ? (
-                <>
-                  <span className="font-bold">{category.emoji} {category.label}</span>
-                  <span className="text-white/50">·</span>
-                  <span className="text-white/70">{svc.emoji} {svc.label}</span>
-                </>
-              ) : (
-                <span className="font-bold text-white/70">לא הוגדרה קטגוריה</span>
-              )}
-            </div>
+        <SegmentedControl
+          aria-label="סינון משלוחים"
+          value={tab}
+          onValueChange={(v) => setTab(v as OpsTab)}
+          options={[
+            { value: "waiting", label: `ממתינים (${waiting.length})` },
+            { value: "active", label: `בביצוע (${active.length})` },
+            { value: "done", label: `הושלמו (${done.length})` },
+          ]}
+        />
 
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              <StatChip label="פעילים" value={active.length} icon={Package} />
-              <StatChip label="היום" value={todayOrders.length} icon={Activity} />
-              <StatChip label="החודש" value={`₪${spentThisMonth.toLocaleString("he-IL")}`} icon={TrendingUp} small />
+        <section className="space-y-2.5" aria-live="polite">
+          {isLoading && !orders ? (
+            <div className="rounded-card bg-surface shadow-card px-4 py-10 text-center text-sm text-text-muted">
+              טוען משלוחים…
             </div>
+          ) : list.length === 0 ? (
+            <ListEmptyState
+              title={
+                tab === "waiting"
+                  ? "אין משלוחים ממתינים"
+                  : tab === "active"
+                    ? "אין משלוחים בביצוע"
+                    : "אין משלוחים שהושלמו לאחרונה"
+              }
+              description={
+                tab === "done"
+                  ? "משלוחים שהושלמו יופיעו כאן"
+                  : "שדרו משלוח חדש — השליחים יקבלו אותו מיד"
+              }
+              icon={<Package className="size-6" />}
+              action={
+                tab !== "done" ? (
+                  <Link
+                    to="/business/new-delivery"
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-pill bg-primary text-primary-foreground font-black shadow-fab"
+                  >
+                    <Plus className="size-4" /> הזמן משלוח
+                  </Link>
+                ) : (
+                  <Link
+                    to="/business/orders"
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-pill bg-navy text-white font-black"
+                  >
+                    לכל ההזמנות
+                  </Link>
+                )
+              }
+            />
+          ) : (
+            list.map((o) => <DeliveryCard key={o.id} job={o} />)
+          )}
+        </section>
 
+        {list.length > 0 && (
+          <div className="pt-1 text-center">
             <Link
-              to="/business/new-delivery"
-              className="mt-5 inline-flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-[#35AD29] text-[#101418] font-black text-[15px] shadow-[0_8px_24px_-8px_rgba(53,173,41,0.4)] active:scale-[0.98] transition"
+              to="/business/orders"
+              className="text-xs font-bold text-text-muted hover:text-text-strong transition"
             >
-              <Plus className="size-5" /> שדר משלוח חדש
+              לכל ההזמנות ←
             </Link>
           </div>
-        </section>
-
-        {/* Active deliveries */}
-        <section>
-          <SectionHeader
-            title="משלוחים פעילים"
-            action={
-              active.length > 0 && (
-                <Link to="/business/orders" className="text-xs font-bold text-[#101418]/70 hover:text-[#101418] flex items-center gap-1">
-                  לכולם <ArrowLeft className="size-3" />
-                </Link>
-              )
-            }
-          />
-          <div className="mt-3 space-y-2">
-            {active.length === 0 ? (
-              <div className="rounded-2xl bg-white border border-black/5 p-6 text-center">
-                <div className="mx-auto size-12 rounded-2xl bg-[#35AD29]/15 grid place-items-center mb-3">
-                  <Package className="size-5 text-[#101418]" />
-                </div>
-                <div className="text-sm font-bold text-[#101418]">אין משלוחים פעילים</div>
-                <div className="text-xs text-slate-500 mt-1">שדר משלוח חדש כדי להתחיל</div>
-              </div>
-            ) : (
-              active.slice(0, 3).map((o) => (
-                <Link
-                  key={o.id}
-                  to="/business/order/$id"
-                  params={{ id: o.id }}
-                  className="block rounded-2xl bg-white border border-black/5 p-4 hover:border-black/10 transition"
-                >
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <span className={`text-[11px] font-black px-2 py-1 rounded-full ${STATUS_STYLES[o.status] ?? "bg-black/5"}`}>
-                      {o.status}
-                    </span>
-                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <Clock className="size-3" /> {new Date(o.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  <div className="text-[13px] text-[#101418] flex items-start gap-1.5">
-                    <MapPin className="size-3.5 mt-0.5 shrink-0 text-slate-400" />
-                    <span className="truncate">{o.pickup_address || "—"}</span>
-                  </div>
-                  <div className="text-[13px] text-[#101418] flex items-start gap-1.5 mt-1">
-                    <MapPin className="size-3.5 mt-0.5 shrink-0 text-[#35AD29]" />
-                    <span className="truncate">{o.dropoff_address || "—"}</span>
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* Quick access grid */}
-        <section>
-          <SectionHeader title="גישה מהירה" />
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <QuickCard to="/business/contacts" icon={Bookmark} title="אנשי קשר" desc="נמענים חוזרים" />
-            <QuickCard to="/business/addresses" icon={MapPin} title="כתובות שמורות" desc="סניפים ומחסנים" />
-            <QuickCard to="/business/recurring-orders" icon={Repeat} title="משלוחים חוזרים" desc="קווי חלוקה" />
-            <QuickCard to="/business/team" icon={Users} title="צוות והרשאות" desc="חברי צוות" />
-          </div>
-        </section>
-
-        {/* Money + insights */}
-        <section>
-          <SectionHeader title="כספים" />
-          <div className="mt-3 grid grid-cols-1 gap-3">
-            <Link
-              to="/business/wallet"
-              className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-black/5 p-4 hover:border-black/10"
-            >
-              <div className="flex items-center gap-3">
-                <div className="size-11 rounded-2xl bg-[#101418] grid place-items-center">
-                  <Wallet className="size-5 text-[#35AD29]" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 font-semibold">יתרת ארנק</div>
-                  <div className="text-lg font-black text-[#101418]">₪{Number(walletBalance).toLocaleString("he-IL")}</div>
-                </div>
-              </div>
-              <ArrowLeft className="size-4 text-slate-400" />
-            </Link>
-            <Link
-              to="/business/billing"
-              className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-black/5 p-4 hover:border-black/10"
-            >
-              <div className="flex items-center gap-3">
-                <div className="size-11 rounded-2xl bg-[#35AD29]/15 grid place-items-center">
-                  <CheckCircle2 className="size-5 text-[#101418]" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 font-semibold">חשבוניות וחיובים</div>
-                  <div className="text-sm font-black text-[#101418]">מצב חיוב חודשי</div>
-                </div>
-              </div>
-              <ArrowLeft className="size-4 text-slate-400" />
-            </Link>
-          </div>
-        </section>
+        )}
       </div>
     </BusinessShell>
   );
 }
 
-function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between">
-      <h3 className="text-[15px] font-black text-[#101418]">{title}</h3>
-      {action}
-    </div>
+function DeliveryCard({ job }: { job: NestJob }) {
+  const status = job.status;
+  const courierName =
+    (job as { couriers?: { full_name?: string } | null }).couriers?.full_name ||
+    (job as { selected_courier_name?: string | null }).selected_courier_name ||
+    null;
+  const price = Number(
+    (job as { customer_price?: number | null }).customer_price ??
+      (job as { payment?: number | string | null }).payment ??
+      0,
   );
-}
+  const time = job.created_at
+    ? new Date(job.created_at).toLocaleTimeString("he-IL", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
-function StatChip({ label, value, icon: Icon, small }: { label: string; value: string | number; icon: LucideIcon; small?: boolean }) {
-  return (
-    <div className="rounded-2xl bg-white/10 backdrop-blur border border-white/10 p-3">
-      <Icon className="size-3.5 text-[#35AD29]" />
-      <div className={`font-black text-white mt-1 ${small ? "text-sm" : "text-lg"}`}>{value}</div>
-      <div className="text-[10px] text-white/60 font-semibold">{label}</div>
-    </div>
-  );
-}
+  const tab = tabForStatus(status);
 
-function QuickCard({ to, icon: Icon, title, desc }: { to: string; icon: LucideIcon; title: string; desc: string }) {
   return (
     <Link
-      to={to as never}
-      className="rounded-2xl bg-white border border-black/5 p-4 hover:border-black/10 transition group"
+      to="/business/order/$id"
+      params={{ id: job.id }}
+      className="block rounded-card bg-surface shadow-card border border-border p-4 hover:shadow-card-strong active:scale-[0.995] transition"
     >
-      <div className="size-10 rounded-xl bg-[#35AD29]/15 grid place-items-center mb-3 group-hover:bg-[#35AD29]/25 transition">
-        <Icon className="size-5 text-[#101418]" />
+      <div className="flex items-center justify-between gap-3 mb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={cn(
+              "text-[11px] font-black px-2.5 py-1 rounded-pill shrink-0",
+              STATUS_PILL[status] ?? "bg-muted text-text-muted",
+            )}
+          >
+            {status}
+          </span>
+          {job.job_number && (
+            <span className="text-[11px] font-mono font-bold text-text-muted truncate">
+              {job.job_number}
+            </span>
+          )}
+        </div>
+        <span className="text-[11px] text-text-muted flex items-center gap-1 shrink-0">
+          <Clock className="size-3" /> {time}
+        </span>
       </div>
-      <div className="text-sm font-black text-[#101418]">{title}</div>
-      <div className="text-[11px] text-slate-500 mt-0.5">{desc}</div>
+
+      <div className="space-y-1.5">
+        <div className="text-[13px] text-text-strong flex items-start gap-1.5">
+          <MapPin className="size-3.5 mt-0.5 shrink-0 text-text-muted" />
+          <span className="truncate">{job.pickup_address || "—"}</span>
+        </div>
+        <div className="text-[13px] text-text-strong flex items-start gap-1.5">
+          <MapPin className="size-3.5 mt-0.5 shrink-0 text-primary" />
+          <span className="truncate">{job.dropoff_address || "—"}</span>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 pt-2.5 border-t border-border">
+        <div className="text-[12px] text-text-muted truncate">
+          {courierName
+            ? `שליח: ${courierName}`
+            : tab === "waiting"
+              ? "ממתין לשיבוץ שליח"
+              : tab === "active"
+                ? "בדרך"
+                : "הושלם"}
+        </div>
+        {price > 0 && (
+          <div className="text-sm font-black text-text-strong shrink-0">
+            ₪{price.toLocaleString("he-IL")}
+          </div>
+        )}
+      </div>
     </Link>
   );
 }

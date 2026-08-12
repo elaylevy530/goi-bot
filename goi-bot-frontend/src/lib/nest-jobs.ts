@@ -13,6 +13,8 @@ export type NestJob = Record<string, unknown> & {
   pricing_type?: string;
   customer_id?: string | null;
   customer_name?: string | null;
+  guest_name?: string | null;
+  guest_phone?: string | null;
   selected_courier_id?: string | null;
   pickup_address?: string | null;
   pickup_area?: string | null;

@@ -7,21 +7,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { nestRegisterCourier } from "@/lib/nest-auth";
 import {
   CheckCircle2, Loader2, User, Phone, MapPin, Bike,
-  Car, Zap, MoreHorizontal, Package, Clock, Route as RouteIcon, Plus,
-  UtensilsCrossed, Boxes, Check, ClipboardList, MessageCircle, Lock,
-  Briefcase, Award, Ruler, Bell, ThumbsUp, Sparkles, Send,
+  Car, Zap, MoreHorizontal, Package,
+  Boxes, ClipboardList, MessageCircle, Lock,
+  Briefcase, Bell, ThumbsUp, Sparkles, Send,
   Camera, Upload, X, KeyRound,
 } from "lucide-react";
 import { BackNav } from "@/components/BackNav";
 import { toast } from "sonner";
 import { cacheCourierKind } from "@/lib/courier-kind";
-// ---------- Option lists ----------
-const CITY_OPTIONS = [
-  "כל הארץ","תל אביב","רמת גן","גבעתיים","פתח תקווה","בני ברק",
-  "ראשון לציון","חולון","בת ים","הרצליה","רעננה","כפר סבא",
-  "נתניה","רחובות","נס ציונה","ירושלים","חיפה","קריות",
-  "אשדוד","אשקלון","באר שבע","אחר",
-];
 
 type CourierKind = "courier" | "mover";
 
@@ -44,81 +37,12 @@ const VEHICLES_BY_KIND: Record<CourierKind, { value: string; icon: typeof Bike }
   ],
 };
 
-const JOB_OPTIONS_BY_KIND: Record<
-  CourierKind,
-  { value: string; icon: typeof Package; db: string }[]
-> = {
-  courier: [
-    { value: "משלוחים בודדים", icon: Package, db: "משלוח בודד" },
-    { value: "משמרות לפי שעה", icon: Clock, db: "משמרת לפי שעה" },
-    { value: "קווים קבועים / חלוקה", icon: RouteIcon, db: "קו חלוקה" },
-    { value: "משלוחי אוכל", icon: Package, db: "משלוחי אוכל" },
-    { value: "חבילות / מסמכים", icon: Boxes, db: "חבילות / מסמכים" },
-    { value: "הכול מתאים לי", icon: Check, db: "*" },
-  ],
-  mover: [
-    { value: "הובלות קטנות / פריט בודד", icon: Package, db: "הובלה קטנה" },
-    { value: "הובלת דירה שלמה", icon: Boxes, db: "הובלת דירה" },
-    { value: "הובלת משרד", icon: Briefcase, db: "הובלת משרד" },
-    { value: "פינויי דירה", icon: Package, db: "פינוי דירה" },
-    { value: "הובלות בין עירוניות", icon: RouteIcon, db: "הובלה בין עירונית" },
-    { value: "פירוק והרכבה", icon: Boxes, db: "פירוק והרכבה" },
-    { value: "אריזה", icon: Package, db: "אריזה" },
-    { value: "אחסנה", icon: Boxes, db: "אחסנה" },
-    { value: "הכול מתאים לי", icon: Check, db: "*" },
-  ],
-};
-
 const CREW_OPTIONS = [
   "לבד",
   "עם עוזר אחד (2 אנשים)",
   "צוות של 3",
   "צוות של 4+",
   "משתנה לפי עבודה",
-];
-
-const MOVER_EQUIPMENT = [
-  "מנוף / ליפט",
-  "שמיכות / ריפוד",
-  "רצועות / חגורות",
-  "עגלות משא",
-  "כלי פירוק והרכבה",
-  "חומרי אריזה",
-];
-
-const FLOOR_OPTIONS = [
-  "רק עם מעלית",
-  "עד קומה 2 בלי מעלית",
-  "עד קומה 4 בלי מעלית",
-  "כל קומה — אין בעיה",
-];
-
-
-
-
-const DISTANCE_OPTIONS = [
-  "רק בתוך העיר שלי",
-  "עד 5 ק״מ מחוץ לעיר",
-  "עד 10 ק״מ מחוץ לעיר",
-  "עד 20 ק״מ מחוץ לעיר",
-  "עד 30 ק״מ מחוץ לעיר",
-  "כל אזור המרכז",
-  "כל הארץ",
-];
-
-const EXPERIENCE_STATUS = [
-  "כן, עובד בזה היום",
-  "כן, עבדתי בעבר",
-  "אין ניסיון אבל רוצה להתחיל",
-];
-
-const EXPERIENCE_DURATION = [
-  "פחות מחודש",
-  "1-3 חודשים",
-  "3-6 חודשים",
-  "חצי שנה עד שנה",
-  "שנה ומעלה",
-  "מעל 3 שנים",
 ];
 
 const INVOICE_OPTIONS = [
@@ -167,85 +91,6 @@ function ChoiceCard({ active, onClick, children, className = "" }: {
     >
       {children}
     </button>
-  );
-}
-
-function CitiesGrid({
-  value, onChange, addLabel = "אזור / עיר נוספת", addPlaceholder = "כתוב עיר או אזור נוסף",
-}: {
-  value: string[]; onChange: (v: string[]) => void;
-  addLabel?: string; addPlaceholder?: string;
-}) {
-  const [query, setQuery] = useState("");
-  const trimmed = query.trim();
-  const allKnown = new Set(CITY_OPTIONS.map((c) => c.toLowerCase()));
-  // Custom (user-added) cities = anything in value that isn't in CITY_OPTIONS
-  const customCities = value.filter((v) => !allKnown.has(v.toLowerCase()));
-  // Show all default options + any custom cities the user already added
-  const allOptions = [...CITY_OPTIONS.filter((c) => c !== "אחר"), ...customCities, "אחר"];
-
-  const exists = trimmed.length > 0 && allOptions.some(
-    (c) => c.toLowerCase() === trimmed.toLowerCase(),
-  );
-  const canAdd = trimmed.length >= 2 && !exists;
-
-  const handleAdd = () => {
-    if (!canAdd) return;
-    const next = [...value.filter((x) => x !== "כל הארץ"), trimmed];
-    onChange(next);
-    setQuery("");
-  };
-
-  return (
-    <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {allOptions.map((a) => {
-          const on = value.includes(a);
-          const isAll = a === "כל הארץ";
-          return (
-            <ChoiceCard
-              key={a}
-              active={on}
-              onClick={() => {
-                if (isAll) {
-                  onChange(on ? [] : ["כל הארץ"]);
-                } else {
-                  const next = toggle(value.filter((x) => x !== "כל הארץ"), a);
-                  onChange(next);
-                }
-              }}
-              className={isAll ? "border-primary/40 bg-primary/5 font-semibold" : ""}
-            >
-              <Checkbox checked={on} className="pointer-events-none" />
-              <span className="flex-1 text-sm font-medium">{a}</span>
-            </ChoiceCard>
-          );
-        })}
-      </div>
-
-      <div className="mt-3">
-        <label className="text-sm font-medium block mb-1.5">{addLabel}</label>
-        <div className="flex gap-2">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={addPlaceholder}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
-          />
-          <Button
-            type="button"
-            onClick={handleAdd}
-            disabled={!canAdd}
-            className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" /> הוסף וסמן
-          </Button>
-        </div>
-        {trimmed.length > 0 && exists && (
-          <p className="text-xs text-muted-foreground mt-1">העיר כבר ברשימה — סמן אותה למעלה</p>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -334,18 +179,13 @@ export function JoinPage() {
   const [gender, setGender] = useState<string>("");
 
   const [baseCity, setBaseCity] = useState("");
-  const [wantedAreas, setWantedAreas] = useState<string[]>([]);
-
-  const [distance, setDistance] = useState<string>("");
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
-  const [jobs, setJobs] = useState<string[]>([]);
   const [invoice, setInvoice] = useState<string>("");
-  const [expStatus, setExpStatus] = useState<string>("");
-  const [expDuration, setExpDuration] = useState<string>("");
   const [password, setPassword] = useState("");
   const [consent, setConsent] = useState(true);
   const [done, setDone] = useState(false);
-  const [kind, setKind] = useState<CourierKind | null>(null);
+  // Product scope: courier registration only (movers live elsewhere).
+  const kind: CourierKind = "courier";
 
   // Mover-specific
   const [crewSize, setCrewSize] = useState<string>("");
@@ -353,19 +193,10 @@ export function JoinPage() {
   const [floors, setFloors] = useState<string>("");
   const [minJobPrice, setMinJobPrice] = useState<string>("");
 
-
   const VEHICLES = kind ? VEHICLES_BY_KIND[kind] : VEHICLES_BY_KIND.courier;
-  const JOB_OPTIONS = kind ? JOB_OPTIONS_BY_KIND[kind] : JOB_OPTIONS_BY_KIND.courier;
-
-
-  const showDuration = expStatus === "כן, עובד בזה היום" || expStatus === "כן, עבדתי בעבר";
 
   const mut = useMutation({
     mutationFn: async () => {
-      const dbJobs = jobs.includes("הכול מתאים לי")
-        ? JOB_OPTIONS.filter((j) => j.db !== "*").map((j) => j.db)
-        : (jobs.map((j) => JOB_OPTIONS.find((x) => x.value === j)?.db).filter(Boolean) as string[]);
-
       const invoiceDb = INVOICE_OPTIONS.find((i) => i.value === invoice)?.db ?? "לא";
 
       let id_photo_base64: string | null = null;
@@ -394,27 +225,26 @@ export function JoinPage() {
         id_number: idNumber || null,
         gender: gender || null,
         base_city: baseCity,
-        wanted_work_areas: wantedAreas,
+        wanted_work_areas: [],
         custom_work_area: null,
         pickup_areas: [],
         custom_pickup_area: null,
         dropoff_areas: [],
         custom_dropoff_area: null,
-        work_distance_from_base: distance || null,
+        work_distance_from_base: null,
         vehicle_types: kind === "mover"
           ? [...vehicleTypes, ...equipment.map((e) => `ציוד: ${e}`)]
           : vehicleTypes,
         job_types: kind === "mover"
           ? [
-              ...dbJobs,
               ...(crewSize ? [`צוות: ${crewSize}`] : []),
               ...(floors ? [`קומות: ${floors}`] : []),
               ...(minJobPrice ? [`מינימום עבודה: ${minJobPrice} ₪`] : []),
             ]
-          : dbJobs,
+          : [],
         invoice_status: invoiceDb,
-        courier_experience_status: expStatus || null,
-        courier_experience_duration: showDuration ? (expDuration || null) : null,
+        courier_experience_status: null,
+        courier_experience_duration: null,
         consent_whatsapp: consent,
         password: password || null,
         courier_kind: kind ?? "courier",
@@ -428,12 +258,8 @@ export function JoinPage() {
           cacheCourierKind(kind ?? "courier");
           await qc.invalidateQueries();
           qc.setQueryData(["my-courier-kind"], kind ?? "courier");
-          toast.success(
-            kind === "mover"
-              ? "נרשמת בהצלחה! מעבר לפאנל המובילים..."
-              : "נרשמת בהצלחה! מעבר לאזור האישי...",
-          );
-          setTimeout(() => navigate({ to: "/courier" }), 600);
+          toast.success("נרשמת בהצלחה! מעבר לאזור האישי...");
+          setTimeout(() => navigate({ to: "/courier/new-jobs" }), 600);
           return;
         } catch {
           toast.success("נרשמת בהצלחה! התחבר עם הטלפון והסיסמה שלך");
@@ -453,7 +279,6 @@ export function JoinPage() {
     idNumber.trim().length >= 9 &&
     gender &&
     baseCity.trim().length >= 2 &&
-    expStatus &&
     vehicleTypes.length > 0 &&
     password.length >= 6 &&
     consent;
@@ -547,85 +372,6 @@ export function JoinPage() {
     );
   }
 
-  // Role picker: shown first, before the full form
-  if (!kind) {
-    return (
-      <div className="min-h-screen bg-[#f6f8f7] py-8 md:py-14 px-4" dir="rtl">
-        <div className="max-w-3xl mx-auto">
-          <BackNav />
-          <header className="text-center mb-8 md:mb-10">
-            <div className="inline-flex items-center gap-1 mb-3">
-              <span className="text-3xl md:text-4xl font-extrabold tracking-tight">
-                <span className="text-primary">G</span>
-                <span className="text-foreground">oi</span>
-              </span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
-              מה מתאר אותך הכי טוב?
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-2">
-              בחר את סוג העבודה שאתה מבצע — נתאים לך טופס והצעות עבודה מדויקות
-            </p>
-          </header>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setKind("courier")}
-              className="group text-right bg-white rounded-3xl border-2 border-border hover:border-primary hover:shadow-xl transition-all p-6 md:p-8"
-            >
-              <div className="size-14 rounded-2xl bg-primary/10 grid place-items-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <Bike className="size-8 text-primary" />
-              </div>
-              <h2 className="text-2xl font-extrabold text-foreground mb-1.5">שליח</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                אופנוע, קטנוע, אופניים חשמליים או רכב פרטי. משלוחי חבילות, מסמכים וקווי חלוקה לפרטיים ולעסקים.
-              </p>
-              <ul className="space-y-1.5 text-sm text-foreground/80">
-                <li className="flex items-center gap-2"><Check className="size-4 text-primary" /> משלוחים מהירים בעיר</li>
-                <li className="flex items-center gap-2"><Check className="size-4 text-primary" /> חבילות עד ~30 ק״ג</li>
-                <li className="flex items-center gap-2"><Check className="size-4 text-primary" /> משמרות וקווים קבועים</li>
-              </ul>
-              <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-primary">
-                אני שליח <Send className="size-4" />
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setKind("mover")}
-              className="group text-right bg-white rounded-3xl border-2 border-border hover:border-primary hover:shadow-xl transition-all p-6 md:p-8"
-            >
-              <div className="size-14 rounded-2xl bg-primary/10 grid place-items-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <Boxes className="size-8 text-primary" />
-              </div>
-              <h2 className="text-2xl font-extrabold text-foreground mb-1.5">מוביל</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                טנדר, משאית או צוות מובילים. גם הובלות קטנות של פריט בודד וגם הובלות דירה, משרד ופינויים.
-              </p>
-              <ul className="space-y-1.5 text-sm text-foreground/80">
-                <li className="flex items-center gap-2"><Check className="size-4 text-primary" /> הובלות קטנות ופריטים בודדים</li>
-                <li className="flex items-center gap-2"><Check className="size-4 text-primary" /> הובלת דירה, משרד ופינויים</li>
-                <li className="flex items-center gap-2"><Check className="size-4 text-primary" /> לבד או עם צוות — אתה בוחר</li>
-              </ul>
-
-              <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-primary">
-                אני מוביל <Send className="size-4" />
-              </div>
-            </button>
-          </div>
-
-          <p className="text-xs text-muted-foreground text-center mt-6">
-            עובד בשניהם? אפשר לבחור עכשיו את סוג העבודה העיקרי — נוכל להוסיף כלי רכב נוספים אחר כך מהאזור האישי.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const kindLabel = kind === "mover" ? "מובילים" : "שליחים";
-  const kindLabelSingular = kind === "mover" ? "מוביל" : "שליח";
-
   return (
     <div className="min-h-screen bg-[#f6f8f7] py-6 md:py-10 px-4" dir="rtl">
       <div className="max-w-3xl mx-auto">
@@ -643,18 +389,11 @@ export function JoinPage() {
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
-            הרשמה ל{kindLabel} של Goi
+            הרשמה לשליחים של Goi
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-2">
             קבל הצעות עבודה ישירות בוואטסאפ — בלי אפליקציות, בלי התחייבות
           </p>
-          <button
-            type="button"
-            onClick={() => { setKind(null); setVehicleTypes([]); setJobs([]); setCrewSize(""); setEquipment([]); setFloors(""); setMinJobPrice(""); }}
-            className="mt-3 text-xs text-primary hover:underline font-semibold"
-          >
-            נרשמת בטעות כ{kindLabelSingular}? החלף סוג
-          </button>
         </header>
 
 
@@ -731,40 +470,8 @@ export function JoinPage() {
             />
           </Section>
 
-          {/* 3. Wanted work areas */}
-          <Section
-            n={3}
-            title="באילו ערים / אזורים אתה רוצה לקבל עבודות?"
-            icon={MapPin}
-            sub="אפשר לבחור כמה אזורים או לבחור כל הארץ"
-          >
-            <CitiesGrid value={wantedAreas} onChange={setWantedAreas} />
-          </Section>
-
-          {/* 4. Distance — couriers only */}
-          {kind !== "mover" && (
-            <Section
-              n={4}
-              title="באיזה מרחק מאזור הבסיס שלך אתה רוצה לקבל עבודות?"
-              icon={Ruler}
-              sub="המרחק מחושב לפי עיר הבסיס שבחרת. את ההתאמה הסופית (איסוף/מסירה) תאשר בבוט לכל עבודה"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {DISTANCE_OPTIONS.map((d) => (
-                  <ChoiceCard key={d} active={distance === d} onClick={() => setDistance(d)}>
-                    <div className={`size-4 rounded-full border-2 ${distance === d ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
-                      {distance === d && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
-                    </div>
-                    <span className="text-sm font-medium">{d}</span>
-                  </ChoiceCard>
-                ))}
-              </div>
-            </Section>
-          )}
-
-
-          {/* 5. Vehicle */}
-          <Section n={5} title="עם מה אתה עובד?" icon={Bike} sub="אפשר לבחור יותר מכלי אחד">
+          {/* 3. Vehicle */}
+          <Section n={3} title="עם מה אתה עובד?" icon={Bike} sub="אפשר לבחור יותר מכלי אחד">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {VEHICLES.map((v) => {
                 const on = vehicleTypes.includes(v.value);
@@ -786,80 +493,24 @@ export function JoinPage() {
             </div>
           </Section>
 
-          {/* 6. Job types */}
-          <Section n={6} title="איזה עבודות מעניינות אותך?" icon={Package} sub="אפשר לבחור יותר מאחד">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {JOB_OPTIONS.map((j) => {
-                const on = jobs.includes(j.value);
-                return (
-                  <button
-                    key={j.value}
-                    type="button"
-                    onClick={() => setJobs(toggle(jobs, j.value))}
-                    className={`rounded-xl border-2 p-3 flex flex-col items-center gap-2 transition-all ${
-                      on ? "border-primary bg-primary/5" : "border-border bg-white hover:border-primary/50"
-                    }`}
-                  >
-                    <Checkbox checked={on} className="pointer-events-none self-start" />
-                    <j.icon className={`size-6 ${on ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className="text-xs font-medium text-center">{j.value}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
-
           {/* Mover-only extras */}
           {kind === "mover" && (
-            <>
-              <Section n={"6א"} title="עובד לבד או עם צוות?" icon={Boxes} sub="חשוב לנו כדי להתאים לך עבודות בגודל הנכון">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {CREW_OPTIONS.map((c) => (
-                    <ChoiceCard key={c} active={crewSize === c} onClick={() => setCrewSize(c)}>
-                      <div className={`size-4 rounded-full border-2 shrink-0 ${crewSize === c ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
-                        {crewSize === c && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
-                      </div>
-                      <span className="text-sm font-medium">{c}</span>
-                    </ChoiceCard>
-                  ))}
-                </div>
-              </Section>
-
-
-
-            </>
+            <Section n={"3א"} title="עובד לבד או עם צוות?" icon={Boxes} sub="חשוב לנו כדי להתאים לך עבודות בגודל הנכון">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {CREW_OPTIONS.map((c) => (
+                  <ChoiceCard key={c} active={crewSize === c} onClick={() => setCrewSize(c)}>
+                    <div className={`size-4 rounded-full border-2 shrink-0 ${crewSize === c ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
+                      {crewSize === c && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
+                    </div>
+                    <span className="text-sm font-medium">{c}</span>
+                  </ChoiceCard>
+                ))}
+              </div>
+            </Section>
           )}
 
-
-
-          {/* 7. Experience */}
-          <Section n={7} title={`יש לך ניסיון כ${kindLabelSingular}?`} icon={Award}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {EXPERIENCE_STATUS.map((e) => (
-                <ChoiceCard key={e} active={expStatus === e} onClick={() => setExpStatus(e)}>
-                  <div className={`size-4 rounded-full border-2 shrink-0 ${expStatus === e ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
-                    {expStatus === e && <div className="size-full rounded-full bg-primary-foreground scale-[0.4]" />}
-                  </div>
-                  <span className="text-sm font-medium">{e}</span>
-                </ChoiceCard>
-              ))}
-            </div>
-            {showDuration && (
-              <div className="mt-4">
-                <p className="text-sm font-medium mb-2">כמה זמן ניסיון יש לך {kind === "mover" ? "בהובלות" : "בשליחויות"}?</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {EXPERIENCE_DURATION.map((d) => (
-                    <ChoiceCard key={d} active={expDuration === d} onClick={() => setExpDuration(d)} className="justify-center">
-                      <span className="text-sm font-medium">{d}</span>
-                    </ChoiceCard>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Section>
-
-          {/* 8. Invoice */}
-          <Section n={8} title="יש לך חשבונית / קבלה?" icon={Briefcase}>
+          {/* 4. Invoice */}
+          <Section n={4} title="יש לך חשבונית / קבלה?" icon={Briefcase}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {INVOICE_OPTIONS.filter((i) => (kind === "mover" ? i.value !== "לא" : true)).map((i) => (
                 <ChoiceCard key={i.value} active={invoice === i.value} onClick={() => setInvoice(i.value)} className={`justify-center flex-col ${i.sub ? "py-3" : ""}`}>
@@ -870,9 +521,8 @@ export function JoinPage() {
             </div>
           </Section>
 
-
-          {/* 8b. Password — for personal area */}
-          <Section n={9} title="בחר סיסמה לאזור האישי שלך" icon={KeyRound} sub="עם המספר שלך + הסיסמה תוכל להיכנס לאזור האישי שלך באתר">
+          {/* 5. Password — for personal area */}
+          <Section n={5} title="בחר סיסמה לאזור האישי שלך" icon={KeyRound} sub="עם המספר שלך + הסיסמה תוכל להיכנס לאזור האישי שלך באתר">
             <Input
               type="password"
               value={password}

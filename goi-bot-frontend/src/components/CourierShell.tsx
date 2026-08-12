@@ -1,13 +1,10 @@
 import { Link, useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
-  LayoutGrid, Inbox, History, Clock, Wallet,
-  Star, User, Bell, Settings, LogOut,
-  Home, Navigation, LifeBuoy, ChevronRight, MessageCircle, X, HandCoins,
+  Inbox, History, Wallet, User, LogOut, Navigation, ChevronRight, X, MessageSquare,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useCourierGpsTracker } from "@/hooks/useCourierGpsTracker";
 import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
@@ -19,23 +16,17 @@ import {
   nestListOpenBroadcastJobs,
 } from "@/lib/nest-jobs";
 
-// Full sidebar navigation (desktop + mobile drawer). Labels adapt to courier kind.
+// Sidebar / drawer — slim MVP nav. Labels adapt to courier kind.
 function buildNav(kind: "courier" | "mover") {
   const jobsLabel = kind === "mover" ? "הובלות פנויות" : "משלוחים פנויים";
   const historyLabel = kind === "mover" ? "ההובלות שלי" : "המשלוחים שלי";
-  const botLabel = kind === "mover" ? "זמינות והגדרות בוט הובלות" : "זמינות קבועה והגדרות בוט";
   return [
     { to: "/courier/new-jobs", label: jobsLabel, icon: Inbox },
     { to: "/courier/active", label: "פעילים", icon: Navigation },
     { to: "/courier/history", label: historyLabel, icon: History },
-    { to: "/courier/my-quotes", label: "הצעות המחיר שלי", icon: HandCoins },
+    { to: "/courier/messages", label: "הודעות", icon: MessageSquare },
     { to: "/courier/wallet", label: "רווחים", icon: Wallet },
-    { to: "/courier/profile/edit", label: "אזור אישי", icon: User },
-    { to: "/courier/messages", label: "הודעות", icon: MessageCircle },
-    { to: "/courier/ratings", label: "דירוגים וביצועים", icon: Star },
-    { to: "/courier/availability", label: botLabel, icon: Clock },
-    { to: "/courier/notifications", label: "התראות", icon: Bell },
-    { to: "/courier/settings", label: "הגדרות חשבון", icon: Settings },
+    { to: "/courier/profile", label: "אזור אישי", icon: User },
   ] as const;
 }
 
@@ -44,7 +35,6 @@ function buildMobileTabs(kind: "courier" | "mover") {
   const jobsLabel = kind === "mover" ? "הובלות" : "משלוחים";
   return [
     { to: "/courier/active", label: "פעילים", icon: Navigation },
-    { to: "/courier/messages", label: "צאט", icon: MessageCircle },
     { to: "/courier/new-jobs", label: jobsLabel, icon: Inbox },
     { to: "/courier/wallet", label: "רווחים", icon: Wallet },
     { to: "/courier/profile", label: "אזור אישי", icon: User },
@@ -115,7 +105,7 @@ function NavBadge({ value, tone = "green" }: { value: number; tone?: "green" | "
       ? "bg-amber-400 text-amber-950"
       : tone === "slate"
         ? "bg-slate-200 text-slate-800"
-        : "bg-[#35AD29] text-white";
+        : "bg-primary text-primary-foreground";
   return (
     <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-extrabold ${cls}`}>
       {value > 99 ? "99+" : value}
@@ -128,12 +118,12 @@ function StatusBadge({ status, kind }: { status?: string | null; kind?: "courier
   // System-level approval indicator (read-only). The on/off switch lives in the dashboard.
   const approved = status === "פעיל" || status === "לא פעיל" || status === "מושהה";
   const cls = approved
-    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+    ? "bg-success-bg text-success-text border border-primary/20"
     : status === "ממתין לאישור"
-      ? "bg-amber-50 text-amber-800 border border-amber-200"
+      ? "bg-warning-bg text-warning-text border border-warning/30"
       : status === "חסום"
-        ? "bg-red-50 text-red-800 border border-red-200"
-        : "bg-slate-100 text-slate-700 border border-slate-200";
+        ? "bg-danger-bg text-danger-text border border-destructive/20"
+        : "bg-muted text-text-muted border border-border";
   const label = approved
     ? (kind === "mover" ? "מאושר להובלות" : "מאושר למשלוחים")
     : status === "ממתין לאישור"
@@ -166,19 +156,23 @@ function SidebarBody({ path, onNavigate, onSignOut, counts, kind }: {
       </div>
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         {NAV.map((item) => {
-          const active = item.to === "/courier/profile/edit"
+          const active = item.to === "/courier/profile"
             ? path.startsWith("/courier/profile")
             : path === item.to;
           const Icon = item.icon;
-          const badge = item.to === "/courier/active" ? activeBadge : 0;
-          void newJobsBadge;
+          const badge =
+            item.to === "/courier/new-jobs"
+              ? newJobsBadge
+              : item.to === "/courier/active"
+                ? activeBadge
+                : 0;
           return (
             <Link
               key={item.to}
               to={item.to}
               onClick={onNavigate}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
-                active ? "bg-[#35AD29] text-white shadow-sm" : "text-white/60 hover:bg-white/10 hover:text-white"
+              className={`flex items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold transition-colors ${
+                active ? "bg-primary text-primary-foreground shadow-fab" : "text-white/60 hover:bg-white/10 hover:text-white"
               }`}
             >
               <Icon className="size-4 shrink-0" />
@@ -265,7 +259,7 @@ function IncomingJobOverlay({ alert, onOpen, onDismiss }: {
   return (
     <div dir="rtl" className="fixed inset-0 z-[80] flex items-start justify-center bg-black/45 px-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:items-center lg:pt-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10 animate-in zoom-in-95 slide-in-from-top-4 duration-200">
-        <div className="bg-[#35AD29] px-5 py-4 text-white">
+        <div className="bg-primary px-5 py-4 text-primary-foreground">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-xs font-extrabold opacity-90">עבודה חדשה עכשיו</div>
@@ -279,7 +273,7 @@ function IncomingJobOverlay({ alert, onOpen, onDismiss }: {
         <div className="space-y-4 p-5">
           {alert.body && <p className="whitespace-pre-line text-base font-bold leading-relaxed text-slate-900">{alert.body}</p>}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" className="h-13 rounded-2xl bg-[#35AD29] text-base font-black hover:bg-[#2f9825]" onClick={onOpen}>
+            <Button type="button" className="h-13 rounded-2xl bg-primary text-base font-black text-primary-foreground hover:bg-primary/90" onClick={onOpen}>
               פתח פרטים
             </Button>
             <Button type="button" variant="outline" className="h-13 rounded-2xl text-base font-bold" onClick={onDismiss}>
@@ -306,12 +300,11 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   const qc = useQueryClient();
   const { data: me } = useMyCourier();
   const { data: navCounts } = useCourierNavCounts(me);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  
+
   const incomingSeenRef = useRef(new Set<string>());
 
-  // App-like back button: shown on every screen that isn't one of the 5 primary tabs.
-  const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/wallet", "/courier/messages", "/courier/profile", "/courier/profile/edit", "/courier"];
+  // App-like back button: hidden on primary bottom-tab screens.
+  const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/wallet", "/courier/profile", "/courier/profile/edit", "/courier"];
   const showBack = !PRIMARY_PATHS.includes(path);
   const goBack = () => {
     const canGoBack = typeof window !== "undefined" && window.history.length > 1;
@@ -454,23 +447,16 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   return (
     <div
       dir="rtl"
-      className={`rtl-panel bg-slate-50 flex w-full lg:h-dvh lg:overflow-hidden ${
+      className={`rtl-panel flex w-full bg-bg lg:h-dvh lg:overflow-hidden ${
         fullBleed ? "h-dvh overflow-hidden" : "min-h-dvh"
       }`}
     >
       {/* Desktop sidebar (right side in RTL) */}
-      <aside className="hidden lg:flex w-[260px] shrink-0 bg-black text-slate-100 flex-col sticky top-0 h-screen">
+      <aside
+        className="hidden lg:flex w-[260px] shrink-0 bg-navy text-slate-100 flex-col sticky top-0 h-screen"
+      >
         <SidebarBody path={path} onSignOut={handleSignOut} counts={navCounts} kind={kind} />
       </aside>
-
-      {/* Mobile "More" drawer — for items not in the bottom tab bar */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="right" dir="rtl" className="w-[280px] p-0 bg-black text-slate-100 border-0 flex flex-col">
-          <SheetHeader className="sr-only"><SheetTitle>תפריט</SheetTitle></SheetHeader>
-          <SidebarBody path={path} onNavigate={() => setMobileOpen(false)} onSignOut={handleSignOut} counts={navCounts} kind={kind} />
-        </SheetContent>
-      </Sheet>
-
 
       <main
         className={`flex-1 min-w-0 flex flex-col ${
@@ -478,38 +464,29 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         }`}
       >
         {/* ===== Desktop top bar ===== */}
-        <header className="hidden lg:block bg-background border-b border-slate-200 px-6 py-4 sticky top-0 z-10">
+        <header className="hidden lg:block bg-surface border-b border-border px-6 py-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="relative shrink-0">
-                <div className="size-11 rounded-full bg-gradient-to-br from-[#35AD29] to-[#2d9623] text-white grid place-items-center font-extrabold text-sm">
+                <div className="size-11 rounded-pill bg-primary text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
                   {initialsOf(me?.full_name)}
                 </div>
-                <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-white ${isAvailable ? "bg-[#35AD29] animate-pulse" : "bg-slate-300"}`} />
+                <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
               </div>
               <div className="min-w-0 text-right">
-                <div className="text-[11px] text-slate-500 font-semibold leading-none mb-1">{greetingHe()}</div>
-                <div className="text-sm font-extrabold text-slate-900 truncate leading-tight">{me?.full_name ?? "שליח"}</div>
+                <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">{greetingHe()}</div>
+                <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{me?.full_name ?? "שליח"}</div>
               </div>
               {(title || subtitle) && (
-                <div className="min-w-0 text-right border-r border-slate-200 pr-3 mr-2">
-                  {title && <h1 className="text-xl font-extrabold text-slate-900 truncate">{title}</h1>}
-                  {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+                <div className="min-w-0 text-right border-r border-border pr-3 mr-2">
+                  {title && <h1 className="text-xl font-extrabold text-text-strong truncate">{title}</h1>}
+                  {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
                 </div>
               )}
             </div>
             <div className="shrink-0 flex items-center gap-2">
               {me && <StatusBadge status={me?.courier_status} kind={kind} />}
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-xl border-slate-200 shrink-0"
-              onClick={() => navigate({ to: "/courier/notifications" })}
-              aria-label="התראות"
-            >
-              <Bell className="size-4" />
-            </Button>
           </div>
           {headerExtra && <div className="mt-3">{headerExtra}</div>}
         </header>
@@ -517,58 +494,49 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
 
         {/* ===== Mobile sticky app bar (PWA-style) — hidden on fullBleed screens ===== */}
         {!fullBleed && (
-          <header className="lg:hidden sticky top-0 z-20 bg-white/85 backdrop-blur-lg border-b border-slate-100 px-4 pt-3 pb-3">
+          <header className="lg:hidden sticky top-0 z-20 bg-surface/90 backdrop-blur-lg border-b border-border px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 {showBack ? (
                   <button
                     onClick={goBack}
-                    className="size-11 grid place-items-center rounded-full bg-slate-100 text-slate-700 active:bg-slate-200 transition-colors shrink-0"
+                    className="size-11 grid place-items-center rounded-pill bg-muted text-text-strong active:bg-border transition-colors shrink-0"
                     aria-label="חזרה"
                   >
                     <ChevronRight className="size-6" />
                   </button>
                 ) : (
                   <div className="relative shrink-0">
-                    <div className="size-11 rounded-full bg-gradient-to-br from-[#35AD29] to-[#2d9623] text-white grid place-items-center font-extrabold text-sm">
+                    <div className="size-11 rounded-pill bg-primary text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
                       {initialsOf(me?.full_name)}
                     </div>
-                    <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-white ${isAvailable ? "bg-[#35AD29] animate-pulse" : "bg-slate-300"}`} />
+                    <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
                   </div>
                 )}
                 <div className="min-w-0 text-right">
                   {showBack ? (
                     <>
-                      <div className="text-[11px] text-slate-500 font-semibold leading-none mb-1">חזרה</div>
-                      <div className="text-sm font-extrabold text-slate-900 truncate leading-tight">{title ?? "המסך הקודם"}</div>
+                      <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">חזרה</div>
+                      <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{title ?? "המסך הקודם"}</div>
                     </>
                   ) : (
                     <>
-                      <div className="text-[11px] text-slate-500 font-semibold leading-none mb-1">{greetingHe()}</div>
-                      <div className="text-sm font-extrabold text-slate-900 truncate leading-tight">{me?.full_name ?? "שליח"}</div>
+                      <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">{greetingHe()}</div>
+                      <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{me?.full_name ?? "שליח"}</div>
                     </>
                   )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  to="/courier/notifications"
-                  className="size-10 grid place-items-center rounded-full bg-slate-100 text-slate-700 active:bg-slate-200 transition-colors shrink-0"
-                  aria-label="התראות"
-                >
-                  <Bell className="size-5" />
-                </Link>
-
-                {/* System approval status (read-only). On/off toggle lives in the dashboard. */}
                 {me && <StatusBadge status={me?.courier_status} kind={kind} />}
               </div>
             </div>
 
             {(title || subtitle) && (
               <div className="mt-3 text-right">
-                {title && <h1 className="text-xl font-extrabold text-slate-900 truncate">{title}</h1>}
-                {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+                {title && <h1 className="text-xl font-extrabold text-text-strong truncate">{title}</h1>}
+                {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
               </div>
             )}
 
@@ -584,10 +552,9 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         }`}>{children}</div>
 
 
-        {/* ===== Mobile bottom tab bar — 5 fixed tabs ===== */}
+        {/* ===== Mobile bottom tab bar — Active / Jobs / Wallet / Profile ===== */}
         <nav
-          className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.08)] px-1 pt-1.5 flex justify-around items-stretch"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.375rem)" }}
+          className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-surface/95 backdrop-blur shadow-bottom-bar px-1.5 pt-1.5 flex justify-around items-stretch pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)]"
           aria-label="תפריט ראשי"
         >
           {MOBILE_TABS.map((item) => {
@@ -597,24 +564,26 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
               (item.to === "/courier/profile" && path.startsWith("/courier/profile"));
             const Icon = item.icon;
             const badge =
-              item.to === "/courier/active"
-                ? (navCounts?.activeJobs ?? 0)
-                : 0;
+              item.to === "/courier/new-jobs"
+                ? (navCounts?.pendingOffers ?? 0) + (navCounts?.openJobs ?? 0)
+                : item.to === "/courier/active"
+                  ? (navCounts?.activeJobs ?? 0)
+                  : 0;
             return (
               <Link
                 key={item.to}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex flex-col items-center justify-center gap-1 flex-1 mx-0.5 py-2 rounded-2xl transition-all duration-200 ease-out ${
+                className={`relative flex flex-col items-center justify-center gap-1 flex-1 mx-0.5 py-2 rounded-pill transition-all duration-200 ease-out ${
                   active
-                    ? "text-[#35AD29] bg-[#35AD29]/10 scale-[1.02]"
-                    : "text-slate-400 active:text-slate-700 active:bg-slate-100"
+                    ? "text-primary bg-primary-soft scale-[1.02]"
+                    : "text-text-muted active:text-text-strong active:bg-muted"
                 }`}
               >
                 <div className="relative">
                   <Icon className={`size-6 transition-all ${active ? "stroke-[2.5]" : "stroke-2"}`} />
                   {badge > 0 && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-amber-400 text-amber-950 text-[10px] font-extrabold ring-2 ring-white">
+                    <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-pill bg-warning text-warning-foreground text-[10px] font-extrabold ring-2 ring-surface">
                       {badge > 99 ? "99+" : badge}
                     </span>
                   )}

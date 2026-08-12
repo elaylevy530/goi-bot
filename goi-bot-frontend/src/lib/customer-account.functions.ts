@@ -55,8 +55,25 @@ async function openJobConversation(
 }
 
 export const signupCustomerFn = createServerFn({ method: "POST" })
-  .handler(async () => {
-    throw new Error("TODO Nest: use POST /api/auth/register/customer");
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        phone: z.string().min(7),
+        full_name: z.string().min(2).optional(),
+        name: z.string().min(2).optional(),
+        password: z.string().min(6),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    return nestServerFetch("/api/auth/register/customer", {
+      method: "POST",
+      body: {
+        phone: data.phone,
+        full_name: data.full_name || data.name || "לקוח",
+        password: data.password,
+      },
+    });
   });
 
 export const getMyOrdersFn = createServerFn({ method: "GET" })
@@ -95,8 +112,23 @@ export const repriceMyOrderFn = createServerFn({ method: "POST" })
   );
 
 export const updateCustomerProfileFn = createServerFn({ method: "POST" })
-  .handler(async () => {
-    throw new Error("TODO Nest: use PATCH /api/auth/me/customer");
+  .middleware([requireNestAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        full_name: z.string().min(2).max(80).optional(),
+        name: z.string().min(2).max(80).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const full_name = data.full_name || data.name;
+    if (!full_name) throw new Error("full_name is required");
+    return nestServerFetch("/api/auth/me/customer", {
+      method: "PATCH",
+      accessToken: context.accessToken,
+      body: { full_name },
+    });
   });
 
 export const sendCourierMessageFn = createServerFn({ method: "POST" })

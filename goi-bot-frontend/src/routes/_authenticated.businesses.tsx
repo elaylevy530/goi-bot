@@ -112,7 +112,7 @@ function BusinessesPage() {
                     <TableCell>{r.city ?? "—"}</TableCell>
                     <TableCell>
                       {r.signed_agreement_at ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                        <Badge variant="outline" className="bg-success-bg text-success-text border-primary/20">
                           <CheckCircle2 className="size-3 me-1" />
                           חתום
                           {r.signed_agreement_version && <span className="ms-1 text-[10px] opacity-70">v{r.signed_agreement_version}</span>}

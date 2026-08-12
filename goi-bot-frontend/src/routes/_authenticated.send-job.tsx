@@ -11,12 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { nestListAreas } from "@/lib/nest-domain";
+import { nestListAreas, nestSendWhatsapp } from "@/lib/nest-domain";
 import { nestListCouriers } from "@/lib/nest-accounts";
 import { nestCreateJob } from "@/lib/nest-jobs";
 import { JOB_TYPES, VEHICLE_TYPES } from "@/lib/constants";
 import { Copy, MessageCircle, CheckCheck, Search, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 
 export const Route = createFileRoute("/_authenticated/send-job")({
   head: () => ({ meta: [{ title: "שליחת עבודה — Goi" }] }),
@@ -25,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/send-job")({
 
 function SendJobPage() {
   const qc = useQueryClient();
+  const dispatch = useServerFn(dispatchJobToCouriers);
   const [jobType, setJobType] = useState<string>("משלוח בודד");
   const [pickup, setPickup] = useState<string>("");
   const [dropoff, setDropoff] = useState<string>("");
@@ -87,26 +90,42 @@ ${description ? `הערות: ${description}\n` : ""}רוצה לקחת? השב 1.
         matching_couriers_count: matching.length,
         status: "נשלחה לשליחים",
       });
-      toast.message("העבודה נוצרה. הפצת WhatsApp דורשת עובד Nest.");
+      // Nest dispatch creates offer_events + push/WhatsApp fan-out
+      try {
+        const res = await dispatch({ data: { jobId: data.id } });
+        if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
+        else toast.message("העבודה נוצרה — אין שליחים תואמים כרגע");
+      } catch (e) {
+        console.error("dispatch", e);
+        toast.error("שיגור נכשל: " + (e as Error).message);
+      }
       return data;
     },
     onSuccess: (d) => {
       setCreatedJobId(d.id);
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("עבודה נוצרה ושמורה במערכת");
+      toast.success("עבודה נוצרה ונשלחה לשליחים");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const logSent = useMutation({
     mutationFn: async ({ courierId, phone }: { courierId: string; phone: string }) => {
-      throw new Error("TODO Nest: WhatsApp send/queue endpoint is not available");
+      if (!createdJobId) throw new Error("שמור קודם את העבודה");
+      await nestSendWhatsapp({
+        phone,
+        message,
+        courier_id: courierId,
+        job_id: createdJobId,
+        log_only: true,
+      });
     },
     onSuccess: (_, vars) => {
       setSentTo((p) => new Set(p).add(vars.courierId));
       toast.success("סומן כנשלח");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const copyMsg = async () => {

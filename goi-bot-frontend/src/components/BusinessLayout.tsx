@@ -43,8 +43,8 @@ export function BusinessLayout({ title, children }: { title: string; children: R
             if (t.highlight) {
               return (
                 <Link key={t.to} to={t.to}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 my-1.5 mx-1 text-sm whitespace-nowrap rounded-lg font-bold transition-colors ${
-                    active ? "bg-[#2d9623] text-white shadow-md" : "bg-[#35AD29] text-white hover:bg-[#2d9623]"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 my-1.5 mx-1 text-sm whitespace-nowrap rounded-pill font-bold transition-colors ${
+                    active ? "bg-primary/90 text-primary-foreground shadow-md" : "bg-primary text-primary-foreground hover:bg-primary/90"
                   }`}>
                   <Icon className="size-4" /> {t.label}
                 </Link>

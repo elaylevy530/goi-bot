@@ -1,4 +1,5 @@
-/** Moved to Nest. TanStack webhook/watchdog routes deleted. */
-export async function handleGreenWebhook(..._args: unknown[]): Promise<never> {
-  throw new Error("TODO Nest: green webhook bot state machine — use Nest /api/public/green-webhook");
+/** Moved to Nest. TanStack webhook routes deleted. */
+export async function handleGreenWebhook(..._args: unknown[]) {
+  console.warn("handleGreenWebhook: use Nest /api/public/green-webhook");
+  return { ok: false as const, skipped: "owned_by_nest" };
 }

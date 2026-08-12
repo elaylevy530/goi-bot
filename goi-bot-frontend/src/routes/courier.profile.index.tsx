@@ -1,29 +1,33 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   nestListMyCourierOutcomes,
   nestListWithdrawals,
-  nestMyNotificationUnreadCount,
   nestGetMyCourierStats,
 } from "@/lib/nest-domain";
 import { nestSignedFileUrlResolved } from "@/lib/nest-files";
+import { nestUpdatePassword } from "@/lib/nest-auth";
+import { PushEnableRow } from "@/components/PushEnableRow";
+import { pushSupported } from "@/lib/push/subscribe";
 import {
   User,
-  Clock,
-  Bell,
-  Star,
-  LifeBuoy,
-  Settings,
   LogOut,
   ChevronLeft,
   MapPin,
   Bike,
   Wallet as WalletIcon,
   History,
-  HandCoins,
+  KeyRound,
+  Loader2,
+  Star,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useCourierTerms, type CourierTerms } from "@/lib/courier-kind";
 
 export const Route = createFileRoute("/courier/profile/")({
@@ -33,14 +37,9 @@ export const Route = createFileRoute("/courier/profile/")({
 
 function buildMenu(t: CourierTerms) {
   return [
-  { to: "/courier/profile/edit", label: "הפרופיל שלי", sub: "תמונה, פרטים אישיים ורכב", icon: User },
-  { to: "/courier/history", label: "העבודות שלי", sub: `היסטוריית ${t.jobPlural} שבוצעו`, icon: History },
-  { to: "/courier/my-quotes", label: "הצעות המחיר שלי", sub: `מעקב אחרי הצעות שהגשת ל${t.jobPlural}`, icon: HandCoins },
-  { to: "/courier/availability", label: "זמינות והגדרות בוט", sub: "ימים, שעות ואזורי עבודה", icon: Clock },
-  { to: "/courier/notifications", label: "הודעות ועדכונים", sub: "הודעות מהמערכת", icon: Bell, badgeKey: "notifications" as const },
-  { to: "/courier/ratings", label: "דירוגים וביצועים", sub: "דירוג, ביטולים וזמני תגובה", icon: Star },
-  { to: "/courier/messages", label: "עזרה ותמיכה", sub: "שאלות נפוצות וצור קשר", icon: LifeBuoy },
-  { to: "/courier/settings", label: "הגדרות חשבון", sub: "אבטחה, סיסמה והעדפות", icon: Settings },
+    { to: "/courier/profile/edit", label: "הפרופיל שלי", sub: "תמונה, פרטים אישיים ורכב", icon: User },
+    { to: "/courier/history", label: "העבודות שלי", sub: `היסטוריית ${t.jobPlural} שבוצעו`, icon: History },
+    { to: "/courier/wallet", label: "רווחים", sub: "יתרה, תשלומים ומשיכות", icon: WalletIcon },
   ];
 }
 
@@ -55,6 +54,7 @@ function ProfilePage() {
   const { data: me } = useMyCourier();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [pwd, setPwd] = useState("");
 
   const { data: stats } = useQuery({
     queryKey: ["profile-hub-stats", me?.id],
@@ -76,7 +76,7 @@ function ProfilePage() {
     },
   });
 
-  const avatarPath = (me as any)?.avatar_url as string | null | undefined;
+  const avatarPath = (me as { avatar_url?: string | null } | null | undefined)?.avatar_url;
   const { data: avatarUrl } = useQuery({
     queryKey: ["courier-avatar-signed", me?.id, avatarPath],
     enabled: !!me?.id && !!avatarPath,
@@ -98,21 +98,23 @@ function ProfilePage() {
         nestListWithdrawals(),
       ]);
       const earned = (outs ?? [])
-        .filter((o: any) => o.delivered_at && !o.was_cancelled)
-        .reduce((s: number, o: any) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-      const paid = (wds ?? []).filter((w: any) => w.status === "שולמה").reduce((s: number, w: any) => s + Number(w.amount), 0);
+        .filter((o) => o.delivered_at && !o.was_cancelled)
+        .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
+      const paid = (wds ?? []).filter((w) => w.status === "שולמה").reduce((s, w) => s + Number(w.amount), 0);
       const reserved = (wds ?? [])
-        .filter((w: any) => w.status !== "נדחתה" && w.status !== "שולמה")
-        .reduce((s: number, w: any) => s + Number(w.amount), 0);
+        .filter((w) => w.status !== "נדחתה" && w.status !== "שולמה")
+        .reduce((s, w) => s + Number(w.amount), 0);
       return Math.max(0, earned - paid - reserved);
     },
   });
 
-  const { data: unreadNotif = 0 } = useQuery({
-    queryKey: ["profile-hub-notif", me?.id],
-    enabled: !!me?.id,
-    refetchInterval: 30_000,
-    queryFn: () => nestMyNotificationUnreadCount(),
+  const changePwd = useMutation({
+    mutationFn: async () => {
+      if (pwd.length < 6) throw new Error("סיסמה חייבת לפחות 6 תווים");
+      await nestUpdatePassword(pwd);
+    },
+    onSuccess: () => { toast.success("הסיסמה עודכנה ✓"); setPwd(""); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const isAvailable = me?.courier_status === "פעיל" && me?.is_paused !== true && me?.accepting_jobs !== false;
@@ -184,7 +186,6 @@ function ProfilePage() {
           <CardContent className="p-0 divide-y divide-slate-100">
             {buildMenu(terms).map((item) => {
               const Icon = item.icon;
-              const badge = item.badgeKey === "notifications" ? unreadNotif : 0;
               return (
                 <Link key={item.label} to={item.to} className="flex items-center gap-3 px-4 py-3.5 active:bg-slate-50 transition-colors">
                   <ChevronLeft className="size-4 text-slate-400 shrink-0" />
@@ -192,20 +193,43 @@ function ProfilePage() {
                     <div className="font-bold text-slate-900 text-[15px] leading-tight">{item.label}</div>
                     <div className="text-xs text-slate-500 mt-0.5 truncate">{item.sub}</div>
                   </div>
-                  <div className="relative shrink-0">
-                    <span className="size-10 grid place-items-center rounded-xl bg-emerald-50">
-                      <Icon className="size-5 text-[#35AD29]" />
-                    </span>
-                    {badge > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-red-500 text-white text-[10px] font-extrabold ring-2 ring-white">
-                        {badge > 99 ? "99+" : badge}
-                      </span>
-                    )}
-                  </div>
+                  <span className="size-10 grid place-items-center rounded-xl bg-emerald-50 shrink-0">
+                    <Icon className="size-5 text-[#35AD29]" />
+                  </span>
                 </Link>
               );
             })}
+          </CardContent>
+        </Card>
 
+        <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <CardContent className="p-5 space-y-4">
+            <h2 className="font-bold text-end">הגדרות בסיסיות</h2>
+            {me?.id && pushSupported() && <PushEnableRow courierId={me.id} />}
+            <div className="space-y-2">
+              <Label className="text-end block">סיסמה חדשה</Label>
+              <Input
+                type="password"
+                value={pwd}
+                onChange={(e) => setPwd(e.target.value)}
+                dir="ltr"
+                minLength={6}
+                placeholder="לפחות 6 תווים"
+              />
+              <Button
+                className="w-full bg-[#35AD29] hover:bg-[#2d9623] text-white"
+                onClick={() => changePwd.mutate()}
+                disabled={changePwd.isPending || pwd.length < 6}
+              >
+                {changePwd.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+                עדכן סיסמה
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
+          <CardContent className="p-0">
             <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-red-50 transition-colors">
               <ChevronLeft className="size-4 text-slate-400 shrink-0" />
               <div className="flex-1 min-w-0 text-right">

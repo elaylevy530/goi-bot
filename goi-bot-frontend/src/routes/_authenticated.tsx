@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: "/business" });
     }
     if (session.roles.includes("courier")) {
-      throw redirect({ to: "/courier" });
+      throw redirect({ to: "/courier/new-jobs" });
     }
     if (session.roles.includes("customer")) {
       throw redirect({ to: "/customer/dashboard" });

@@ -36,9 +36,8 @@ export function AuthShell({
   return (
     <div
       dir={rtl ? "rtl" : "ltr"}
-      className="min-h-screen w-full bg-slate-50 flex flex-col"
+      className="min-h-screen w-full bg-bg flex flex-col font-sans"
     >
-      {/* Hero */}
       <div className="relative h-64 bg-primary flex flex-col items-center justify-center overflow-hidden shrink-0">
         <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full" />
         <div className="absolute top-20 -left-20 w-64 h-64 bg-black/10 rounded-full" />
@@ -47,7 +46,7 @@ export function AuthShell({
           <Link
             to="/"
             aria-label="חזרה לדף הבית"
-            className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-full px-3 py-1.5 bg-white/15 backdrop-blur-sm ring-1 ring-white/25 transition"
+            className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-pill px-3 py-1.5 bg-white/15 backdrop-blur-sm ring-1 ring-white/25 transition"
           >
             <ArrowRight className="size-3.5" />
             דף הבית
@@ -55,19 +54,20 @@ export function AuthShell({
         )}
 
         <div className="relative z-10 flex flex-col items-center">
-          <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-2xl mb-4 rotate-6">
+          <div className="w-20 h-20 bg-surface rounded-card flex items-center justify-center shadow-card-strong mb-4 rotate-6">
             <div className="-rotate-6 text-primary text-4xl font-black leading-none">
               {logo ?? "G"}
             </div>
           </div>
-          <h1 className="text-white text-3xl font-black tracking-tight">GOI</h1>
+          <h1 className="text-white text-3xl font-black tracking-tight font-wordmark">
+            GOI
+          </h1>
           <p className="text-white/90 mt-1 text-sm font-light">{tagline}</p>
         </div>
       </div>
 
-      {/* Lifted card */}
-      <div className="flex-1 -mt-8 bg-background rounded-t-[40px] px-6 pt-8 shadow-2xl z-20 mx-auto w-full max-w-md relative">
-        <h2 className="text-2xl font-bold text-foreground mb-6">{title}</h2>
+      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-6 pt-8 shadow-card-strong z-20 mx-auto w-full max-w-md relative">
+        <h2 className="text-2xl font-bold text-text-strong mb-6">{title}</h2>
         {children}
         {footer && <div className="mt-8 pb-10 text-center">{footer}</div>}
       </div>
@@ -99,15 +99,15 @@ export function AuthField({
       <div className="flex justify-between items-center mb-1 mr-1">
         <label
           htmlFor={htmlFor}
-          className="block text-xs font-bold text-muted-foreground"
+          className="block text-xs font-bold text-text-muted"
         >
           {label}
         </label>
         {action}
       </div>
-      <div className="flex items-center bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 focus-within:border-primary focus-within:bg-background transition-all">
+      <div className="flex items-center bg-muted border border-border rounded-card px-4 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 transition-all">
         {prefix && (
-          <span className="text-muted-foreground font-medium ml-3 text-sm tracking-wider" dir="ltr">
+          <span className="text-text-muted font-medium ml-3 text-sm tracking-wider" dir="ltr">
             {prefix}
           </span>
         )}
@@ -126,7 +126,7 @@ export function AuthInput(
     <input
       {...props}
       className={
-        "w-full py-4 bg-transparent outline-none text-foreground font-medium text-base placeholder:text-slate-300 " +
+        "w-full py-4 bg-transparent outline-none text-text-strong font-medium text-base placeholder:text-text-muted/50 " +
         (props.className ?? "")
       }
     />

@@ -28,7 +28,7 @@ type MessageRow = {
   id: string;
   conversation_id: string;
   sender_user_id: string;
-  sender_role: "courier" | "business" | "admin";
+  sender_role: "courier" | "business" | "admin" | "guest";
   body: string | null;
   attachment_url: string | null;
   attachment_mime: string | null;
@@ -65,6 +65,13 @@ function formatSize(b: number | null | undefined) {
 function titleFor(c: ConversationRow, viewer: ViewerRole) {
   if (c.kind === "courier_support") return viewer === "admin" ? `תמיכה · ${c.courier?.full_name ?? "שליח"}` : "תמיכת המערכת";
   if (c.kind === "business_support") return viewer === "admin" ? `תמיכה · ${c.business?.name ?? "עסק"}` : "תמיכת המערכת";
+  if (c.kind === "guest_support") {
+    const guest = c.job?.guest_name?.trim() || c.subject || "לקוח";
+    const num = c.job?.job_number ? `#${c.job.job_number}` : null;
+    return viewer === "admin"
+      ? `הובלות · ${guest}${num ? ` · ${num}` : ""}`
+      : "תמיכת GOI";
+  }
   if (c.kind === "courier_business") {
     if (viewer === "courier") return c.business?.name ?? "בית העסק";
     if (viewer === "business") return c.courier?.full_name ?? "השליח";
@@ -77,7 +84,7 @@ function unreadFor(c: ConversationRow, viewer: ViewerRole) {
   return viewer === "courier" ? c.unread_courier : viewer === "business" ? c.unread_business : c.unread_admin;
 }
 
-type AdminFilter = "all" | "courier_support" | "business_support" | "courier_business" | "unread";
+type AdminFilter = "all" | "courier_support" | "business_support" | "courier_business" | "guest_support" | "unread";
 
 export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: ViewerRole; initialConversationId?: string }) {
   const qc = useQueryClient();
@@ -164,13 +171,14 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       courier_support: conversations.filter((c) => c.kind === "courier_support").length,
       business_support: conversations.filter((c) => c.kind === "business_support").length,
       courier_business: conversations.filter((c) => c.kind === "courier_business").length,
+      guest_support: conversations.filter((c) => c.kind === "guest_support").length,
       unread: conversations.filter((c) => c.unread_admin > 0).length,
     };
   }, [conversations, viewerRole]);
 
 
   const openConversation = async (args: {
-    kind: "courier_support" | "business_support" | "courier_business";
+    kind: "courier_support" | "business_support" | "courier_business" | "guest_support";
     courier_id?: string | null;
     business_id?: string | null;
     job_id?: string | null;
@@ -223,6 +231,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                 ["courier_support", "שליחים", adminCounts.courier_support],
                 ["business_support", "עסקים", adminCounts.business_support],
                 ["courier_business", "משלוחים", adminCounts.courier_business],
+                ["guest_support", "הובלות", adminCounts.guest_support],
               ] as const).map(([key, label, count]) => (
                 <button
                   key={key}
@@ -256,6 +265,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                 const kindLabel =
                   c.kind === "courier_support" ? "תמיכה · שליח"
                   : c.kind === "business_support" ? "תמיכה · עסק"
+                  : c.kind === "guest_support" ? "תמיכת לקוח · הובלות"
                   : "שליח ↔ עסק";
                 return (
                   <li key={c.id}>
@@ -271,6 +281,9 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                       {viewerRole === "admin" && (
                         <div className="text-[10px] text-muted-foreground mb-1">{kindLabel}</div>
                       )}
+                      {viewerRole === "admin" && c.kind === "guest_support" && c.job?.guest_phone ? (
+                        <div className="text-[10px] text-muted-foreground mb-1 truncate">{c.job.guest_phone}</div>
+                      ) : null}
                       <div className="text-xs text-muted-foreground truncate">{c.last_message_preview ?? "—"}</div>
                       <div className="text-[10px] text-muted-foreground mt-1">
                         {formatDistanceToNow(new Date(c.last_message_at), { locale: he, addSuffix: true })}
@@ -474,6 +487,15 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
               <span>משלוח · {conv.job.pickup_address ?? ""} ← {conv.job.dropoff_address ?? ""}</span>
             </div>
           )}
+          {conv.kind === "guest_support" && conv.job && (
+            <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+              <Briefcase className="size-3" />
+              <span>
+                {conv.job.job_number ? `#${conv.job.job_number} · ` : ""}
+                {conv.job.pickup_address ?? ""} ← {conv.job.dropoff_address ?? ""}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -485,10 +507,15 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
           const mine = m.sender_role === viewerRole;
           const url = m.attachment_url ? urls[m.id] : null;
           const kind = m.attachment_kind ?? detectKind(m.attachment_mime);
+          const roleInitial =
+            m.sender_role === "admin" ? "מ"
+            : m.sender_role === "courier" ? "ש"
+            : m.sender_role === "guest" ? "ל"
+            : "ע";
           return (
             <div key={m.id} dir="ltr" className={`flex ${mine ? "flex-row-reverse" : "flex-row"} gap-2 items-end`}>
               <Avatar className="size-7 shrink-0">
-                <AvatarFallback className="text-[10px]">{m.sender_role === "admin" ? "מ" : m.sender_role === "courier" ? "ש" : "ע"}</AvatarFallback>
+                <AvatarFallback className="text-[10px]">{roleInitial}</AvatarFallback>
               </Avatar>
               <div dir="rtl" className={`max-w-[75%] rounded-2xl px-3 py-2 ${mine ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-card border rounded-bl-sm"}`}>
                 {m.attachment_url && (

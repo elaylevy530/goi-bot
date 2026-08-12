@@ -130,7 +130,7 @@ function CustomersPage() {
                   <TableCell>{c.city ?? "—"}</TableCell>
                   <TableCell className="text-sm">{c.address ?? "—"}</TableCell>
                   <TableCell className="text-sm">{c.preferred_job_type ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline" className={c.status === "פעיל" ? "bg-primary/10 text-primary border-primary/20" : c.status === "חדש" ? "bg-sky-100 text-sky-700 border-sky-200" : "bg-amber-100 text-amber-700 border-amber-200"}>{c.status}</Badge></TableCell>
+                  <TableCell><Badge variant="outline" className={c.status === "פעיל" ? "bg-primary/10 text-primary border-primary/20" : c.status === "חדש" ? "bg-info-bg text-info-text border-border" : "bg-warning-bg text-warning-text border-warning/30"}>{c.status}</Badge></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("he-IL")}</TableCell>
                   <TableCell className="text-end">
                     <div className="inline-flex items-center gap-1">

@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 
 import { InstallAppButton } from "@/components/InstallApp";
+import { partnersUrl } from "@/lib/partners-redirect";
 
 const SITE_URL = "https://goi-bot.lovable.app";
 const OG_IMAGE = SITE_URL + "/og-join.jpg";
@@ -3152,14 +3153,14 @@ function Footer() {
               </div>
             </div>
           </div>
-          <Link
-            to="/join"
+          <a
+            href={partnersUrl("/join")}
             className="group inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full font-bold text-[13.5px] shadow-[0_12px_28px_-12px_rgba(18,140,126,0.6)] hover:scale-[1.03] active:scale-[0.98] transition shrink-0 w-full sm:w-auto"
             style={{ background: WA_GREEN, color: "white" }}
           >
             <MessageCircle className="w-4 h-4" />
             הצטרף אלינו
-          </Link>
+          </a>
         </div>
       </div>
 
@@ -3222,7 +3223,7 @@ function Footer() {
             title="שותפים"
             links={[
               ["אזור לקוחות פרטיים", "/customer-login"],
-              ["שליח או מוביל?", "/couriers"],
+              ["שליח או מוביל?", partnersUrl("/")],
               ["התחברות שליח", "/courier-login"],
               ["כניסת עסקים", "/business-login"],
               ["ניהול", "/admin-login"],
