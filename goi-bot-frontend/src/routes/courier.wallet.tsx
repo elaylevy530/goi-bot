@@ -157,8 +157,27 @@ function WalletPage() {
   const kmToday = rows
     .filter((o) => o.delivered_at && !o.was_cancelled && o.delivered_at >= todayStart.toISOString())
     .reduce((s, o) => s + kmOf(o), 0);
-  const jobsToday = rows.filter((o) => o.delivered_at && !o.was_cancelled && o.delivered_at >= todayStart.toISOString()).length;
+  const todayRows = rows.filter((o) => o.delivered_at && !o.was_cancelled && o.delivered_at >= todayStart.toISOString());
+  const jobsToday = todayRows.length;
+  const tipsToday = todayRows.reduce((s, o) => s + Number(o.tip_amount ?? 0), 0);
+  const avgPerDelivery = jobsToday > 0 ? earnedToday / jobsToday : 0;
+  const hoursOnlineToday =
+    jobsToday === 0 ? 0 : Math.max(1, Math.min(12, Math.round((Date.now() - todayStart.getTime()) / 3_600_000)));
   const pricePerKm = totalKm > 0 ? totalEarned / totalKm : 0;
+
+  const hourlyToday = useMemo(() => {
+    const buckets = Array.from({ length: 12 }, (_, i) => ({ hour: 8 + i, value: 0 }));
+    for (const o of todayRows as any[]) {
+      if (!o.delivered_at) continue;
+      const h = new Date(o.delivered_at).getHours();
+      const idx = buckets.findIndex((b) => b.hour === h);
+      if (idx >= 0) {
+        buckets[idx].value += Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0);
+      }
+    }
+    return buckets;
+  }, [rows]);
+  const maxHourly = Math.max(1, ...hourlyToday.map((b) => b.value));
 
   const paidOut = (withdrawals as any[])
     .filter((w: any) => w.status === "שולמה")
@@ -203,59 +222,43 @@ function WalletPage() {
   const fmt1 = (n: number) => new Intl.NumberFormat("he-IL", { maximumFractionDigits: 1 }).format(n);
 
   return (
-    <CourierShell title="הארנק שלי" subtitle="רווחים, יעדים ותשלומים">
-      <div className="-mx-1 sm:mx-0 space-y-4">
-        {/* ============ HERO BALANCE ============ */}
-        <div className="relative overflow-hidden rounded-[2rem] shadow-lg shadow-emerald-900/10">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-700" />
-          {/* soft ambient orbs */}
-          <div className="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
-          <div className="absolute -bottom-28 -right-12 w-80 h-80 rounded-full bg-teal-200/10 blur-3xl" />
-          <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "20px 20px" }} />
-
-          <div className="relative p-6 text-white">
-            <div className="flex justify-between items-start mb-6">
-              <div className="text-end min-w-0">
-                <div className="text-[11px] text-white/70">שלום,</div>
-                <div className="text-base font-bold truncate max-w-[200px]">{me?.full_name ?? "שליח"}</div>
+    <CourierShell title="הארנק שלי" subtitle="רווחים יומיים ומשיכות">
+      <div className="-mx-1 sm:mx-0 space-y-4" dir="rtl">
+        {/* ============ DAILY EARNINGS HERO (Figma 44:276) ============ */}
+        <div className="relative overflow-hidden rounded-[1.75rem] bg-primary text-primary-foreground shadow-fab">
+          <div className="absolute -top-20 -left-10 size-56 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -bottom-24 -right-8 size-64 rounded-full bg-black/10 blur-3xl" />
+          <div className="relative p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div className="text-right min-w-0">
+                <p className="text-[13px] text-primary-foreground/80">הרווחים שלי היום</p>
+                <div className="mt-1 flex items-baseline justify-start gap-1.5">
+                  <span className="text-4xl font-black tracking-tight tabular-nums">₪{fmt(earnedToday)}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-primary-foreground/75">
+                  יתרה למשיכה: ₪{fmt(availableToWithdraw)}
+                  {reservedWithdrawals > 0 ? ` · בתהליך ₪${fmt(reservedWithdrawals)}` : ""}
+                </p>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/15">
-                <Sparkles className="size-3.5" />
-                <span className="text-xs font-semibold tracking-wide">Goi · ארנק</span>
-              </div>
-            </div>
-
-            <div className="text-end mb-6">
-              <p className="text-emerald-50/90 text-sm font-medium mb-1">יתרה זמינה למשיכה</p>
-              <div className="flex items-baseline justify-end gap-1.5">
-                <span className="text-emerald-100 text-2xl font-bold">₪</span>
-                <span className="text-5xl font-black tracking-tight tabular-nums">{fmt(availableToWithdraw)}</span>
-              </div>
-              <div className="mt-3 flex items-center justify-end gap-3 text-[11px] text-white/85">
-                <span>סה״כ ברווח: <b className="text-white">₪{fmt(balance)}</b></span>
-                {reservedWithdrawals > 0 && (
-                  <>
-                    <span className="size-1 rounded-full bg-white/50" />
-                    <span>בתהליך משיכה: <b className="text-white">₪{fmt(reservedWithdrawals)}</b></span>
-                  </>
-                )}
+              <div className="size-11 rounded-full bg-white/15 grid place-items-center shrink-0">
+                <WalletIcon className="size-5" />
               </div>
             </div>
 
-            {/* mini stat strip */}
-            <div className="grid grid-cols-3 gap-2 mb-5 text-end">
-              <HeroChip label="הרווחת היום" value={`₪${fmt(earnedToday)}`} />
-              <HeroChip label="ק״מ היום" value={fmt1(kmToday)} />
-              <HeroChip label="משלוחים היום" value={String(jobsToday)} />
+            <div className="grid grid-cols-2 gap-2.5 mb-4">
+              <HeroChip label="משלוחים" value={String(jobsToday)} />
+              <HeroChip label="שעות פעילות" value={String(hoursOnlineToday)} />
+              <HeroChip label="ממוצע למשלוח" value={`₪${fmt(avgPerDelivery)}`} />
+              <HeroChip label="טיפים" value={`₪${fmt(tipsToday)}`} />
             </div>
 
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <button
                   disabled={availableToWithdraw <= 0}
-                  className="w-full bg-white text-[#1f7a18] py-3.5 rounded-2xl font-bold text-[15px] shadow-xl active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-white text-primary py-3.5 rounded-2xl font-bold text-[15px] shadow-xl active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <Send className="size-4" /> בקשת משיכה מיידית
+                  <Send className="size-4" /> בקשת משיכה
                 </button>
               </DialogTrigger>
               <DialogContent dir="rtl" className="max-w-md">
@@ -336,6 +339,60 @@ function WalletPage() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+
+        {/* Hourly today chart */}
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-text-strong">הכנסות לפי שעה</h3>
+            <span className="text-[11px] text-text-subtle">ק״מ היום {fmt1(kmToday)}</span>
+          </div>
+          <div className="flex items-end justify-between h-24 gap-1" dir="ltr">
+            {hourlyToday.map((b) => {
+              const h = (b.value / maxHourly) * 100;
+              return (
+                <div key={b.hour} className="flex-1 flex flex-col items-center gap-1">
+                  <div className="w-full h-20 flex items-end">
+                    <div
+                      className="w-full rounded-t-md bg-primary/80"
+                      style={{ height: `${Math.max(h, b.value > 0 ? 10 : 3)}%` }}
+                      title={`${b.hour}:00 · ₪${fmt(b.value)}`}
+                    />
+                  </div>
+                  <span className="text-[9px] text-text-muted tabular-nums">{b.hour}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Recent deliveries today */}
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">
+          <h3 className="text-sm font-bold text-text-strong mb-3 text-right">משלוחים מהיום</h3>
+          {todayRows.length === 0 ? (
+            <p className="py-6 text-center text-xs text-text-subtle">עדיין אין משלוחים היום</p>
+          ) : (
+            <ul className="space-y-2">
+              {todayRows.slice(0, 8).map((o: any) => (
+                <li key={o.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
+                  <span className="text-sm font-extrabold text-primary tabular-nums">
+                    ₪{fmt(Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0))}
+                  </span>
+                  <div className="min-w-0 text-right">
+                    <p className="text-sm font-bold text-text-strong truncate">
+                      {o.jobs?.customer_name || o.jobs?.job_type || "משלוח"}
+                    </p>
+                    <p className="text-[11px] text-text-subtle truncate">
+                      {o.delivered_at
+                        ? new Date(o.delivered_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
+                        : ""}
+                      {o.jobs?.job_number ? ` · #${o.jobs.job_number}` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* ============ QUICK KPI CARDS ============ */}

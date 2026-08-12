@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -277,6 +277,25 @@ export function ActiveJobs() {
                 <SoftNavBtn label="לאיסוף" sublabel={j.pickup_area ?? ""} tint="indigo" onClick={() => openNav(j.pickup_address ?? j.pickup_area)} />
                 <SoftNavBtn label="למסירה" sublabel={j.dropoff_area ?? ""} tint="rose" onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)} />
               </div>
+
+              <Link
+                to="/courier/mission/$jobId"
+                params={{ jobId: j.id }}
+                search={{
+                  stage:
+                    stage === "picked_up"
+                      ? "en_route"
+                      : stage === "to_pickup"
+                        ? "to_pickup"
+                        : stage === "delivered"
+                          ? "complete"
+                          : "accepted",
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl h-12 font-semibold text-[14px] text-primary-foreground bg-primary shadow-fab active:scale-[0.99]"
+              >
+                <Navigation className="size-4" strokeWidth={2.25} />
+                פתח מסך ניווט
+              </Link>
 
               {/* Primary action — refined, system-green pill */}
               {primary && (

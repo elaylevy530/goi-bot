@@ -120,6 +120,7 @@ import { Route as AuthenticatedCouriersBankDetailsRouteImport } from './routes/_
 import { Route as ApiPublicNotificationQueueWorkerRouteImport } from './routes/api/public/notification-queue-worker'
 import { Route as BusinessOrderIdRouteImport } from './routes/business.order.$id'
 import { Route as BusinessTrackIdRouteImport } from './routes/business.track.$id'
+import { Route as CourierMissionJobIdRouteImport } from './routes/courier.mission.$jobId'
 import { Route as CourierMultiStopIdRouteImport } from './routes/courier.multi-stop.$id'
 import { Route as CourierProfileIndexRouteImport } from './routes/courier.profile.index'
 import { Route as CourierProfileEditRouteImport } from './routes/courier.profile.edit'
@@ -700,6 +701,11 @@ const BusinessTrackIdRoute = BusinessTrackIdRouteImport.update({
   path: '/track/$id',
   getParentRoute: () => BusinessRoute,
 } as any)
+const CourierMissionJobIdRoute = CourierMissionJobIdRouteImport.update({
+  id: '/mission/$jobId',
+  path: '/mission/$jobId',
+  getParentRoute: () => CourierRoute,
+} as any)
 const CourierMultiStopIdRoute = CourierMultiStopIdRouteImport.update({
   id: '/multi-stop/$id',
   path: '/multi-stop/$id',
@@ -851,6 +857,7 @@ export interface FileRoutesByFullPath {
   '/api/public/notification-queue-worker': typeof ApiPublicNotificationQueueWorkerRoute
   '/business/order/$id': typeof BusinessOrderIdRoute
   '/business/track/$id': typeof BusinessTrackIdRoute
+  '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
@@ -969,6 +976,7 @@ export interface FileRoutesByTo {
   '/api/public/notification-queue-worker': typeof ApiPublicNotificationQueueWorkerRoute
   '/business/order/$id': typeof BusinessOrderIdRoute
   '/business/track/$id': typeof BusinessTrackIdRoute
+  '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
@@ -1091,6 +1099,7 @@ export interface FileRoutesById {
   '/api/public/notification-queue-worker': typeof ApiPublicNotificationQueueWorkerRoute
   '/business/order/$id': typeof BusinessOrderIdRoute
   '/business/track/$id': typeof BusinessTrackIdRoute
+  '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
@@ -1213,6 +1222,7 @@ export interface FileRouteTypes {
     | '/api/public/notification-queue-worker'
     | '/business/order/$id'
     | '/business/track/$id'
+    | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
     | '/courier/profile/edit'
     | '/customer/chat/$jobId'
@@ -1331,6 +1341,7 @@ export interface FileRouteTypes {
     | '/api/public/notification-queue-worker'
     | '/business/order/$id'
     | '/business/track/$id'
+    | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
     | '/courier/profile/edit'
     | '/customer/chat/$jobId'
@@ -1452,6 +1463,7 @@ export interface FileRouteTypes {
     | '/api/public/notification-queue-worker'
     | '/business/order/$id'
     | '/business/track/$id'
+    | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
     | '/courier/profile/edit'
     | '/customer/chat/$jobId'
@@ -2281,6 +2293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BusinessTrackIdRouteImport
       parentRoute: typeof BusinessRoute
     }
+    '/courier/mission/$jobId': {
+      id: '/courier/mission/$jobId'
+      path: '/mission/$jobId'
+      fullPath: '/courier/mission/$jobId'
+      preLoaderRoute: typeof CourierMissionJobIdRouteImport
+      parentRoute: typeof CourierRoute
+    }
     '/courier/multi-stop/$id': {
       id: '/courier/multi-stop/$id'
       path: '/multi-stop/$id'
@@ -2514,6 +2533,7 @@ interface CourierRouteChildren {
   CourierRatingsRoute: typeof CourierRatingsRoute
   CourierSettingsRoute: typeof CourierSettingsRoute
   CourierWalletRoute: typeof CourierWalletRoute
+  CourierMissionJobIdRoute: typeof CourierMissionJobIdRoute
   CourierMultiStopIdRoute: typeof CourierMultiStopIdRoute
 }
 
@@ -2531,6 +2551,7 @@ const CourierRouteChildren: CourierRouteChildren = {
   CourierRatingsRoute: CourierRatingsRoute,
   CourierSettingsRoute: CourierSettingsRoute,
   CourierWalletRoute: CourierWalletRoute,
+  CourierMissionJobIdRoute: CourierMissionJobIdRoute,
   CourierMultiStopIdRoute: CourierMultiStopIdRoute,
 }
 
@@ -2620,13 +2641,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

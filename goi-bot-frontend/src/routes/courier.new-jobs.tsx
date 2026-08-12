@@ -58,6 +58,7 @@ function NewJobsPage() {
   const { jobId: focusJobId } = Route.useSearch();
   const isApproved = isCourierApproved(me);
   const [tab, setTab] = useState<JobsTab>("available");
+  const [filter, setFilter] = useState<"all" | "near" | "pay" | "food">("all");
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
 
@@ -164,7 +165,9 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-active-count"] });
-      if (v.response === "accepted") navigate({ to: "/courier/active" });
+      if (v.response === "accepted" && v.jobId) {
+        navigate({ to: "/courier/mission/$jobId", params: { jobId: v.jobId }, search: { stage: "accepted" } });
+      }
     },
     onError: (e: Error) => {
       if (e.message === "taken") {
@@ -198,14 +201,14 @@ function NewJobsPage() {
         void notifyJobTakenFn({ data: { jobId } });
       } catch {}
     },
-    onSuccess: () => {
+    onSuccess: (_d, jobId) => {
       toast.success("העבודה נלקחה ✓");
       setDetail(null);
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-active-count"] });
-      navigate({ to: "/courier/active" });
+      navigate({ to: "/courier/mission/$jobId", params: { jobId }, search: { stage: "accepted" } });
     },
     onError: (e: Error) => {
       if (e.message === "taken") {
@@ -274,11 +277,12 @@ function NewJobsPage() {
     item_category?: string | null;
     package_type?: string | null;
     number_of_packages?: number | null;
+    customer_name?: string | null;
     __kind: "open" | "quote" | "offer";
     __raw: any;
   };
 
-  const availableJobs: ListJob[] = useMemo(() => {
+  const allAvailableJobs: ListJob[] = useMemo(() => {
     const out: ListJob[] = [];
     for (const j of visibleOpenJobs as any[]) {
       out.push({ ...j, __kind: "open", __raw: j });
@@ -293,6 +297,25 @@ function NewJobsPage() {
     return out;
   }, [visibleOpenJobs, visibleQuoteJobs, offers]);
 
+  const availableJobs: ListJob[] = useMemo(() => {
+    const isFood = (j: ListJob) => {
+      const blob = `${j.job_type ?? ""} ${j.item_category ?? ""} ${(j as any).package_type ?? ""} ${j.customer_name ?? ""}`.toLowerCase();
+      return /מסעד|אוכל|food|restaurant|קפה|פיצה|סושי|בורגר|wolt|munch/.test(blob);
+    };
+    if (filter === "food") return allAvailableJobs.filter(isFood);
+    if (filter === "pay") {
+      return [...allAvailableJobs].sort((a, b) => Number(b.payment ?? 0) - Number(a.payment ?? 0));
+    }
+    if (filter === "near") {
+      return [...allAvailableJobs].sort((a, b) => {
+        const da = Number((a as any).distance_km ?? (a as any).distance ?? Infinity);
+        const db = Number((b as any).distance_km ?? (b as any).distance ?? Infinity);
+        return da - db;
+      });
+    }
+    return allAvailableJobs;
+  }, [allAvailableJobs, filter]);
+
   const openDetails = (job: ListJob) => {
     if (job.__kind === "offer") {
       const j = job.__raw?.job;
@@ -306,7 +329,7 @@ function NewJobsPage() {
   };
 
   const displayName = me?.full_name?.trim() || "שליח";
-  const availableCount = availableJobs.length;
+  const availableCount = allAvailableJobs.length;
 
   return (
     <CourierShell fullBleed>
@@ -378,6 +401,31 @@ function NewJobsPage() {
 
             {/* Content */}
             <div className="px-6 pb-4">
+              {tab === "available" && availableCount > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-none">
+                  {(
+                    [
+                      ["all", "הכל"],
+                      ["near", "קרוב אליי"],
+                      ["pay", "תשלום גבוה"],
+                      ["food", "מסעדות"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setFilter(key)}
+                      className={`shrink-0 min-h-9 rounded-full px-3.5 text-xs font-bold transition-colors ${
+                        filter === key
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-surface text-text-subtle border border-border"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {tab === "active" ? (
                 <ActiveJobs />
               ) : isLoading && availableCount === 0 ? (
@@ -386,43 +434,69 @@ function NewJobsPage() {
                 </div>
               ) : availableCount === 0 ? (
                 <EmptyAvailableState kind={t.kind} />
+              ) : availableJobs.length === 0 ? (
+                <div className="py-14 text-center text-sm text-text-subtle">אין משלוחים במסנן הזה</div>
               ) : (
                 <ul className="flex flex-col gap-3">
                   {availableJobs.map((job) => {
                     const isQuote = job.__kind === "quote" || job.pricing_type === "quote_request";
-                    const payment = job.payment != null && !isQuote ? `${Number(job.payment).toFixed(0)} ₪` : null;
+                    const payNum = job.payment != null && !isQuote ? Number(job.payment) : null;
+                    const title = String((job as any).customer_name || deliveryKindLabel(job));
                     return (
-                      <li key={`${job.__kind}-${job.id}`}>
+                      <li
+                        key={`${job.__kind}-${job.id}`}
+                        className="rounded-[20px] border border-border bg-surface shadow-card overflow-hidden"
+                      >
                         <button
                           type="button"
                           onClick={() => openDetails(job)}
-                          className="w-full rounded-[20px] bg-surface shadow-card p-5 text-right active:bg-muted/60 transition-colors"
+                          className="w-full p-3.5 text-right active:bg-muted/40 transition-colors"
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-base font-bold text-text-strong truncate">
+                            <p className="text-xl font-extrabold text-primary tabular-nums">
+                              {payNum != null ? `₪${payNum.toFixed(0)}` : "הצעה"}
+                            </p>
+                            <div className="min-w-0 text-right">
+                              <p className="text-base font-bold text-text-strong truncate">{title}</p>
+                              <p className="text-xs text-text-subtle mt-0.5 truncate">
                                 {deliveryKindLabel(job)}
+                                {job.job_number ? ` · #${job.job_number}` : ""}
                               </p>
-                              <p className="mt-1 text-sm text-text-subtle">
-                                {shortAddress(job.pickup_address ?? job.pickup_area)}
-                                {" → "}
-                                {shortAddress(job.dropoff_address ?? job.dropoff_area)}
-                              </p>
-                              {job.job_number && (
-                                <p className="mt-1 text-xs text-text-muted">#{job.job_number}</p>
-                              )}
-                            </div>
-                            <div className="shrink-0 text-left">
-                              {payment ? (
-                                <p className="text-base font-extrabold text-primary">{payment}</p>
-                              ) : (
-                                <p className="text-xs font-bold text-warning-text bg-warning-bg rounded-pill px-2 py-1">
-                                  הצעת מחיר
-                                </p>
-                              )}
                             </div>
                           </div>
+                          <div className="mt-3 h-[70px] rounded-xl bg-[#e8edf3] overflow-hidden relative">
+                            <div className="absolute inset-0 opacity-60" style={{
+                              backgroundImage: "linear-gradient(135deg,#fff 25%,transparent 25%),linear-gradient(225deg,#fff 25%,transparent 25%)",
+                              backgroundSize: "24px 24px",
+                            }} />
+                            <div className="absolute inset-x-6 top-1/2 h-1 rounded-full bg-primary/70 -translate-y-1/2" />
+                            <span className="absolute left-8 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-primary" />
+                            <span className="absolute right-8 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-destructive" />
+                          </div>
+                          <div className="mt-3 space-y-1 text-[13px] text-text-subtle">
+                            <p>מנקודת איסוף: {shortAddress(job.pickup_address ?? job.pickup_area)}</p>
+                            <p>ליעד מסירה: {shortAddress(job.dropoff_address ?? job.dropoff_area)}</p>
+                          </div>
                         </button>
+                        <div className="px-3.5 pb-3.5">
+                          <button
+                            type="button"
+                            className="w-full min-h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold"
+                            onClick={() => {
+                              if (job.__kind === "offer") {
+                                const offerId = job.__raw?.offer?.id;
+                                if (offerId) respond.mutate({ id: offerId, response: "accepted", jobId: job.id });
+                              } else if (job.__kind === "quote") {
+                                openDetails(job);
+                              } else {
+                                claim.mutate(job.id);
+                              }
+                            }}
+                            disabled={claim.isPending || respond.isPending}
+                          >
+                            {isQuote ? "הגש הצעת מחיר" : "קבל משלוח"}
+                          </button>
+                        </div>
                       </li>
                     );
                   })}

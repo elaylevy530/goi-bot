@@ -38,6 +38,11 @@ import {
   Users, MapPin, Bike, TrendingUp, Building2, Target, Compass,
 } from "lucide-react";
 
+/** DB historically used "individual"; join form / UI use "courier". Treat both as שליח. */
+function normalizeCourierKind(kind: string | null | undefined): "courier" | "mover" {
+  return kind === "mover" ? "mover" : "courier";
+}
+
 // Public registration URL — always use the published domain so couriers
 // don't hit the Lovable preview auth wall when opened from the editor.
 const PUBLIC_JOIN_URL = partnersUrl("/join");
@@ -296,13 +301,13 @@ function CouriersPage() {
   const { data: allCouriers = [], isLoading } = useQuery({ queryKey: ["couriers"], queryFn: fetchCouriers });
   const [fKind, setFKind] = useState<"courier" | "mover">("courier");
   const couriers = useMemo(
-    () => allCouriers.filter((c) => (c.courier_kind ?? "courier") === fKind),
+    () => allCouriers.filter((c) => normalizeCourierKind(c.courier_kind) === fKind),
     [allCouriers, fKind],
   );
   const kindCounts = useMemo(() => {
     let couriersN = 0, moversN = 0;
     allCouriers.forEach((c) => {
-      if ((c.courier_kind ?? "courier") === "mover") moversN++;
+      if (normalizeCourierKind(c.courier_kind) === "mover") moversN++;
       else couriersN++;
     });
     return { couriers: couriersN, movers: moversN };
