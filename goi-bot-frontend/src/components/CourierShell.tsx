@@ -343,7 +343,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
     <div
       dir="rtl"
       className={`rtl-panel flex w-full bg-bg ${
-        fullBleed ? "h-dvh overflow-hidden" : "min-h-dvh"
+        fullBleed ? "fixed inset-0 overflow-hidden" : "min-h-dvh"
       }`}
     >
       <main

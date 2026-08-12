@@ -8,7 +8,7 @@
   "orientation": "portrait-primary",
   "start_url": "/auth",
   "scope": "/",
-  "background_color": "#FFFFFF",
+  "background_color": "#f5f6f7",
   "theme_color": "#35AD29",
   "icons": [
     { "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
