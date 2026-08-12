@@ -472,10 +472,6 @@
   }
 }
 
-/* PWA safe-area support for iOS standalone */
-@supports (padding: max(0px)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
+/* PWA: draw edge-to-edge (viewport-fit=cover). Safe-area padding is applied
+   per-screen / per-shell so full-bleed heroes (e.g. AuthShell) can paint under
+   the status bar instead of leaving a body gap. */

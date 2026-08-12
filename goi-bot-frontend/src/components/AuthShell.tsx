@@ -36,40 +36,43 @@ export function AuthShell({
   return (
     <div
       dir={rtl ? "rtl" : "ltr"}
-      className="min-h-screen w-full bg-bg flex flex-col font-sans"
+      className="min-h-dvh w-full bg-bg flex flex-col font-sans"
     >
-      <div className="relative h-64 bg-primary flex flex-col items-center justify-center overflow-hidden shrink-0">
-        <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full" />
-        <div className="absolute top-20 -left-20 w-64 h-64 bg-black/10 rounded-full" />
+      {/* Green paints under the status bar; content sits below safe-area */}
+      <div className="relative bg-primary shrink-0 pt-[env(safe-area-inset-top,0px)]">
+        <div className="relative h-64 flex flex-col items-center justify-center overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full" />
+          <div className="absolute top-20 -left-20 w-64 h-64 bg-black/10 rounded-full" />
 
-        {showBackHome && (
-          <Link
-            to="/"
-            aria-label="חזרה לדף הבית"
-            className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-pill px-3 py-1.5 bg-white/15 backdrop-blur-sm ring-1 ring-white/25 transition"
-          >
-            <ArrowRight className="size-3.5" />
-            דף הבית
-          </Link>
-        )}
+          {showBackHome && (
+            <Link
+              to="/"
+              aria-label="חזרה לדף הבית"
+              className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-pill px-3 py-1.5 bg-white/15 backdrop-blur-sm ring-1 ring-white/25 transition"
+            >
+              <ArrowRight className="size-3.5" />
+              דף הבית
+            </Link>
+          )}
 
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="w-20 h-20 bg-surface rounded-card flex items-center justify-center shadow-card-strong mb-4 rotate-6">
-            <div className="-rotate-6 text-primary text-4xl font-black leading-none">
-              {logo ?? "G"}
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="w-20 h-20 bg-surface rounded-card flex items-center justify-center shadow-card-strong mb-4 rotate-6">
+              <div className="-rotate-6 text-primary text-4xl font-black leading-none">
+                {logo ?? "G"}
+              </div>
             </div>
+            <h1 className="text-white text-3xl font-black tracking-tight font-wordmark">
+              GOI
+            </h1>
+            <p className="text-white/90 mt-1 text-sm font-light">{tagline}</p>
           </div>
-          <h1 className="text-white text-3xl font-black tracking-tight font-wordmark">
-            GOI
-          </h1>
-          <p className="text-white/90 mt-1 text-sm font-light">{tagline}</p>
         </div>
       </div>
 
-      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-6 pt-8 shadow-card-strong z-20 mx-auto w-full max-w-md relative">
+      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-6 pt-8 shadow-card-strong z-20 mx-auto w-full max-w-md relative pb-[max(2.5rem,env(safe-area-inset-bottom,0px))]">
         <h2 className="text-2xl font-bold text-text-strong mb-6">{title}</h2>
         {children}
-        {footer && <div className="mt-8 pb-10 text-center">{footer}</div>}
+        {footer && <div className="mt-8 pb-4 text-center">{footer}</div>}
       </div>
     </div>
   );
