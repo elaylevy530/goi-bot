@@ -952,7 +952,7 @@ function HistoryPage() {
   return (
     <CourierShell fullBleed>
       <div dir="rtl" className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-bg">
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-6">
           <div className="flex flex-col gap-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div className="flex items-center justify-between px-6 py-2">
               <button

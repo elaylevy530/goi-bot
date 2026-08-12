@@ -399,7 +399,7 @@ function NewJobsPage() {
         {tab === "active" ? (
           <div
             data-ptr-scroll
-            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[11.5rem] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[11.5rem] px-4 pb-4"
           >
             <ActiveJobs />
           </div>
@@ -408,7 +408,7 @@ function NewJobsPage() {
             <Loader2 className="size-6 animate-spin" />
           </div>
         ) : (
-          <div className="flex-1 min-h-0 pt-[10.5rem] pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]">
+          <div className="flex-1 min-h-0 pt-[10.5rem]">
             <CourierJobsMap
               jobs={mapJobs}
               onClaim={handleClaim}

@@ -343,7 +343,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
     <div
       dir="rtl"
       className={`rtl-panel flex w-full bg-bg ${
-        fullBleed ? "fixed inset-0 overflow-hidden" : "min-h-dvh"
+        fullBleed ? "h-dvh overflow-hidden" : "min-h-dvh"
       }`}
     >
       <main
@@ -405,13 +405,14 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         {/* Content — full-bleed removes padding so map/canvas fills the viewport. */}
         <div className={`flex-1 min-h-0 flex flex-col overscroll-y-contain scroll-smooth ${
           fullBleed
-            ? "p-0 pb-0 overflow-hidden h-full"
-            : "px-3 py-3 sm:px-5 sm:py-4 lg:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] overflow-y-auto [-webkit-overflow-scrolling:touch] [&>*]:shrink-0"
+            ? "p-0 overflow-hidden"
+            : "px-3 py-3 sm:px-5 sm:py-4 lg:p-6 overflow-y-auto [-webkit-overflow-scrolling:touch] [&>*]:shrink-0"
         }`}>{children}</div>
 
-        {/* Bottom tab bar — Active / Jobs / Wallet / Profile */}
+        {/* Bottom tab bar sits in-flow so it stays flush with the screen bottom.
+            Home-indicator inset is padding inside the bar, not a gap below it. */}
         <nav
-          className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-surface/95 backdrop-blur shadow-bottom-bar px-1.5 pt-1.5 flex justify-around items-stretch pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)]"
+          className="shrink-0 z-30 border-t border-border bg-surface/95 backdrop-blur shadow-bottom-bar px-1.5 pt-1.5 flex justify-around items-stretch pb-[max(0.375rem,env(safe-area-inset-bottom,0px))]"
           aria-label="תפריט ראשי"
         >
           {MOBILE_TABS.map((item) => {
