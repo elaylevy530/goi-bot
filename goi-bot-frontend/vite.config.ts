@@ -5,8 +5,49 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import fs from "node:fs";
+import path from "node:path";
+import type { Plugin } from "vite";
 
 const nestTarget = process.env.VITE_API_URL || "http://localhost:3001";
+const appBuildId =
+  process.env.VITE_APP_BUILD_ID ||
+  process.env.CF_PAGES_COMMIT_SHA ||
+  process.env.COMMIT_REF ||
+  process.env.GITHUB_SHA ||
+  Date.now().toString(36);
+
+process.env.VITE_APP_BUILD_ID = appBuildId;
+
+function appVersionPlugin(buildId: string): Plugin {
+  const payload = JSON.stringify({
+    buildId,
+    builtAt: new Date().toISOString(),
+  });
+  return {
+    name: "goi-app-version",
+    configureServer(server) {
+      server.middlewares.use("/version.json", (_req, res) => {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.end(payload);
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "version.json", source: payload });
+    },
+    closeBundle() {
+      for (const dir of ["dist", "dist/client", "dist/public"]) {
+        try {
+          if (!fs.existsSync(dir)) continue;
+          fs.writeFileSync(path.join(dir, "version.json"), payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+  };
+}
 
 /**
  * Nest-owned paths proxied in local dev.
@@ -66,6 +107,10 @@ export default defineConfig({
       ? { preset: "netlify" }
       : undefined,
   vite: {
+    define: {
+      "import.meta.env.VITE_APP_BUILD_ID": JSON.stringify(appBuildId),
+    },
+    plugins: [appVersionPlugin(appBuildId)],
     server: {
       proxy,
     },

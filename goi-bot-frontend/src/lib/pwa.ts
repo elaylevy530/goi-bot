@@ -1,5 +1,5 @@
 /* PWA install + service-worker helpers (guarded for Lovable preview). */
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -156,4 +156,110 @@ export function useServiceWorkerUpdate() {
     if (w) w.postMessage("SKIP_WAITING");
   }, [waiting]);
   return { updateAvailable: !!waiting, applyUpdate };
+}
+
+const BUILD_ID_KEY = "goi:app-build-id";
+const DISMISS_UPDATE_KEY = "goi:update-dismissed";
+
+type VersionPayload = { buildId?: string };
+
+async function fetchRemoteBuildId(): Promise<string | null> {
+  try {
+    const res = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as VersionPayload;
+    const id = String(data.buildId ?? "").trim();
+    return id || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Detects a new deployed build (PWA / mobile) without relying on a caching service worker. */
+export function useAppVersionUpdate() {
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const remoteIdRef = useRef<string | null>(null);
+
+  const check = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const remote = await fetchRemoteBuildId();
+    if (!remote) return;
+    remoteIdRef.current = remote;
+
+    const local = String(import.meta.env.VITE_APP_BUILD_ID ?? "").trim();
+    let stored = "";
+    try {
+      stored = localStorage.getItem(BUILD_ID_KEY) ?? "";
+    } catch {
+      stored = "";
+    }
+
+    if (local && local === remote) {
+      try {
+        localStorage.setItem(BUILD_ID_KEY, remote);
+      } catch {
+        /* ignore */
+      }
+      setUpdateAvailable(false);
+      return;
+    }
+
+    if (!stored) {
+      try {
+        localStorage.setItem(BUILD_ID_KEY, local || remote);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    if (stored !== remote) {
+      try {
+        if (sessionStorage.getItem(DISMISS_UPDATE_KEY) === remote) return;
+      } catch {
+        /* ignore */
+      }
+      setUpdateAvailable(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void check();
+    const timer = window.setInterval(() => void check(), 60_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [check]);
+
+  const applyUpdate = useCallback(async () => {
+    const remote = remoteIdRef.current;
+    if (remote) {
+      try {
+        localStorage.setItem(BUILD_ID_KEY, remote);
+      } catch {
+        /* ignore */
+      }
+    }
+    await clearAppShellCaches();
+    window.location.reload();
+  }, []);
+
+  const dismissUpdate = useCallback(() => {
+    const remote = remoteIdRef.current;
+    if (remote) {
+      try {
+        sessionStorage.setItem(DISMISS_UPDATE_KEY, remote);
+      } catch {
+        /* ignore */
+      }
+    }
+    setUpdateAvailable(false);
+  }, []);
+
+  return { updateAvailable, applyUpdate, dismissUpdate };
 }

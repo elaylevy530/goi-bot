@@ -15,8 +15,8 @@
   VITE_API_URL = "https://goi-bot.fly.dev"
   API_URL = "https://goi-bot.fly.dev"
 
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/server"
-  status = 200
-  force = false
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+    Content-Type = "application/json; charset=utf-8"

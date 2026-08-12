@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   useInstallPrompt,
-  useServiceWorkerUpdate,
+  useAppVersionUpdate,
   isBannerDismissed,
   dismissInstallBanner,
 } from "@/lib/pwa";
@@ -227,39 +227,52 @@ function IOSInstallSheet({
   );
 }
 
-/** Non-blocking SW update banner. */
+/** Popup when a new deployed build is available. */
 export function UpdateBanner() {
-  const { updateAvailable, applyUpdate } = useServiceWorkerUpdate();
-  const [hidden, setHidden] = useState(false);
-  if (!updateAvailable || hidden) return null;
+  const { updateAvailable, applyUpdate, dismissUpdate } = useAppVersionUpdate();
+  const [busy, setBusy] = useState(false);
+  if (!updateAvailable) return null;
+
+  const onUpdate = async () => {
+    setBusy(true);
+    await applyUpdate();
+  };
+
   return (
-    <div
-      dir="rtl"
-      className="fixed inset-x-3 top-3 z-[70] mx-auto max-w-md rounded-2xl border border-emerald-200 bg-white p-3 shadow-lg"
-      style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
-    >
-      <div className="flex items-center gap-3">
-        <div className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
-          <RefreshCw className="size-5" />
+    <Dialog open onOpenChange={(open) => { if (!open) dismissUpdate(); }}>
+      <DialogContent dir="rtl" className="max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-right">יש עדכון לאפליקציה</DialogTitle>
+          <DialogDescription className="text-right">
+            גרסה חדשה של Goi מוכנה. רעננו כדי לקבל את השינויים.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-primary-soft p-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+            <RefreshCw className="size-5" />
+          </div>
+          <p className="flex-1 text-sm font-medium text-text-strong text-right">
+            מומלץ לעדכן עכשיו כדי להמשיך לעבוד עם הגרסה העדכנית.
+          </p>
         </div>
-        <div className="flex-1 text-sm font-medium text-slate-900">
-          גרסה חדשה של Goi זמינה
-        </div>
-        <Button
-          size="sm"
-          onClick={applyUpdate}
-          className="bg-[#35AD29] text-white hover:bg-[#2E9A24]"
-        >
-          עדכון עכשיו
-        </Button>
-        <button
-          aria-label="סגירה"
-          onClick={() => setHidden(true)}
-          className="rounded-md p-1 text-slate-400 hover:text-slate-600"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-    </div>
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button
+            onClick={() => void onUpdate()}
+            disabled={busy}
+            className="w-full min-h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {busy ? "מרענן…" : "עדכון עכשיו"}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={dismissUpdate}
+            disabled={busy}
+            className="w-full min-h-11"
+          >
+            אחר כך
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

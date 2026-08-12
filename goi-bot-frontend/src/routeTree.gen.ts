@@ -32,6 +32,7 @@ import { Route as RRouteImport } from './routes/r'
 import { Route as RestaurantRouteImport } from './routes/restaurant'
 import { Route as SignupBusinessRouteImport } from './routes/signup-business'
 import { Route as StoreRouteImport } from './routes/store'
+import { Route as VersionDotjsonRouteImport } from './routes/version[.]json'
 import { Route as WhatsappBotRouteImport } from './routes/whatsapp-bot'
 import { Route as AuthenticatedActiveJobsRouteImport } from './routes/_authenticated.active-jobs'
 import { Route as AuthenticatedAreasTagsRouteImport } from './routes/_authenticated.areas-tags'
@@ -242,6 +243,11 @@ const SignupBusinessRoute = SignupBusinessRouteImport.update({
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
   path: '/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VersionDotjsonRoute = VersionDotjsonRouteImport.update({
+  id: '/version.json',
+  path: '/version.json',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WhatsappBotRoute = WhatsappBotRouteImport.update({
@@ -770,6 +776,7 @@ export interface FileRoutesByFullPath {
   '/restaurant': typeof RestaurantRoute
   '/signup-business': typeof SignupBusinessRoute
   '/store': typeof StoreRoute
+  '/version.json': typeof VersionDotjsonRoute
   '/whatsapp-bot': typeof WhatsappBotRoute
   '/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/areas-tags': typeof AuthenticatedAreasTagsRoute
@@ -890,6 +897,7 @@ export interface FileRoutesByTo {
   '/restaurant': typeof RestaurantRoute
   '/signup-business': typeof SignupBusinessRoute
   '/store': typeof StoreRoute
+  '/version.json': typeof VersionDotjsonRoute
   '/whatsapp-bot': typeof WhatsappBotRoute
   '/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/areas-tags': typeof AuthenticatedAreasTagsRoute
@@ -1012,6 +1020,7 @@ export interface FileRoutesById {
   '/restaurant': typeof RestaurantRoute
   '/signup-business': typeof SignupBusinessRoute
   '/store': typeof StoreRoute
+  '/version.json': typeof VersionDotjsonRoute
   '/whatsapp-bot': typeof WhatsappBotRoute
   '/_authenticated/active-jobs': typeof AuthenticatedActiveJobsRoute
   '/_authenticated/areas-tags': typeof AuthenticatedAreasTagsRoute
@@ -1135,6 +1144,7 @@ export interface FileRouteTypes {
     | '/restaurant'
     | '/signup-business'
     | '/store'
+    | '/version.json'
     | '/whatsapp-bot'
     | '/active-jobs'
     | '/areas-tags'
@@ -1255,6 +1265,7 @@ export interface FileRouteTypes {
     | '/restaurant'
     | '/signup-business'
     | '/store'
+    | '/version.json'
     | '/whatsapp-bot'
     | '/active-jobs'
     | '/areas-tags'
@@ -1376,6 +1387,7 @@ export interface FileRouteTypes {
     | '/restaurant'
     | '/signup-business'
     | '/store'
+    | '/version.json'
     | '/whatsapp-bot'
     | '/_authenticated/active-jobs'
     | '/_authenticated/areas-tags'
@@ -1499,6 +1511,7 @@ export interface RootRouteChildren {
   RestaurantRoute: typeof RestaurantRoute
   SignupBusinessRoute: typeof SignupBusinessRoute
   StoreRoute: typeof StoreRoute
+  VersionDotjsonRoute: typeof VersionDotjsonRoute
   WhatsappBotRoute: typeof WhatsappBotRoute
   BlogSlugRoute: typeof BlogSlugRoute
   ExpressServiceTypeRoute: typeof ExpressServiceTypeRoute
@@ -1675,6 +1688,13 @@ declare module '@tanstack/react-router' {
       path: '/store'
       fullPath: '/store'
       preLoaderRoute: typeof StoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/version.json': {
+      id: '/version.json'
+      path: '/version.json'
+      fullPath: '/version.json'
+      preLoaderRoute: typeof VersionDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/whatsapp-bot': {
@@ -2624,6 +2644,7 @@ const rootRouteChildren: RootRouteChildren = {
   RestaurantRoute: RestaurantRoute,
   SignupBusinessRoute: SignupBusinessRoute,
   StoreRoute: StoreRoute,
+  VersionDotjsonRoute: VersionDotjsonRoute,
   WhatsappBotRoute: WhatsappBotRoute,
   BlogSlugRoute: BlogSlugRoute,
   ExpressServiceTypeRoute: ExpressServiceTypeRoute,
