@@ -164,7 +164,7 @@ export class AccountsService {
         courier_status: dto.courier_status ?? "נרשם",
         lead_source: dto.lead_source ?? "ידני",
         notes: dto.notes ?? null,
-        courier_kind: dto.courier_kind ?? "individual",
+        courier_kind: dto.courier_kind === "mover" ? "mover" : "courier",
         accepting_jobs: false,
       }),
     );

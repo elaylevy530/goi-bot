@@ -28,7 +28,7 @@ export class Courier {
   @Column({ type: "varchar", length: 32, default: "pending" })
   courier_status!: string;
 
-  @Column({ type: "varchar", length: 32, default: "individual" })
+  @Column({ type: "varchar", length: 32, default: "courier" })
   courier_kind!: string;
 
   @Column({ type: "boolean", default: true })

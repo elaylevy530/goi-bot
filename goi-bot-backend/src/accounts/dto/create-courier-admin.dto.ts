@@ -58,6 +58,6 @@ export class CreateCourierAdminDto {
   notes?: string | null;
 
   @IsOptional()
-  @IsIn(["individual", "mover"])
+  @IsIn(["courier", "individual", "mover"])
   courier_kind?: string;
 }

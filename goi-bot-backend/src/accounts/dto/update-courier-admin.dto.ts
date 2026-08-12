@@ -9,7 +9,7 @@ export class UpdateCourierAdminDto extends UpdateCourierSelfDto {
   courier_status?: string;
 
   @IsOptional()
-  @IsIn(["individual", "mover"])
+  @IsIn(["courier", "individual", "mover"])
   courier_kind?: string;
 
   @IsOptional()
