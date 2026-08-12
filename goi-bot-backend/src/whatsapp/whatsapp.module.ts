@@ -1,6 +1,9 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { Courier } from "../accounts/entities/courier.entity";
 import { PartnersModule } from "../partners/partners.module";
+import { AdminWhatsappController } from "./admin-whatsapp.controller";
+import { AdminWhatsappService } from "./admin-whatsapp.service";
 import { GreenApiWebhookEvent } from "./entities/green-webhook-event.entity";
 import { WaBotState } from "./entities/wa-bot-state.entity";
 import { WhatsappDispatchSettings } from "./entities/whatsapp-dispatch-settings.entity";
@@ -24,6 +27,7 @@ import { WhatsappWebhookService } from "./whatsapp-webhook.service";
       WhatsappMessage,
       WaBotState,
       WhatsappDispatchSettings,
+      Courier,
     ]),
     PartnersModule,
   ],
@@ -31,8 +35,14 @@ import { WhatsappWebhookService } from "./whatsapp-webhook.service";
     GreenWebhookController,
     WhatsappCloudWebhookController,
     WhatsappDispatchController,
+    AdminWhatsappController,
   ],
-  providers: [WhatsappWebhookService, GreenApiClient, WhatsappDispatchService],
+  providers: [
+    WhatsappWebhookService,
+    GreenApiClient,
+    WhatsappDispatchService,
+    AdminWhatsappService,
+  ],
   exports: [GreenApiClient, WhatsappDispatchService],
 })
 export class WhatsappModule {}

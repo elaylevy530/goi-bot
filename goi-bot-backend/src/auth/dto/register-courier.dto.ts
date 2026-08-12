@@ -25,10 +25,11 @@ export class RegisterCourierDto {
   @MaxLength(12)
   id_number?: string | null;
 
+  /** Optional — live GPS location is preferred over a typed base city. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(80)
-  base_city!: string;
+  base_city?: string | null;
 
   @IsOptional()
   @IsArray()

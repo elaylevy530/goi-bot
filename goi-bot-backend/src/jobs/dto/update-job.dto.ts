@@ -46,4 +46,28 @@ export class UpdateJobDto {
   @IsString()
   @MaxLength(128)
   paypal_order_id?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  pickup_lat?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  pickup_lng?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  dropoff_lat?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  dropoff_lng?: number | null;
+
+  @IsOptional()
+  @IsString()
+  pickup_area?: string | null;
+
+  @IsOptional()
+  @IsString()
+  dropoff_area?: string | null;
 }

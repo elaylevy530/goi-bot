@@ -17,13 +17,19 @@ import type { AuthUserContext } from "../auth/auth.types";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { CronSecretGuard } from "../workers/guards/cron-secret.guard";
 import {
+  AddCourierTagDto,
   BonusDto,
+  CreateAreaDto,
   CreateMessageDto,
+  CreateTagDto,
   JobOutcomeDto,
   MaintenanceDto,
   NotificationDto,
   OpenConversationDto,
   SupportTicketDto,
+  UpdateClassificationRuleDto,
+  UpdateExpressPricingDto,
+  UpdateWithdrawalDto,
   WithdrawalDto,
 } from "./domain.dto";
 import { DomainService } from "./domain.service";
@@ -148,6 +154,17 @@ export class AccountDomainController {
     return this.domain.createWithdrawal(auth.userId, data(body));
   }
 
+  @Patch("withdrawals/:id")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  updateWithdrawal(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: UpdateWithdrawalDto,
+  ) {
+    return this.domain.updateWithdrawal(id, auth.userId, data(body));
+  }
+
   @Get("bonuses")
   @UseGuards(RolesGuard)
   @Roles("admin", "manager")
@@ -209,6 +226,33 @@ export class AccountDomainController {
   @Roles("admin", "manager")
   courierStats(@Param("id", ParseUUIDPipe) id: string) {
     return this.domain.getCourierStats(id);
+  }
+
+  @Get("couriers/:id/tags")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  listCourierTags(@Param("id", ParseUUIDPipe) id: string) {
+    return this.domain.listCourierTags(id);
+  }
+
+  @Post("couriers/:id/tags")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  addCourierTag(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: AddCourierTagDto,
+  ) {
+    return this.domain.addCourierTag(id, body.tag_id, body.assigned_automatically);
+  }
+
+  @Delete("couriers/:id/tags/:tagId")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  removeCourierTag(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("tagId", ParseUUIDPipe) tagId: string,
+  ) {
+    return this.domain.removeCourierTag(id, tagId);
   }
 
   @Get("customers/me/branches")
@@ -294,6 +338,103 @@ export class AccountDomainController {
   customerJobs(@Param("id", ParseUUIDPipe) id: string) {
     return this.domain.listCustomerJobs(id);
   }
+
+  @Get("customers/me/contacts")
+  listContacts(@CurrentUser() auth: AuthUserContext) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.listSavedContacts(businessId),
+    );
+  }
+
+  @Post("customers/me/contacts")
+  upsertContact(@CurrentUser() auth: AuthUserContext, @Body() body: BodyData) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.upsertSavedContact(businessId, body),
+    );
+  }
+
+  @Delete("customers/me/contacts/:id")
+  deleteContact(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.deleteSavedContact(businessId, id),
+    );
+  }
+
+  @Get("customers/me/team-members")
+  listTeam(@CurrentUser() auth: AuthUserContext) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.listTeamMembers(businessId),
+    );
+  }
+
+  @Post("customers/me/team-members")
+  inviteTeam(@CurrentUser() auth: AuthUserContext, @Body() body: BodyData) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.inviteTeamMember(businessId, body),
+    );
+  }
+
+  @Patch("customers/me/team-members/:id")
+  updateTeam(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: { role?: string },
+  ) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.updateTeamMemberRole(businessId, id, String(body.role || "viewer")),
+    );
+  }
+
+  @Delete("customers/me/team-members/:id")
+  deleteTeam(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.deleteTeamMember(businessId, id),
+    );
+  }
+
+  @Get("customers/me/recurring-orders")
+  listRecurring(@CurrentUser() auth: AuthUserContext) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.listRecurringOrders(businessId),
+    );
+  }
+
+  @Post("customers/me/recurring-orders")
+  createRecurring(@CurrentUser() auth: AuthUserContext, @Body() body: BodyData) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.saveRecurringOrder(businessId, body),
+    );
+  }
+
+  @Patch("customers/me/recurring-orders/:id")
+  updateRecurring(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: BodyData,
+  ) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) => {
+      if (typeof body.active === "boolean" && Object.keys(body).length === 1) {
+        return this.domain.toggleRecurringOrder(businessId, id, body.active);
+      }
+      return this.domain.saveRecurringOrder(businessId, body, id);
+    });
+  }
+
+  @Delete("customers/me/recurring-orders/:id")
+  deleteRecurring(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+      this.domain.deleteRecurringOrder(businessId, id),
+    );
+  }
 }
 
 @Controller("api/whatsapp")
@@ -356,6 +497,16 @@ export class ExpressPricingController {
   active() {
     return this.domain.activeExpressPricing();
   }
+
+  @Patch("express/:id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "manager")
+  updateExpress(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: UpdateExpressPricingDto,
+  ) {
+    return this.domain.updateExpressPricingRule(id, data(body));
+  }
 }
 
 @Controller("api/platform")
@@ -366,5 +517,57 @@ export class AreaController {
   @Get("areas")
   list() {
     return this.domain.listAreas();
+  }
+
+  @Post("areas")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  createArea(@Body() body: CreateAreaDto) {
+    return this.domain.createArea(body.name);
+  }
+
+  @Delete("areas/:id")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  deleteArea(@Param("id", ParseUUIDPipe) id: string) {
+    return this.domain.deleteArea(id);
+  }
+
+  @Get("tags")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  listTags() {
+    return this.domain.listTags();
+  }
+
+  @Post("tags")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  createTag(@Body() body: CreateTagDto) {
+    return this.domain.createTag(body.name, body.color);
+  }
+
+  @Delete("tags/:id")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  deleteTag(@Param("id", ParseUUIDPipe) id: string) {
+    return this.domain.deleteTag(id);
+  }
+
+  @Get("classification-rules")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  listRules() {
+    return this.domain.listClassificationRules();
+  }
+
+  @Patch("classification-rules/:id")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  updateRule(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: UpdateClassificationRuleDto,
+  ) {
+    return this.domain.updateClassificationRule(id, data(body));
   }
 }

@@ -12,7 +12,9 @@ import {
 } from "@nestjs/common";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthUserContext } from "../auth/auth.types";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { CreateJobDto } from "./dto/create-job.dto";
 import { CreateQuoteDto } from "./dto/create-quote.dto";
 import { ClaimJobDto, RespondOfferDto } from "./dto/courier-actions.dto";
@@ -164,6 +166,16 @@ export class JobsController {
     // Ensure caller can update the job before opening it to couriers.
     await this.jobs.getForUser(id, auth.userId, auth.roles);
     return this.jobs.dispatchJob(id);
+  }
+
+  @Post(":id/match-couriers")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "manager")
+  matchCouriers(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: { limit?: number },
+  ) {
+    return this.jobs.matchCouriers(id, body?.limit ?? 15);
   }
 
   @Post(":id/cancel")

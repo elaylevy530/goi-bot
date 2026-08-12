@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -11,6 +12,9 @@ import { Customer } from "../accounts/entities/customer.entity";
 import { CourierAdminNotification } from "../accounts/entities/courier-admin-notification.entity";
 import { WithdrawalRequest } from "../accounts/entities/withdrawal-request.entity";
 import { CourierBonus } from "../accounts/entities/courier-bonus.entity";
+import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
+import { SavedContact } from "../accounts/entities/saved-contact.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import type { AppRole } from "../auth/auth.types";
 import { Message } from "../chat/entities/message.entity";
@@ -18,6 +22,9 @@ import { ExpressPricingRule } from "../jobs/entities/express-pricing-rule.entity
 import { JobOutcome } from "../jobs/entities/job-outcome.entity";
 import { StatusLog } from "../jobs/entities/status-log.entity";
 import { Area } from "../platform/entities/area.entity";
+import { ClassificationRule } from "../platform/entities/classification-rule.entity";
+import { CourierTag } from "../platform/entities/courier-tag.entity";
+import { Tag } from "../platform/entities/tag.entity";
 import { Conversation } from "../push/entities/conversation.entity";
 import { SupportTicket } from "../support/entities/support-ticket.entity";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
@@ -59,6 +66,13 @@ export class DomainService {
     @InjectRepository(BillingRecord) private readonly billingRecords: Repository<BillingRecord>,
     @InjectRepository(Job) private readonly jobs: Repository<Job>,
     @InjectRepository(OfferEvent) private readonly offerEvents: Repository<OfferEvent>,
+    @InjectRepository(Tag) private readonly tags: Repository<Tag>,
+    @InjectRepository(CourierTag) private readonly courierTags: Repository<CourierTag>,
+    @InjectRepository(ClassificationRule)
+    private readonly classificationRules: Repository<ClassificationRule>,
+    @InjectRepository(SavedContact) private readonly savedContacts: Repository<SavedContact>,
+    @InjectRepository(TeamMember) private readonly teamMembers: Repository<TeamMember>,
+    @InjectRepository(RecurringOrder) private readonly recurringOrders: Repository<RecurringOrder>,
   ) {}
 
   getOutcome(jobId: string) {
@@ -144,6 +158,7 @@ export class DomainService {
           unread_admin: 0,
           unread_business: 0,
           unread_courier: 0,
+          unread_guest: 0,
         }),
       );
     }
@@ -196,9 +211,15 @@ export class DomainService {
     }));
     conversation.last_message_at = message.created_at;
     conversation.last_message_preview = message.body?.slice(0, 250) ?? message.attachment_name;
-    if (senderRole !== "admin") conversation.unread_admin += 1;
-    if (senderRole !== "courier") conversation.unread_courier += 1;
-    if (senderRole !== "business") conversation.unread_business += 1;
+    if (conversation.kind === "guest_support") {
+      // Admin reply → guest unread; guest messages are posted via public API.
+      if (senderRole === "admin") conversation.unread_guest += 1;
+      else conversation.unread_admin += 1;
+    } else {
+      if (senderRole !== "admin") conversation.unread_admin += 1;
+      if (senderRole !== "courier") conversation.unread_courier += 1;
+      if (senderRole !== "business") conversation.unread_business += 1;
+    }
     await this.conversations.save(conversation);
     return message;
   }
@@ -233,17 +254,41 @@ export class DomainService {
     return { ok: true as const };
   }
 
+  private async attachCouriersToWithdrawals(rows: WithdrawalRequest[]) {
+    const ids = [...new Set(rows.map((r) => r.courier_id).filter(Boolean))];
+    const couriers = ids.length
+      ? await this.couriers.find({
+          where: { id: In(ids) },
+          select: ["id", "full_name", "whatsapp_phone"],
+        })
+      : [];
+    const byId = new Map(couriers.map((c) => [c.id, c]));
+    return rows.map((r) => ({
+      ...r,
+      couriers: byId.get(r.courier_id)
+        ? {
+            full_name: byId.get(r.courier_id)!.full_name,
+            whatsapp_phone: byId.get(r.courier_id)!.whatsapp_phone,
+          }
+        : null,
+    }));
+  }
+
   async listWithdrawals(userId: string, roles: AppRole[]) {
     if (roles.includes("admin") || roles.includes("manager")) {
-      return this.withdrawals.find({ order: { created_at: "DESC" } });
+      const rows = await this.withdrawals.find({ order: { created_at: "DESC" } });
+      return this.attachCouriersToWithdrawals(rows);
     }
     const previewId = previewCourierId();
     const courier = previewId
       ? await this.couriers.findOne({ where: { id: previewId }, select: ["id"] })
       : await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
-    return courier
-      ? this.withdrawals.find({ where: { courier_id: courier.id }, order: { created_at: "DESC" } })
-      : [];
+    if (!courier) return [];
+    const rows = await this.withdrawals.find({
+      where: { courier_id: courier.id },
+      order: { created_at: "DESC" },
+    });
+    return this.attachCouriersToWithdrawals(rows);
   }
   async createWithdrawal(userId: string, body: Mutable) {
     const previewId = previewCourierId();
@@ -255,12 +300,45 @@ export class DomainService {
     const withdrawal = this.withdrawals.create({
       courier_id: courierId,
       amount: String(body.amount),
+      status: "ממתינה",
     });
     Object.assign(withdrawal, body, {
       courier_id: courierId,
       amount: String(body.amount),
+      status: "ממתינה",
     });
     return this.withdrawals.save(withdrawal);
+  }
+
+  async updateWithdrawal(id: string, adminUserId: string, body: Mutable) {
+    const row = await this.withdrawals.findOne({ where: { id } });
+    if (!row) throw new NotFoundException("Withdrawal not found");
+    const status = String(body.status || "").trim();
+    const allowed = ["ממתינה", "אושרה", "שולמה", "נדחתה"];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(`status must be one of: ${allowed.join(", ")}`);
+    }
+    row.status = status;
+    if (status === "אושרה") {
+      row.approved_by = adminUserId;
+      row.approved_at = new Date();
+      row.rejection_reason = null;
+    }
+    if (status === "נדחתה") {
+      row.rejection_reason = (body.reason as string | undefined) ?? null;
+      row.approved_by = adminUserId;
+      row.approved_at = new Date();
+    }
+    if (status === "שולמה") {
+      row.paid_at = new Date();
+      if (!row.approved_at) {
+        row.approved_by = adminUserId;
+        row.approved_at = new Date();
+      }
+      if (body.reference_number != null) row.reference_number = String(body.reference_number);
+      if (body.receipt_url != null) row.receipt_url = String(body.receipt_url);
+    }
+    return this.withdrawals.save(row);
   }
 
   listBonuses() { return this.bonuses.find({ order: { sort_order: "ASC", created_at: "DESC" } }); }
@@ -380,6 +458,247 @@ export class DomainService {
   }
   listAreas() {
     return this.areas.find({ where: { is_active: true }, order: { name: "ASC" } });
+  }
+
+  async createArea(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new BadRequestException("name is required");
+    const existing = await this.areas.findOne({ where: { name: trimmed } });
+    if (existing) {
+      if (!existing.is_active) {
+        existing.is_active = true;
+        return this.areas.save(existing);
+      }
+      return existing;
+    }
+    return this.areas.save(this.areas.create({ name: trimmed, is_active: true }));
+  }
+
+  async deleteArea(id: string) {
+    const row = await this.areas.findOne({ where: { id } });
+    if (!row) throw new NotFoundException("Area not found");
+    row.is_active = false;
+    await this.areas.save(row);
+    return { ok: true as const };
+  }
+
+  async updateExpressPricingRule(id: string, body: Mutable) {
+    const row = await this.expressPricing.findOne({ where: { id } });
+    if (!row) throw new NotFoundException("Express pricing rule not found");
+    const numericKeys = ["base_price", "price_per_km", "min_price", "deposit_percent"] as const;
+    for (const key of numericKeys) {
+      if (body[key] != null) row[key] = String(body[key]);
+    }
+    if (body.display_name != null) row.display_name = String(body.display_name);
+    if (body.payment_mode != null) row.payment_mode = String(body.payment_mode);
+    if (body.allow_customer_fixed_price != null) {
+      row.allow_customer_fixed_price = Boolean(body.allow_customer_fixed_price);
+    }
+    if (body.allow_customer_quote != null) {
+      row.allow_customer_quote = Boolean(body.allow_customer_quote);
+    }
+    if (body.notes !== undefined) {
+      row.notes = body.notes == null ? null : String(body.notes);
+    }
+    return this.expressPricing.save(row);
+  }
+
+  listTags() {
+    return this.tags.find({ order: { name: "ASC" } });
+  }
+
+  async createTag(name: string, color?: string | null) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new BadRequestException("name is required");
+    return this.tags.save(this.tags.create({ name: trimmed, color: color ?? null }));
+  }
+
+  async deleteTag(id: string) {
+    await this.courierTags.delete({ tag_id: id });
+    await this.classificationRules.delete({ tag_id: id });
+    await this.tags.delete(id);
+    return { ok: true as const };
+  }
+
+  async listClassificationRules() {
+    const rules = await this.classificationRules.find({ order: { created_at: "ASC" } });
+    const tagIds = [...new Set(rules.map((r) => r.tag_id))];
+    const tags = tagIds.length
+      ? await this.tags.find({ where: { id: In(tagIds) } })
+      : [];
+    const byId = new Map(tags.map((t) => [t.id, t]));
+    return rules.map((r) => ({
+      ...r,
+      tags: byId.get(r.tag_id) ? { name: byId.get(r.tag_id)!.name } : null,
+    }));
+  }
+
+  async updateClassificationRule(id: string, body: Mutable) {
+    const row = await this.classificationRules.findOne({ where: { id } });
+    if (!row) throw new NotFoundException("Classification rule not found");
+    if (body.enabled != null) row.enabled = Boolean(body.enabled);
+    if (body.description != null) row.description = String(body.description);
+    if (body.field != null) row.field = String(body.field);
+    if (body.operator != null) row.operator = String(body.operator);
+    if (body.value != null) row.value = String(body.value);
+    if (body.tag_id != null) row.tag_id = String(body.tag_id);
+    return this.classificationRules.save(row);
+  }
+
+  async listCourierTags(courierId: string) {
+    const rows = await this.courierTags.find({
+      where: { courier_id: courierId },
+      order: { created_at: "DESC" },
+    });
+    const tagIds = rows.map((r) => r.tag_id);
+    const tags = tagIds.length
+      ? await this.tags.find({ where: { id: In(tagIds) } })
+      : [];
+    const byId = new Map(tags.map((t) => [t.id, t]));
+    return rows.map((r) => ({
+      ...r,
+      tags: byId.get(r.tag_id) ? { name: byId.get(r.tag_id)!.name } : null,
+    }));
+  }
+
+  async addCourierTag(courierId: string, tagId: string, assignedAutomatically = false) {
+    const tag = await this.tags.findOne({ where: { id: tagId } });
+    if (!tag) throw new NotFoundException("Tag not found");
+    const existing = await this.courierTags.findOne({
+      where: { courier_id: courierId, tag_id: tagId },
+    });
+    if (existing) return existing;
+    return this.courierTags.save(
+      this.courierTags.create({
+        courier_id: courierId,
+        tag_id: tagId,
+        assigned_automatically: assignedAutomatically,
+      }),
+    );
+  }
+
+  async removeCourierTag(courierId: string, tagId: string) {
+    await this.courierTags.delete({ courier_id: courierId, tag_id: tagId });
+    return { ok: true as const };
+  }
+
+  listSavedContacts(businessId: string) {
+    return this.savedContacts.find({
+      where: { business_id: businessId },
+      order: { contact_name: "ASC" },
+    });
+  }
+
+  async upsertSavedContact(businessId: string, body: Mutable) {
+    const id = body.id as string | undefined;
+    if (id) {
+      const row = await this.savedContacts.findOne({ where: { id, business_id: businessId } });
+      if (!row) throw new NotFoundException("Contact not found");
+      Object.assign(row, {
+        contact_name: body.contact_name ?? row.contact_name,
+        phone: body.phone ?? row.phone,
+        city: body.city ?? row.city,
+        full_address: body.full_address ?? row.full_address,
+        notes: body.notes ?? row.notes,
+        tags: Array.isArray(body.tags) ? body.tags.map(String) : row.tags,
+      });
+      return this.savedContacts.save(row);
+    }
+    return this.savedContacts.save(
+      this.savedContacts.create({
+        business_id: businessId,
+        contact_name: String(body.contact_name || ""),
+        phone: (body.phone as string | null) ?? null,
+        city: (body.city as string | null) ?? null,
+        full_address: (body.full_address as string | null) ?? null,
+        notes: (body.notes as string | null) ?? null,
+        tags: Array.isArray(body.tags) ? body.tags.map(String) : [],
+      }),
+    );
+  }
+
+  async deleteSavedContact(businessId: string, id: string) {
+    await this.savedContacts.delete({ id, business_id: businessId });
+    return { ok: true as const };
+  }
+
+  listTeamMembers(businessId: string) {
+    return this.teamMembers.find({
+      where: { business_id: businessId },
+      order: { created_at: "DESC" },
+    });
+  }
+
+  inviteTeamMember(businessId: string, body: Mutable) {
+    return this.teamMembers.save(
+      this.teamMembers.create({
+        business_id: businessId,
+        name: String(body.name || ""),
+        phone: (body.phone as string | null) ?? null,
+        role: String(body.role || "viewer"),
+        invited_at: new Date(),
+        accepted_at: null,
+      }),
+    );
+  }
+
+  async updateTeamMemberRole(businessId: string, id: string, role: string) {
+    const row = await this.teamMembers.findOne({ where: { id, business_id: businessId } });
+    if (!row) throw new NotFoundException("Team member not found");
+    row.role = role;
+    return this.teamMembers.save(row);
+  }
+
+  async deleteTeamMember(businessId: string, id: string) {
+    await this.teamMembers.delete({ id, business_id: businessId });
+    return { ok: true as const };
+  }
+
+  listRecurringOrders(businessId: string) {
+    return this.recurringOrders.find({
+      where: { business_id: businessId },
+      order: { created_at: "DESC" },
+    });
+  }
+
+  async saveRecurringOrder(businessId: string, body: Mutable, id?: string) {
+    if (id) {
+      const row = await this.recurringOrders.findOne({ where: { id, business_id: businessId } });
+      if (!row) throw new NotFoundException("Recurring order not found");
+      Object.assign(row, body, { business_id: businessId, id });
+      if (body.payment != null) row.payment = String(body.payment);
+      if (body.active != null) row.active = Boolean(body.active);
+      if (body.couriers_needed != null) row.couriers_needed = Number(body.couriers_needed);
+      if (Array.isArray(body.days_of_week)) row.days_of_week = body.days_of_week.map(Number);
+      return this.recurringOrders.save(row);
+    }
+    return this.recurringOrders.save(
+      this.recurringOrders.create({
+        business_id: businessId,
+        recurrence_type: String(body.recurrence_type || "weekly"),
+        days_of_week: Array.isArray(body.days_of_week) ? body.days_of_week.map(Number) : [],
+        start_time: (body.start_time as string | null) ?? null,
+        end_time: (body.end_time as string | null) ?? null,
+        pickup_address: (body.pickup_address as string | null) ?? null,
+        dropoff_address: (body.dropoff_address as string | null) ?? null,
+        payment: body.payment != null ? String(body.payment) : null,
+        couriers_needed: Number(body.couriers_needed ?? 1),
+        active: body.active != null ? Boolean(body.active) : true,
+        notes: (body.notes as string | null) ?? null,
+      }),
+    );
+  }
+
+  async deleteRecurringOrder(businessId: string, id: string) {
+    await this.recurringOrders.delete({ id, business_id: businessId });
+    return { ok: true as const };
+  }
+
+  async toggleRecurringOrder(businessId: string, id: string, active: boolean) {
+    const row = await this.recurringOrders.findOne({ where: { id, business_id: businessId } });
+    if (!row) throw new NotFoundException("Recurring order not found");
+    row.active = active;
+    return this.recurringOrders.save(row);
   }
 
   getCourierStats(courierId: string) {

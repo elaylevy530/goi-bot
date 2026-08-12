@@ -143,4 +143,40 @@ export class WhatsappDispatchService {
       return { ok: false, skipped: "send_failed" };
     }
   }
+
+  /**
+   * Best-effort WhatsApp group notice after a courier claims/accepts a job.
+   * Never throws — missing config / send failures are logged and skipped.
+   */
+  async notifyJobTaken(
+    job: Job,
+    courierName: string,
+  ): Promise<{ ok: boolean; skipped?: string }> {
+    if (!this.green.isConfigured()) {
+      return { ok: false, skipped: "green_api_missing" };
+    }
+    const settings = await this.get();
+    const groupId = isMoveJob(job)
+      ? settings.movers_group_id
+      : settings.couriers_group_id;
+    if (!groupId) {
+      return { ok: false, skipped: "group_missing" };
+    }
+    const pickup = job.pickup_address || job.pickup_area || "—";
+    const dropoff = job.dropoff_address || job.dropoff_area || "—";
+    const msg = `✅ עבודה נלקחה ב-Goi!
+מס׳: ${job.job_number}
+שליח: ${courierName || "—"}
+איסוף: ${pickup} → מסירה: ${dropoff}`;
+    try {
+      await this.green.sendGroupText(groupId, msg);
+      return { ok: true };
+    } catch (e) {
+      this.logger.error(
+        `notifyJobTaken ${job.id} failed`,
+        e instanceof Error ? e.stack : e,
+      );
+      return { ok: false, skipped: "send_failed" };
+    }
+  }
 }

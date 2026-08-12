@@ -5,6 +5,7 @@ import { Job } from "../jobs/entities/job.entity";
 import { BillingRecord } from "./entities/billing-record.entity";
 import { PaypalPayout } from "./entities/paypal-payout.entity";
 import { PaypalWebhookEvent } from "./entities/paypal-webhook-event.entity";
+import { WalletTransaction } from "./entities/wallet-transaction.entity";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { PaypalClientService } from "./paypal-client.service";
@@ -17,7 +18,14 @@ import { PaypalWebhookService } from "./paypal-webhook.service";
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BillingRecord, Job, PaypalWebhookEvent, PaypalPayout, Customer]),
+    TypeOrmModule.forFeature([
+      BillingRecord,
+      Job,
+      PaypalWebhookEvent,
+      PaypalPayout,
+      Customer,
+      WalletTransaction,
+    ]),
   ],
   controllers: [PaymentsController, PaypalWebhookController],
   providers: [PaymentsService, PaypalWebhookService, PaypalClientService],

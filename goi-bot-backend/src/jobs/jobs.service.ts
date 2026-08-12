@@ -8,7 +8,9 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomBytes } from "crypto";
 import { In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
+import { BusinessNotification } from "../accounts/entities/business-notification.entity";
 import { Courier } from "../accounts/entities/courier.entity";
+import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Customer } from "../accounts/entities/customer.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import type { AppRole } from "../auth/auth.types";
@@ -25,21 +27,11 @@ import { JobOutcome } from "./entities/job-outcome.entity";
 import { JobStop } from "./entities/job-stop.entity";
 import { StatusLog } from "./entities/status-log.entity";
 import { generateJobShortCode } from "./job-short-code";
-
-/**
- * Statuses under which a job is still "open" to couriers (not yet assigned).
- * Includes the legacy production Hebrew values alongside the generic ones
- * used by freshly-created Nest jobs, since both may coexist during migration.
- */
-const OPEN_STATUSES = [
-  "pending",
-  "awaiting_quotes",
-  "open",
-  "offered",
-  "נשלחה לשליחים",
-  "ממתינה לתגובות",
-  "יש שליחים שאישרו",
-];
+import {
+  CLAIMABLE_STATUSES,
+  OPEN_STATUSES,
+  isClaimableStatus as statusIsClaimable,
+} from "./job-statuses";
 
 function generateTrackingToken(): string {
   return randomBytes(16).toString("hex");
@@ -62,14 +54,144 @@ export class JobsService {
     @InjectRepository(JobOutcome) private readonly outcomes: Repository<JobOutcome>,
     @InjectRepository(JobStop) private readonly jobStops: Repository<JobStop>,
     @InjectRepository(StatusLog) private readonly statusLogs: Repository<StatusLog>,
+    @InjectRepository(CourierStats) private readonly courierStats: Repository<CourierStats>,
+    @InjectRepository(BusinessNotification)
+    private readonly businessNotifications: Repository<BusinessNotification>,
     private readonly whatsappDispatch: WhatsappDispatchService,
     private readonly offerPush: OfferPushService,
   ) {}
 
   /**
+   * Rank eligible couriers for admin matching UI (does not create offers).
+   */
+  async matchCouriers(jobId: string, limit = 15) {
+    const job = await this.jobs.findOne({ where: { id: jobId } });
+    if (!job) throw new NotFoundException("Job not found");
+
+    const eligible = await this.couriers.find({
+      where: {
+        courier_status: "פעיל",
+        accepting_jobs: true,
+        is_paused: false,
+        admin_jobs_blocked: false,
+      },
+      take: 500,
+    });
+    const statsRows = await this.courierStats.find({
+      where: { courier_id: In(eligible.map((c) => c.id)) },
+    });
+    const statsById = new Map(statsRows.map((s) => [s.courier_id, s]));
+
+    const vehicleNeeded = (job.vehicle_required || "").trim();
+    const pickup = (job.pickup_area || "").trim();
+    const dropoff = (job.dropoff_area || "").trim();
+    const jobType = (job.job_type || "").trim();
+
+    type Reason = { label: string; points: number };
+    const matches = eligible.map((c) => {
+      const stats = statsById.get(c.id);
+      const reasons: Reason[] = [];
+      let score = 40;
+      reasons.push({ label: "שליח פעיל", points: 40 });
+
+      const vehicles = [
+        c.vehicle_type,
+        c.vehicle_label,
+        ...(c.vehicle_types || []),
+      ]
+        .filter(Boolean)
+        .map(String);
+      if (vehicleNeeded && vehicles.some((v) => v.includes(vehicleNeeded) || vehicleNeeded.includes(v))) {
+        score += 20;
+        reasons.push({ label: "התאמת רכב", points: 20 });
+      } else if (!vehicleNeeded) {
+        score += 5;
+        reasons.push({ label: "ללא דרישת רכב", points: 5 });
+      }
+
+      const areas = [
+        ...(c.working_areas || []),
+        ...(c.pickup_areas || []),
+        ...(c.dropoff_areas || []),
+        c.base_city,
+      ]
+        .filter(Boolean)
+        .map(String);
+      if (pickup && areas.some((a) => a.includes(pickup) || pickup.includes(a))) {
+        score += 15;
+        reasons.push({ label: "אזור איסוף", points: 15 });
+      }
+      if (dropoff && areas.some((a) => a.includes(dropoff) || dropoff.includes(a))) {
+        score += 10;
+        reasons.push({ label: "אזור מסירה", points: 10 });
+      }
+      if (jobType && (c.job_types || []).includes(jobType)) {
+        score += 10;
+        reasons.push({ label: "סוג עבודה", points: 10 });
+      }
+
+      const acceptance = stats?.acceptance_rate != null ? Number(stats.acceptance_rate) : null;
+      const onTime = stats?.on_time_rate != null ? Number(stats.on_time_rate) : null;
+      const rating = stats?.avg_rating != null ? Number(stats.avg_rating) : null;
+      const completed = stats?.jobs_completed ?? 0;
+
+      if (acceptance != null && !Number.isNaN(acceptance)) {
+        const pts = Math.round(Math.min(1, Math.max(0, acceptance)) * 10);
+        if (pts > 0) {
+          score += pts;
+          reasons.push({ label: "שיעור קבלה", points: pts });
+        }
+      }
+      if (onTime != null && !Number.isNaN(onTime)) {
+        const pts = Math.round(Math.min(1, Math.max(0, onTime)) * 10);
+        if (pts > 0) {
+          score += pts;
+          reasons.push({ label: "עמידה בזמנים", points: pts });
+        }
+      }
+      if (rating != null && !Number.isNaN(rating)) {
+        const pts = Math.round((Math.min(5, Math.max(0, rating)) / 5) * 8);
+        if (pts > 0) {
+          score += pts;
+          reasons.push({ label: "דירוג ממוצע", points: pts });
+        }
+      }
+      if (completed >= 10) {
+        score += 5;
+        reasons.push({ label: "ניסיון מוכח", points: 5 });
+      }
+
+      return {
+        courier_id: c.id,
+        full_name: c.full_name,
+        whatsapp_phone: c.whatsapp_phone,
+        vehicle_label: c.vehicle_label || c.vehicle_type,
+        base_city: c.base_city,
+        score,
+        acceptance_rate: acceptance,
+        on_time_rate: onTime,
+        avg_rating: rating,
+        jobs_completed: completed,
+        reasons,
+      };
+    });
+
+    matches.sort((a, b) => b.score - a.score);
+    return { matches: matches.slice(0, Math.max(1, Math.min(50, limit))) };
+  }
+
+  /**
    * Open a job to couriers: Hebrew open status + offer_events fan-out,
    * then best-effort WhatsApp group + Web Push notifications.
    * Inbox visibility never depends on external channel success.
+   */
+  /**
+   * Create→dispatch contract (courier inbox visibility):
+   * 1. Create job with Hebrew open status (or leave default — dispatch normalizes).
+   * 2. Call POST /api/jobs/:id/dispatch for any send-to-couriers flow
+   *    (skip only true quote_request waiting-for-bids product paths).
+   * 3. Dispatch sets status=`נשלחה לשליחים`, creates offer_events, fan-out push/WhatsApp.
+   * Without step 2 the job stays invisible/incomplete in courier `/courier/new-jobs`.
    */
   async dispatchJob(jobId: string) {
     const job = await this.jobs.findOne({ where: { id: jobId } });
@@ -82,6 +204,7 @@ export class JobsService {
     }
 
     const previousStatus = job.status;
+    // Canonical Hebrew open status for courier inbox / claim WHERE
     job.status = "נשלחה לשליחים";
     if (job.pricing_type === "quote_request" && !job.quote_deadline_at) {
       job.quote_deadline_at = new Date(Date.now() + OFFER_TTL_MS);
@@ -290,7 +413,10 @@ export class JobsService {
         job_number: jobNumber,
         short_code: shortCode,
         recipient_tracking_token: generateTrackingToken(),
-        status: dto.status ?? "pending",
+        // Prefer Hebrew open/draft statuses. English `pending` is legacy — dispatch
+        // normalizes to `נשלחה לשליחים`. Callers that intend courier fan-out MUST
+        // also call `dispatchJob` after create (see dispatchJob JSDoc).
+        status: dto.status ?? "טיוטה",
         job_type: dto.job_type ?? "delivery",
         pricing_type: dto.pricing_type ?? "fixed",
         matching_model: dto.matching_model ?? null,
@@ -484,7 +610,7 @@ export class JobsService {
     if (
       job.pricing_type === "quote_request" &&
       !job.selected_quote_id &&
-      ["נשלחה לשליחים", "ממתינה לתגובות", ...OPEN_STATUSES].includes(job.status)
+      (OPEN_STATUSES as readonly string[]).includes(job.status)
     ) {
       job.status = "יש שליחים שאישרו";
       await this.jobs.save(job);
@@ -639,7 +765,58 @@ export class JobsService {
   }
 
   private isClaimableStatus(status: string) {
-    return ["נשלחה לשליחים", "ממתינה לתגובות", "יש שליחים שאישרו", ...OPEN_STATUSES].includes(status);
+    return statusIsClaimable(status);
+  }
+
+  /** Cancel sibling pending offers + notify business/WhatsApp after a successful claim/accept. */
+  private async afterCourierAssigned(
+    job: Job,
+    courier: Courier,
+    acceptedOfferId?: string,
+  ) {
+    const qb = this.offers
+      .createQueryBuilder()
+      .update(OfferEvent)
+      .set({ response: "cancelled", responded_at: new Date() })
+      .where("job_id = :jobId AND response = :pending", {
+        jobId: job.id,
+        pending: "pending",
+      });
+    if (acceptedOfferId) {
+      qb.andWhere("id != :offerId", { offerId: acceptedOfferId });
+    }
+    await qb.execute();
+
+    if (job.customer_id) {
+      try {
+        await this.businessNotifications.save(
+          this.businessNotifications.create({
+            business_id: job.customer_id,
+            job_id: job.id,
+            kind: "courier_accepted",
+            title: "שליח אישר את המשלוח",
+            body: `${courier.full_name} לקח את ${job.job_number}`,
+            link: `/business/order/${job.id}`,
+          }),
+        );
+      } catch (e) {
+        this.logger.warn(
+          `afterCourierAssigned business notify failed for ${job.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+
+    void this.whatsappDispatch
+      .notifyJobTaken(job, courier.full_name)
+      .catch((e) =>
+        this.logger.warn(
+          `afterCourierAssigned whatsapp taken notify failed for ${job.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        ),
+      );
   }
 
   async claimJob(userId: string, jobId: string, _source = "app") {
@@ -662,7 +839,7 @@ export class JobsService {
       {
         id: jobId,
         selected_courier_id: IsNull(),
-        status: In(["נשלחה לשליחים", "ממתינה לתגובות", "יש שליחים שאישרו"]),
+        status: In([...CLAIMABLE_STATUSES]),
       },
       {
         selected_courier_id: courier.id,
@@ -676,6 +853,8 @@ export class JobsService {
     if (!result.affected) {
       return { ok: false as const, reason: "taken" };
     }
+
+    await this.afterCourierAssigned(job, courier);
     return { ok: true as const, job_id: jobId };
   }
 
@@ -733,7 +912,7 @@ export class JobsService {
       {
         id: job.id,
         selected_courier_id: IsNull(),
-        status: In(["נשלחה לשליחים", "ממתינה לתגובות", "יש שליחים שאישרו"]),
+        status: In([...CLAIMABLE_STATUSES]),
       },
       {
         selected_courier_id: courier.id,
@@ -757,16 +936,7 @@ export class JobsService {
     offer.responded_at = new Date();
     await this.offers.save(offer);
 
-    await this.offers
-      .createQueryBuilder()
-      .update(OfferEvent)
-      .set({ response: "cancelled", responded_at: new Date() })
-      .where("job_id = :jobId AND id != :offerId AND response = :pending", {
-        jobId: job.id,
-        offerId,
-        pending: "pending",
-      })
-      .execute();
+    await this.afterCourierAssigned(job, courier, offerId);
 
     return { ok: true as const, response: "accepted" as const, job_id: job.id, courier_id: courier.id };
   }
@@ -836,7 +1006,7 @@ export class JobsService {
       if (
         courier &&
         (job.selected_courier_id === courier.id ||
-          OPEN_STATUSES.includes(job.status))
+          (OPEN_STATUSES as readonly string[]).includes(job.status))
       ) {
         return;
       }

@@ -9,6 +9,12 @@ import {
 } from "@nestjs/common";
 import { CreateGuestJobDto } from "./dto/create-guest-job.dto";
 import {
+  GuestChatListDto,
+  GuestChatMarkReadDto,
+  GuestChatOpenDto,
+  GuestChatPostMessageDto,
+} from "./dto/guest-chat.dto";
+import {
   GuestCancelJobDto,
   GuestJobRefDto,
   GuestSelectQuoteDto,
@@ -125,5 +131,50 @@ export class PublicJobsController {
     @Body() body: GuestRepriceJobDto,
   ) {
     return this.publicJobs.repriceGuest(jobId, body);
+  }
+
+  @Post(":job_id/chat/open")
+  @Header("Cache-Control", "no-store")
+  openChat(
+    @Param("job_id", ParseUUIDPipe) jobId: string,
+    @Body() body: GuestChatOpenDto,
+  ) {
+    return this.publicJobs.openGuestChat(jobId, { ...body, job_id: jobId });
+  }
+
+  @Post(":job_id/chat/messages/list")
+  @Header("Cache-Control", "no-store")
+  listChatMessages(
+    @Param("job_id", ParseUUIDPipe) jobId: string,
+    @Body() body: GuestChatListDto,
+  ) {
+    return this.publicJobs.listGuestChatMessages(jobId, {
+      ...body,
+      job_id: jobId,
+    });
+  }
+
+  @Post(":job_id/chat/messages")
+  @Header("Cache-Control", "no-store")
+  postChatMessage(
+    @Param("job_id", ParseUUIDPipe) jobId: string,
+    @Body() body: GuestChatPostMessageDto,
+  ) {
+    return this.publicJobs.postGuestChatMessage(jobId, {
+      ...body,
+      job_id: jobId,
+    });
+  }
+
+  @Post(":job_id/chat/mark-read")
+  @Header("Cache-Control", "no-store")
+  markChatRead(
+    @Param("job_id", ParseUUIDPipe) jobId: string,
+    @Body() body: GuestChatMarkReadDto,
+  ) {
+    return this.publicJobs.markGuestChatRead(jobId, {
+      ...body,
+      job_id: jobId,
+    });
   }
 }

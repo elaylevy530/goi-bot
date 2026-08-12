@@ -174,4 +174,9 @@ export class UpdateCourierSelfDto {
   @IsString()
   @MaxLength(60)
   courier_experience_duration?: string | null;
+
+  /** Free-text notes the courier may edit on their own profile. */
+  @IsOptional()
+  @IsString()
+  notes?: string | null;
 }

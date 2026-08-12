@@ -58,8 +58,4 @@ export class UpdateCourierAdminDto extends UpdateCourierSelfDto {
   @IsString()
   @MaxLength(255)
   vehicle_label?: string | null;
-
-  @IsOptional()
-  @IsString()
-  notes?: string | null;
 }

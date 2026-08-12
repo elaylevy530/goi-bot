@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { Customer } from "../accounts/entities/customer.entity";
+import { previewCustomerId } from "../auth/auth-als";
 import { Job } from "../jobs/entities/job.entity";
 import { BillingRecord } from "./entities/billing-record.entity";
+import { WalletTransaction } from "./entities/wallet-transaction.entity";
 import type { CapturePerJobDto } from "./dto/capture-per-job.dto";
 import type { UpdateBillingRecordDto } from "./dto/update-billing-record.dto";
 
@@ -13,7 +21,59 @@ export class PaymentsService {
     private readonly billing: Repository<BillingRecord>,
     @InjectRepository(Job)
     private readonly jobs: Repository<Job>,
+    @InjectRepository(Customer)
+    private readonly customers: Repository<Customer>,
+    @InjectRepository(WalletTransaction)
+    private readonly walletTx: Repository<WalletTransaction>,
   ) {}
+
+  private async requireBusinessId(userId: string) {
+    const previewId = previewCustomerId();
+    const customer = previewId
+      ? await this.customers.findOne({ where: { id: previewId }, select: ["id"] })
+      : await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
+    if (!customer) throw new ForbiddenException("Business profile required");
+    return customer.id;
+  }
+
+  async listWalletTransactions(userId: string) {
+    const businessId = await this.requireBusinessId(userId);
+    return this.walletTx.find({
+      where: { business_id: businessId },
+      order: { created_at: "DESC" },
+      take: 200,
+    });
+  }
+
+  /**
+   * Ledger credit for prepaid wallet. Real card/PayPal capture can be layered later;
+   * this records the recharge + bonus so the business UI balance works.
+   */
+  async rechargeWallet(
+    userId: string,
+    body: { amount: number; bonusVal?: number; pct?: number },
+  ) {
+    const businessId = await this.requireBusinessId(userId);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount < 50) {
+      throw new BadRequestException("Minimum recharge is ₪50");
+    }
+    const bonusVal = Math.max(0, Number(body.bonusVal ?? 0));
+    const pct = Math.max(0, Number(body.pct ?? 0));
+    const credit = amount + bonusVal;
+    return this.walletTx.save(
+      this.walletTx.create({
+        business_id: businessId,
+        amount: String(credit),
+        kind: "recharge",
+        description:
+          bonusVal > 0
+            ? `טעינה ₪${amount} + בונוס ${pct}% (₪${bonusVal})`
+            : `טעינה ₪${amount}`,
+        metadata: { amount, bonusVal, pct },
+      }),
+    );
+  }
 
   async getBillingRecord(id: string) {
     const rec = await this.billing.findOne({ where: { id } });

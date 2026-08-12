@@ -32,6 +32,7 @@ import { Kiosk } from "../munch/entities/kiosk.entity";
 import { KioskCategory } from "../munch/entities/kiosk-category.entity";
 import { KioskProduct } from "../munch/entities/kiosk-product.entity";
 import { MunchOrder } from "../munch/entities/munch-order.entity";
+import { PartnerContactLead } from "../partners/entities/partner-contact-lead.entity";
 import { Partner } from "../partners/entities/partner.entity";
 import { PilotCity } from "../pilot-cities/entities/pilot-city.entity";
 import { PricingRule } from "../pricing/entities/pricing-rule.entity";
@@ -41,13 +42,20 @@ import { CourierPushSubscription } from "../push/entities/courier-push-subscript
 import { CustomerPushSubscription } from "../push/entities/customer-push-subscription.entity";
 import { NotificationQueueItem } from "../workers/entities/notification-queue-item.entity";
 import { Area } from "../platform/entities/area.entity";
+import { ClassificationRule } from "../platform/entities/classification-rule.entity";
+import { CourierTag } from "../platform/entities/courier-tag.entity";
 import { PlatformSetting } from "../platform/entities/platform-setting.entity";
+import { Tag } from "../platform/entities/tag.entity";
 import { SupportTicket } from "../support/entities/support-ticket.entity";
 import { GreenApiWebhookEvent } from "../whatsapp/entities/green-webhook-event.entity";
 import { WaBotState } from "../whatsapp/entities/wa-bot-state.entity";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 import { WhatsappDispatchSettings } from "../whatsapp/entities/whatsapp-dispatch-settings.entity";
 import { WhatsappMessage } from "../whatsapp/entities/whatsapp-message.entity";
+import { SavedContact } from "../accounts/entities/saved-contact.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
+import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
+import { WalletTransaction } from "../payments/entities/wallet-transaction.entity";
 
 /** All TypeORM entities registered for synchronize. No migrations. */
 export const TYPEORM_ENTITIES = [
@@ -92,9 +100,17 @@ export const TYPEORM_ENTITIES = [
   AdminChatMessage,
   PlatformSetting,
   Area,
+  Tag,
+  CourierTag,
+  ClassificationRule,
+  SavedContact,
+  TeamMember,
+  RecurringOrder,
+  WalletTransaction,
   SupportTicket,
   PilotCity,
   Partner,
+  PartnerContactLead,
   Kiosk,
   KioskCategory,
   KioskProduct,

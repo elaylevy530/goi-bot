@@ -19,6 +19,7 @@ import { CronSecretGuard } from "../workers/guards/cron-secret.guard";
 import { AccountsService } from "./accounts.service";
 import { ApproveCourierDto } from "./dto/approve-courier.dto";
 import { ClassifyPhoneDto } from "./dto/classify-phone.dto";
+import { CreateCourierAdminDto } from "./dto/create-courier-admin.dto";
 import { ListCouriersQueryDto } from "./dto/list-couriers-query.dto";
 import { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
 import { UpdateCourierAdminDto } from "./dto/update-courier-admin.dto";
@@ -111,6 +112,13 @@ export class AccountsController {
   @Roles("admin", "manager")
   listCouriers(@Query() query: ListCouriersQueryDto) {
     return this.accounts.listCouriers(query.status, query.limit);
+  }
+
+  @Post("couriers")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "manager")
+  createCourier(@Body() dto: CreateCourierAdminDto) {
+    return this.accounts.createCourier(dto);
   }
 
   @Get("couriers/:id")

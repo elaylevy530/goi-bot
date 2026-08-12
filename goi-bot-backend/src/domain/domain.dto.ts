@@ -88,3 +88,45 @@ export class SupportTicketDto {
   @IsString() issue_type!: string;
   @IsString() message!: string;
 }
+
+export class UpdateWithdrawalDto {
+  @IsString() status!: string;
+  @IsOptional() @IsString() reason?: string;
+  @IsOptional() @IsString() reference_number?: string;
+  @IsOptional() @IsString() receipt_url?: string;
+}
+
+export class CreateAreaDto {
+  @IsString() name!: string;
+}
+
+export class CreateTagDto {
+  @IsString() name!: string;
+  @IsOptional() @IsString() color?: string;
+}
+
+export class UpdateClassificationRuleDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() field?: string;
+  @IsOptional() @IsString() operator?: string;
+  @IsOptional() @IsString() value?: string;
+  @IsOptional() @IsUUID() tag_id?: string;
+}
+
+export class UpdateExpressPricingDto {
+  @IsOptional() @IsString() display_name?: string;
+  @IsOptional() @IsNumber() base_price?: number;
+  @IsOptional() @IsNumber() price_per_km?: number;
+  @IsOptional() @IsNumber() min_price?: number;
+  @IsOptional() @IsString() payment_mode?: string;
+  @IsOptional() @IsNumber() deposit_percent?: number;
+  @IsOptional() @IsBoolean() allow_customer_fixed_price?: boolean;
+  @IsOptional() @IsBoolean() allow_customer_quote?: boolean;
+  @IsOptional() @IsString() notes?: string;
+}
+
+export class AddCourierTagDto {
+  @IsUUID() tag_id!: string;
+  @IsOptional() @IsBoolean() assigned_automatically?: boolean;
+}

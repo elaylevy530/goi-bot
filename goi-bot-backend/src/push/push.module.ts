@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Courier } from "../accounts/entities/courier.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { AdminPushController } from "./admin-push.controller";
+import { AdminPushService } from "./admin-push.service";
 import { ChatPushController } from "./chat-push.controller";
 import { ChatPushGuard } from "./chat-push.guard";
 import { ChatPushService } from "./chat-push.service";
@@ -26,13 +28,14 @@ import { WebPushService } from "./web-push.service";
       Customer,
     ]),
   ],
-  controllers: [ChatPushController, PushSubscriptionsController],
+  controllers: [ChatPushController, PushSubscriptionsController, AdminPushController],
   providers: [
     ChatPushService,
     ChatPushGuard,
     WebPushService,
     OfferPushService,
     PushSubscriptionsService,
+    AdminPushService,
   ],
   exports: [WebPushService, OfferPushService],
 })

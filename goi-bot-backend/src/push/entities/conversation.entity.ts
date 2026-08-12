@@ -13,7 +13,11 @@ export class Conversation {
   id!: string;
 
   @Column({ type: "varchar", length: 32 })
-  kind!: "courier_support" | "business_support" | "courier_business";
+  kind!:
+    | "courier_support"
+    | "business_support"
+    | "courier_business"
+    | "guest_support";
 
   @Index()
   @Column({ type: "uuid", nullable: true })
@@ -43,6 +47,10 @@ export class Conversation {
 
   @Column({ type: "int", default: 0 })
   unread_admin!: number;
+
+  /** Unread messages for guest (tracking_token) side of guest_support threads. */
+  @Column({ type: "int", default: 0 })
+  unread_guest!: number;
 
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;

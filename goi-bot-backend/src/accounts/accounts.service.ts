@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
@@ -8,6 +13,7 @@ import { BusinessNotification } from "./entities/business-notification.entity";
 import { Courier } from "./entities/courier.entity";
 import { Customer } from "./entities/customer.entity";
 import type { ApproveCourierDto } from "./dto/approve-courier.dto";
+import type { CreateCourierAdminDto } from "./dto/create-courier-admin.dto";
 import type { UpdateCourierAdminDto } from "./dto/update-courier-admin.dto";
 import type { UpdateCourierSelfDto } from "./dto/update-courier-self.dto";
 import type { UpdateCustomerAdminDto } from "./dto/update-customer-admin.dto";
@@ -127,6 +133,41 @@ export class AccountsService {
       order: { created_at: "DESC" },
       take: limit,
     });
+  }
+
+  /** Admin manual create — courier row only. Use auth provision-courier for login. */
+  async createCourier(dto: CreateCourierAdminDto): Promise<Courier> {
+    const phone = normalizePhone(dto.whatsapp_phone);
+    if (phone.length < 9) {
+      throw new BadRequestException("מספר וואטסאפ לא תקין");
+    }
+    const existing = await this.couriers
+      .createQueryBuilder("c")
+      .select("c.id")
+      .where("regexp_replace(c.whatsapp_phone, '\\D', '', 'g') LIKE :suffix", {
+        suffix: `%${phone.slice(-9)}`,
+      })
+      .getOne();
+    if (existing) {
+      throw new ConflictException("מספר וואטסאפ כבר רשום במערכת");
+    }
+
+    return this.couriers.save(
+      this.couriers.create({
+        full_name: dto.full_name.trim(),
+        whatsapp_phone: dto.whatsapp_phone.trim(),
+        base_city: dto.base_city ?? null,
+        gender: dto.gender ?? null,
+        vehicle_type: dto.vehicle_type ?? null,
+        invoice_status: dto.invoice_status ?? null,
+        courier_experience_duration: dto.courier_experience_duration ?? null,
+        courier_status: dto.courier_status ?? "נרשם",
+        lead_source: dto.lead_source ?? "ידני",
+        notes: dto.notes ?? null,
+        courier_kind: dto.courier_kind ?? "individual",
+        accepting_jobs: false,
+      }),
+    );
   }
 
   async getCourier(id: string): Promise<Courier> {

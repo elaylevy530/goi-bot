@@ -5,6 +5,9 @@ import { BusinessBranch } from "../accounts/entities/business-branch.entity";
 import { BusinessIntegration } from "../accounts/entities/business-integration.entity";
 import { BusinessFavoriteCourier } from "../accounts/entities/business-favorite-courier.entity";
 import { IntegrationRequestLog } from "../accounts/entities/integration-request-log.entity";
+import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
+import { SavedContact } from "../accounts/entities/saved-contact.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { BillingRecord } from "../payments/entities/billing-record.entity";
 import { Job } from "../jobs/entities/job.entity";
 import { OfferEvent } from "../jobs/entities/offer-event.entity";
@@ -18,6 +21,9 @@ import { ExpressPricingRule } from "../jobs/entities/express-pricing-rule.entity
 import { JobOutcome } from "../jobs/entities/job-outcome.entity";
 import { StatusLog } from "../jobs/entities/status-log.entity";
 import { Area } from "../platform/entities/area.entity";
+import { ClassificationRule } from "../platform/entities/classification-rule.entity";
+import { CourierTag } from "../platform/entities/courier-tag.entity";
+import { Tag } from "../platform/entities/tag.entity";
 import { Conversation } from "../push/entities/conversation.entity";
 import { SupportTicket } from "../support/entities/support-ticket.entity";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
@@ -50,6 +56,12 @@ import { DomainService } from "./domain.service";
       SupportTicket,
       ExpressPricingRule,
       Area,
+      Tag,
+      CourierTag,
+      ClassificationRule,
+      SavedContact,
+      TeamMember,
+      RecurringOrder,
       CourierStats,
       BusinessBranch,
       BusinessIntegration,

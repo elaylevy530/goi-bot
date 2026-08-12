@@ -4,13 +4,21 @@ import { randomBytes } from "crypto";
 import { In, Repository } from "typeorm";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Courier } from "../accounts/entities/courier.entity";
+import { Message } from "../chat/entities/message.entity";
 import { AppError } from "../common/errors/app.error";
 import { PartnersService } from "../partners/partners.service";
 import { PaypalClientService } from "../payments/paypal-client.service";
 import { PlatformService } from "../platform/platform.service";
+import { Conversation } from "../push/entities/conversation.entity";
 import { GreenApiClient } from "../whatsapp/green-api.client";
 import { WhatsappDispatchService } from "../whatsapp/whatsapp-dispatch.service";
 import type { CreateGuestJobDto } from "./dto/create-guest-job.dto";
+import type {
+  GuestChatListDto,
+  GuestChatMarkReadDto,
+  GuestChatOpenDto,
+  GuestChatPostMessageDto,
+} from "./dto/guest-chat.dto";
 import type { GuestJobRefDto, GuestSelectQuoteDto } from "./dto/guest-job-ref.dto";
 import type { GuestPaypalCaptureDto, GuestPaypalOrderDto } from "./dto/guest-paypal.dto";
 import type { GuestRepriceJobDto } from "./dto/reprice-job.dto";
@@ -72,6 +80,9 @@ export class PublicJobsService {
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
     @InjectRepository(CourierStats)
     private readonly courierStats: Repository<CourierStats>,
+    @InjectRepository(Conversation)
+    private readonly conversations: Repository<Conversation>,
+    @InjectRepository(Message) private readonly messages: Repository<Message>,
     private readonly jobsService: JobsService,
     private readonly paypal: PaypalClientService,
     private readonly partners: PartnersService,
@@ -820,5 +831,107 @@ export class PublicJobsService {
 
     const whatsapp = await this.whatsappDispatch.notifyJobDispatched(job);
     return { ok: true as const, whatsapp };
+  }
+
+  // ── Guest ↔ admin support chat (token-gated) ──────────────────────────
+
+  private async getOrCreateGuestSupportConversation(job: Job): Promise<Conversation> {
+    let conversation = await this.conversations.findOne({
+      where: {
+        kind: "guest_support",
+        job_id: job.id,
+      },
+    });
+    if (conversation) return conversation;
+
+    const subjectParts = [
+      job.job_number ? `#${job.job_number}` : null,
+      job.guest_name?.trim() || null,
+      job.pickup_address?.trim() || null,
+    ].filter(Boolean);
+
+    conversation = await this.conversations.save(
+      this.conversations.create({
+        kind: "guest_support",
+        courier_id: null,
+        business_id: null,
+        job_id: job.id,
+        subject: subjectParts.join(" · ") || "תמיכת לקוח",
+        last_message_at: new Date(),
+        last_message_preview: null,
+        unread_admin: 0,
+        unread_business: 0,
+        unread_courier: 0,
+        unread_guest: 0,
+      }),
+    );
+    return conversation;
+  }
+
+  async openGuestChat(jobId: string, dto: GuestChatOpenDto) {
+    const job = await this.requireGuestJob(jobId, dto.tracking_token);
+    const conversation = await this.getOrCreateGuestSupportConversation(job);
+    return {
+      conversation,
+      job: {
+        id: job.id,
+        job_number: job.job_number,
+        status: job.status,
+        guest_name: job.guest_name,
+        guest_phone: job.guest_phone,
+        pickup_address: job.pickup_address,
+        dropoff_address: job.dropoff_address,
+      },
+    };
+  }
+
+  async listGuestChatMessages(jobId: string, dto: GuestChatListDto) {
+    const job = await this.requireGuestJob(jobId, dto.tracking_token);
+    const conversation = await this.getOrCreateGuestSupportConversation(job);
+    const messages = await this.messages.find({
+      where: { conversation_id: conversation.id },
+      order: { created_at: "ASC" },
+    });
+    return { conversation, messages };
+  }
+
+  async postGuestChatMessage(jobId: string, dto: GuestChatPostMessageDto) {
+    const job = await this.requireGuestJob(jobId, dto.tracking_token);
+    const conversation = await this.getOrCreateGuestSupportConversation(job);
+    const body = dto.body.trim();
+    if (!body) {
+      throw new AppError("bad_request", { userMessage: "נא להזין הודעה" });
+    }
+
+    // sender_user_id must be a UUID; use job id as the stable guest identity.
+    const message = await this.messages.save(
+      this.messages.create({
+        conversation_id: conversation.id,
+        sender_user_id: job.id,
+        sender_role: "guest",
+        body,
+        attachment_url: null,
+        attachment_kind: null,
+        attachment_name: null,
+        attachment_mime: null,
+        attachment_size: null,
+        duration_ms: null,
+      }),
+    );
+
+    conversation.last_message_at = message.created_at;
+    conversation.last_message_preview = body.slice(0, 250);
+    conversation.unread_admin += 1;
+    await this.conversations.save(conversation);
+
+    return { conversation, message };
+  }
+
+  async markGuestChatRead(jobId: string, dto: GuestChatMarkReadDto) {
+    const job = await this.requireGuestJob(jobId, dto.tracking_token);
+    const conversation = await this.getOrCreateGuestSupportConversation(job);
+    conversation.unread_guest = 0;
+    await this.conversations.save(conversation);
+    return { ok: true as const, conversation_id: conversation.id };
   }
 }

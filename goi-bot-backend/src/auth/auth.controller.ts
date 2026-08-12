@@ -7,6 +7,10 @@ import { Roles } from "./decorators/roles.decorator";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { CourierPasswordResetConfirmDto } from "./dto/courier-password-reset.dto";
 import { CourierPasswordResetRequestDto } from "./dto/courier-password-reset.dto";
+import {
+  CustomerPasswordResetConfirmDto,
+  CustomerPasswordResetRequestDto,
+} from "./dto/customer-password-reset.dto";
 import { EnsureCustomerDto } from "./dto/ensure-customer.dto";
 import { LoginDto } from "./dto/login.dto";
 import { ProvisionCourierDto } from "./dto/provision-courier.dto";
@@ -151,6 +155,20 @@ export class AuthController {
     return this.authService.confirmCourierPasswordReset(
       dto.phone,
       dto.code,
+      dto.newPassword,
+    );
+  }
+
+  /** Customer password reset — opaque JWT token, no SMS OTP. */
+  @Post("customer/password-reset/request")
+  requestCustomerPasswordReset(@Body() dto: CustomerPasswordResetRequestDto) {
+    return this.authService.requestCustomerPasswordReset(dto.phone);
+  }
+
+  @Post("customer/password-reset/confirm")
+  confirmCustomerPasswordReset(@Body() dto: CustomerPasswordResetConfirmDto) {
+    return this.authService.confirmCustomerPasswordReset(
+      dto.token,
       dto.newPassword,
     );
   }

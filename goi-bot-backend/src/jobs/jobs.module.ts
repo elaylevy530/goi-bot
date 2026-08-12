@@ -1,11 +1,14 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { BusinessNotification } from "../accounts/entities/business-notification.entity";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { Message } from "../chat/entities/message.entity";
 import { PartnersModule } from "../partners/partners.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { PlatformModule } from "../platform/platform.module";
+import { Conversation } from "../push/entities/conversation.entity";
 import { PushModule } from "../push/push.module";
 import { WhatsappModule } from "../whatsapp/whatsapp.module";
 import { JobOutcome } from "./entities/job-outcome.entity";
@@ -34,10 +37,13 @@ import { PublicMoverJobsController } from "./public-mover-jobs.controller";
       Customer,
       Courier,
       CourierStats,
+      BusinessNotification,
       ExpressPricingRule,
       JobOutcome,
       JobStop,
       StatusLog,
+      Conversation,
+      Message,
     ]),
     PartnersModule,
     PaymentsModule,
