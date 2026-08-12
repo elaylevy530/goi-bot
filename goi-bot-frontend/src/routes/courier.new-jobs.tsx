@@ -18,13 +18,14 @@ import {
   nestRespondOffer,
 } from "@/lib/nest-jobs";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
-import { Bell, Loader2, SearchX } from "lucide-react";
+import { Bell, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
 import { isCourierApproved, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind } from "@/lib/courier-live-jobs";
 import { ContactBlock, ActiveJobs } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
+import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
 
 export const Route = createFileRoute("/courier/new-jobs")({
   head: () => ({ meta: [{ title: "עבודות חדשות — Goi" }] }),
@@ -44,12 +45,6 @@ function deliveryKindLabel(job: any) {
   return category && category !== baseType ? `${label} · ${category}` : label;
 }
 
-function shortAddress(value?: string | null) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "—";
-  return raw.split(",")[0]?.trim() || raw;
-}
-
 function NewJobsPage() {
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -58,7 +53,6 @@ function NewJobsPage() {
   const { jobId: focusJobId } = Route.useSearch();
   const isApproved = isCourierApproved(me);
   const [tab, setTab] = useState<JobsTab>("available");
-  const [filter, setFilter] = useState<"all" | "near" | "pay" | "food">("all");
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
 
@@ -264,26 +258,8 @@ function NewJobsPage() {
     [quoteJobs, declinedSet, quoteByJob],
   );
 
-  type ListJob = {
-    id: string;
-    job_number?: string;
-    pickup_address?: string | null;
-    pickup_area?: string | null;
-    dropoff_address?: string | null;
-    dropoff_area?: string | null;
-    payment?: number | string | null;
-    pricing_type?: string | null;
-    job_type?: string | null;
-    item_category?: string | null;
-    package_type?: string | null;
-    number_of_packages?: number | null;
-    customer_name?: string | null;
-    __kind: "open" | "quote" | "offer";
-    __raw: any;
-  };
-
-  const allAvailableJobs: ListJob[] = useMemo(() => {
-    const out: ListJob[] = [];
+  const mapJobs: MapJob[] = useMemo(() => {
+    const out: MapJob[] = [];
     for (const j of visibleOpenJobs as any[]) {
       out.push({ ...j, __kind: "open", __raw: j });
     }
@@ -297,26 +273,7 @@ function NewJobsPage() {
     return out;
   }, [visibleOpenJobs, visibleQuoteJobs, offers]);
 
-  const availableJobs: ListJob[] = useMemo(() => {
-    const isFood = (j: ListJob) => {
-      const blob = `${j.job_type ?? ""} ${j.item_category ?? ""} ${(j as any).package_type ?? ""} ${j.customer_name ?? ""}`.toLowerCase();
-      return /מסעד|אוכל|food|restaurant|קפה|פיצה|סושי|בורגר|wolt|munch/.test(blob);
-    };
-    if (filter === "food") return allAvailableJobs.filter(isFood);
-    if (filter === "pay") {
-      return [...allAvailableJobs].sort((a, b) => Number(b.payment ?? 0) - Number(a.payment ?? 0));
-    }
-    if (filter === "near") {
-      return [...allAvailableJobs].sort((a, b) => {
-        const da = Number((a as any).distance_km ?? (a as any).distance ?? Infinity);
-        const db = Number((b as any).distance_km ?? (b as any).distance ?? Infinity);
-        return da - db;
-      });
-    }
-    return allAvailableJobs;
-  }, [allAvailableJobs, filter]);
-
-  const openDetails = (job: ListJob) => {
+  const openDetails = (job: MapJob) => {
     if (job.__kind === "offer") {
       const j = job.__raw?.job;
       const offer = job.__raw?.offer;
@@ -328,183 +285,120 @@ function NewJobsPage() {
     }
   };
 
+  const handleClaim = (job: MapJob) => {
+    if (job.__kind === "offer") {
+      const offerId = job.__raw?.offer?.id;
+      if (offerId) respond.mutate({ id: offerId, response: "accepted", jobId: job.id });
+      return;
+    }
+    if (job.__kind === "quote") {
+      openDetails(job);
+      return;
+    }
+    claim.mutate(job.id);
+  };
+
+  const handleDecline = (job: MapJob) => {
+    if (job.__kind === "offer") {
+      const offerId = job.__raw?.offer?.id;
+      if (offerId) respond.mutate({ id: offerId, response: "declined" });
+      return;
+    }
+    if (job.__kind === "quote") {
+      void declineQuoteJob(job.id);
+      return;
+    }
+    void declineOpenJob(job.id);
+  };
+
+  const handleQuote = (job: MapJob) => {
+    setQuoteFor({
+      jobId: job.id,
+      jobNumber: job.job_number,
+      quote: (job as any).existingQuote,
+    });
+  };
+
   const displayName = me?.full_name?.trim() || "שליח";
-  const availableCount = allAvailableJobs.length;
+  const availableCount = mapJobs.length;
 
   return (
     <CourierShell fullBleed>
       <div dir="rtl" className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-bg">
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6">
-          <div className="flex flex-col gap-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            {/* Header — Figma home-dashboard */}
-            <div className="flex items-center justify-between px-6 py-2">
+        {/* Compact top chrome — keeps the map dominant */}
+        <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
+          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/95 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
               <CourierMenuButton className="size-11 shadow-card border-0" />
-
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div className="min-w-0 text-right">
-                  <p className="text-[13px] text-text-subtle leading-tight">שלום,</p>
-                  <p className="text-lg font-bold text-text-strong truncate leading-tight">{displayName}</p>
+                  <p className="text-[12px] text-text-subtle leading-tight">שלום,</p>
+                  <p className="text-base font-bold text-text-strong truncate leading-tight">{displayName}</p>
                 </div>
                 <CourierAvatar
                   path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
                   name={displayName}
-                  size={48}
+                  size={40}
                 />
                 <Link
                   to="/courier/messages"
                   aria-label="הודעות"
-                  className="size-11 grid place-items-center rounded-full bg-surface shadow-card text-text-strong active:bg-muted transition-colors shrink-0"
+                  className="size-10 grid place-items-center rounded-full bg-surface shadow-card text-text-strong active:bg-muted transition-colors shrink-0"
                 >
                   <Bell className="size-5" strokeWidth={2} />
                 </Link>
               </div>
             </div>
 
-            {/* Status card — status toggle only (no cash toggle) */}
-            <div className="px-6">
-              <AcceptJobsToggle me={me} />
-            </div>
+            <AcceptJobsToggle me={me} compact />
 
-            {/* Section title + tabs */}
-            <div className="px-6 pt-2">
-              <h2 className="text-lg font-bold text-text-strong text-right">
-                {t.kind === "mover" ? "הובלות באזורך" : "משלוחים באזורך"}
-              </h2>
-            </div>
-
-            <div className="px-6">
-              <div className="flex w-full rounded-[14px] bg-muted p-1">
-                <button
-                  type="button"
-                  onClick={() => setTab("active")}
-                  className={`flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-sm text-center transition-all ${
-                    tab === "active"
-                      ? "bg-surface font-bold text-primary shadow-card"
-                      : "font-semibold text-text-subtle"
-                  }`}
-                >
-                  {t.kind === "mover" ? `הובלות פעילות (${activeCount})` : `משלוחים פעילים (${activeCount})`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTab("available")}
-                  className={`flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-sm text-center transition-all ${
-                    tab === "available"
-                      ? "bg-surface font-bold text-primary shadow-card"
-                      : "font-semibold text-text-subtle"
-                  }`}
-                >
-                  {t.kind === "mover" ? `הובלות זמינות (${availableCount})` : `משלוחים זמינים (${availableCount})`}
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="px-6 pb-4">
-              {tab === "available" && availableCount > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-none">
-                  {(
-                    [
-                      ["all", "הכל"],
-                      ["near", "קרוב אליי"],
-                      ["pay", "תשלום גבוה"],
-                      ["food", "מסעדות"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setFilter(key)}
-                      className={`shrink-0 min-h-9 rounded-full px-3.5 text-xs font-bold transition-colors ${
-                        filter === key
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-surface text-text-subtle border border-border"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {tab === "active" ? (
-                <ActiveJobs />
-              ) : isLoading && availableCount === 0 ? (
-                <div className="flex justify-center py-16 text-text-muted">
-                  <Loader2 className="size-6 animate-spin" />
-                </div>
-              ) : availableCount === 0 ? (
-                <EmptyAvailableState kind={t.kind} />
-              ) : availableJobs.length === 0 ? (
-                <div className="py-14 text-center text-sm text-text-subtle">אין משלוחים במסנן הזה</div>
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {availableJobs.map((job) => {
-                    const isQuote = job.__kind === "quote" || job.pricing_type === "quote_request";
-                    const payNum = job.payment != null && !isQuote ? Number(job.payment) : null;
-                    const title = String((job as any).customer_name || deliveryKindLabel(job));
-                    return (
-                      <li
-                        key={`${job.__kind}-${job.id}`}
-                        className="rounded-[20px] border border-border bg-surface shadow-card overflow-hidden"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openDetails(job)}
-                          className="w-full p-3.5 text-right active:bg-muted/40 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-xl font-extrabold text-primary tabular-nums">
-                              {payNum != null ? `₪${payNum.toFixed(0)}` : "הצעה"}
-                            </p>
-                            <div className="min-w-0 text-right">
-                              <p className="text-base font-bold text-text-strong truncate">{title}</p>
-                              <p className="text-xs text-text-subtle mt-0.5 truncate">
-                                {deliveryKindLabel(job)}
-                                {job.job_number ? ` · #${job.job_number}` : ""}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-3 h-[70px] rounded-xl bg-[#e8edf3] overflow-hidden relative">
-                            <div className="absolute inset-0 opacity-60" style={{
-                              backgroundImage: "linear-gradient(135deg,#fff 25%,transparent 25%),linear-gradient(225deg,#fff 25%,transparent 25%)",
-                              backgroundSize: "24px 24px",
-                            }} />
-                            <div className="absolute inset-x-6 top-1/2 h-1 rounded-full bg-primary/70 -translate-y-1/2" />
-                            <span className="absolute left-8 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-primary" />
-                            <span className="absolute right-8 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-destructive" />
-                          </div>
-                          <div className="mt-3 space-y-1 text-[13px] text-text-subtle">
-                            <p>מנקודת איסוף: {shortAddress(job.pickup_address ?? job.pickup_area)}</p>
-                            <p>ליעד מסירה: {shortAddress(job.dropoff_address ?? job.dropoff_area)}</p>
-                          </div>
-                        </button>
-                        <div className="px-3.5 pb-3.5">
-                          <button
-                            type="button"
-                            className="w-full min-h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold"
-                            onClick={() => {
-                              if (job.__kind === "offer") {
-                                const offerId = job.__raw?.offer?.id;
-                                if (offerId) respond.mutate({ id: offerId, response: "accepted", jobId: job.id });
-                              } else if (job.__kind === "quote") {
-                                openDetails(job);
-                              } else {
-                                claim.mutate(job.id);
-                              }
-                            }}
-                            disabled={claim.isPending || respond.isPending}
-                          >
-                            {isQuote ? "הגש הצעת מחיר" : "קבל משלוח"}
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+            <div className="flex w-full rounded-[14px] bg-muted/90 backdrop-blur p-1 shadow-card">
+              <button
+                type="button"
+                onClick={() => setTab("active")}
+                className={`flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center transition-all ${
+                  tab === "active"
+                    ? "bg-surface font-bold text-primary shadow-card"
+                    : "font-semibold text-text-subtle"
+                }`}
+              >
+                {t.kind === "mover" ? `פעילות (${activeCount})` : `פעילים (${activeCount})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("available")}
+                className={`flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center transition-all ${
+                  tab === "available"
+                    ? "bg-surface font-bold text-primary shadow-card"
+                    : "font-semibold text-text-subtle"
+                }`}
+              >
+                {t.kind === "mover" ? `זמינות (${availableCount})` : `זמינים (${availableCount})`}
+              </button>
             </div>
           </div>
         </div>
+
+        {tab === "active" ? (
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[11.5rem] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+            <ActiveJobs />
+          </div>
+        ) : isLoading && availableCount === 0 ? (
+          <div className="flex-1 grid place-items-center text-text-muted">
+            <Loader2 className="size-6 animate-spin" />
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 pt-[10.5rem] pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]">
+            <CourierJobsMap
+              jobs={mapJobs}
+              onClaim={handleClaim}
+              onDecline={handleDecline}
+              onQuote={handleQuote}
+              onDetails={openDetails}
+              claiming={claim.isPending || respond.isPending}
+            />
+          </div>
+        )}
       </div>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
@@ -597,26 +491,7 @@ function NewJobsPage() {
   );
 }
 
-function EmptyAvailableState({ kind }: { kind: "courier" | "mover" }) {
-  const noun = kind === "mover" ? "הובלות" : "משלוחים";
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 px-2 py-12 text-center">
-      <div className="rounded-full bg-info-bg p-4 text-primary">
-        <SearchX className="size-9" strokeWidth={2} aria-hidden />
-      </div>
-      <div className="flex flex-col gap-2 items-center max-w-[280px]">
-        <p className="text-xl font-bold text-text-strong">
-          {`אין כרגע ${noun} באזורכם`}
-        </p>
-        <p className="text-sm text-text-subtle">
-          משכו למטה לרענון, או נסעו לאזור עמוס יותר.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function AcceptJobsToggle({ me }: { me: any }) {
+function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean }) {
   const qc = useQueryClient();
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
   const [on, setOn] = useState<boolean>(false);
@@ -669,7 +544,7 @@ function AcceptJobsToggle({ me }: { me: any }) {
   const title = !approved
     ? "סטטוס - לא פעיל"
     : on
-      ? "סטטוס - פעיל"
+      ? "חיבור פעיל לקבלת הזמנות"
       : "סטטוס - לא פעיל";
   const subtitle = !approved
     ? "החשבון ממתין לאישור או מושהה"
@@ -679,9 +554,9 @@ function AcceptJobsToggle({ me }: { me: any }) {
 
   return (
     <div
-      className={`w-full rounded-[20px] bg-surface shadow-card p-5 flex items-center justify-between gap-4 ${
-        !approved ? "opacity-70" : ""
-      }`}
+      className={`w-full bg-surface shadow-card flex items-center justify-between gap-3 ${
+        compact ? "rounded-card px-3.5 py-2.5" : "rounded-[20px] p-5 gap-4"
+      } ${!approved ? "opacity-70" : ""}`}
     >
       <Switch
         checked={on}
@@ -692,11 +567,24 @@ function AcceptJobsToggle({ me }: { me: any }) {
           toggle.mutate(next);
         }}
         aria-label={title}
-        className="shrink-0 h-8 w-[3.25rem] [&>span]:size-6 data-[state=checked]:[&>span]:translate-x-[1.35rem] data-[state=checked]:bg-primary"
+        className={`shrink-0 data-[state=checked]:bg-primary ${
+          compact
+            ? "h-7 w-12 [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5"
+            : "h-8 w-[3.25rem] [&>span]:size-6 data-[state=checked]:[&>span]:translate-x-[1.35rem]"
+        }`}
       />
-      <div className="min-w-0 flex-1 text-right">
-        <div className="text-base font-bold text-text-strong leading-tight truncate">{title}</div>
-        <div className="text-[13px] text-text-subtle mt-0.5 leading-snug">{subtitle}</div>
+      <div className="min-w-0 flex-1 text-right flex items-center justify-end gap-2">
+        {compact && on && approved && (
+          <span className="size-2 rounded-full bg-primary shrink-0" aria-hidden />
+        )}
+        <div className="min-w-0">
+          <div className={`font-bold text-text-strong leading-tight truncate ${compact ? "text-sm" : "text-base"}`}>
+            {title}
+          </div>
+          {!compact && (
+            <div className="text-[13px] text-text-subtle mt-0.5 leading-snug">{subtitle}</div>
+          )}
+        </div>
       </div>
     </div>
   );

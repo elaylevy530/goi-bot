@@ -64,7 +64,7 @@ export type MapJob = {
 /** Compact live countdown for accepting an offer.
  *  Uses `expiresAt` when set, otherwise a synthetic 10-minute window. */
 const SYNTHETIC_ACCEPT_WINDOW_SEC = 10 * 60;
-function AcceptTimerChip({ expiresAt }: { expiresAt?: string | null }) {
+function AcceptTimerBox({ expiresAt }: { expiresAt?: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   const mountAtRef = useRef<number>(Date.now());
   useEffect(() => {
@@ -75,25 +75,33 @@ function AcceptTimerChip({ expiresAt }: { expiresAt?: string | null }) {
     ? new Date(expiresAt).getTime()
     : mountAtRef.current + SYNTHETIC_ACCEPT_WINDOW_SEC * 1000;
   const secLeft = Math.max(0, Math.floor((effectiveDeadline - now) / 1000));
-  const mm = String(Math.floor(secLeft / 60)).padStart(2, "0");
+  const mm = String(Math.floor(secLeft / 60));
   const ss = String(secLeft % 60).padStart(2, "0");
   const urgent = secLeft <= 60;
   const expired = secLeft === 0;
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-[11px] font-bold tabular-nums ${
+    <div
+      className={`shrink-0 w-[4.5rem] min-h-11 grid place-items-center rounded-card border bg-surface ${
         expired
-          ? "text-slate-400"
+          ? "border-border text-text-muted"
           : urgent
-          ? "text-rose-600 animate-pulse"
-          : "text-slate-500"
+            ? "border-destructive/40 text-destructive animate-pulse"
+            : "border-border text-destructive"
       }`}
       aria-label="זמן לאישור המשלוח"
     >
-      <Timer className="size-3" />
-      {mm}:{ss}
-    </span>
+      <span className="inline-flex items-center gap-1 text-sm font-bold tabular-nums">
+        <Timer className="size-3.5 opacity-80" />
+        {mm}:{ss}
+      </span>
+    </div>
   );
+}
+
+function shortLine(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "—";
+  return raw.split(",")[0]?.trim() || raw;
 }
 
 function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -252,7 +260,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
   const visibleJobs = useMemo(() => {
     return jobs.filter((j) => {
-      if (j.pickup_lat == null || j.pickup_lng == null) return false;
       if (filter === "now") return !j.job_date;
       if (filter === "schedule") return !!j.job_date;
       if (filter === "quote") return j.__kind === "quote";
@@ -264,16 +271,29 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   const scoredJobs = useMemo(() => {
     return visibleJobs
       .map((j) => {
-        const pickup = { lat: Number(j.pickup_lat), lng: Number(j.pickup_lng) };
-        const distToPickup = myPos ? haversineKm(myPos, pickup) : 5;
+        const hasPickup = j.pickup_lat != null && j.pickup_lng != null;
+        const pickup = hasPickup
+          ? { lat: Number(j.pickup_lat), lng: Number(j.pickup_lng) }
+          : null;
+        const fromJobKm = Number(
+          (j as { estimated_distance_km?: unknown; distance_km?: unknown }).estimated_distance_km
+            ?? (j as { distance_km?: unknown }).distance_km
+            ?? NaN,
+        );
+        const distToPickup =
+          myPos && pickup
+            ? haversineKm(myPos, pickup)
+            : Number.isFinite(fromJobKm)
+              ? fromJobKm
+              : null;
         const pay = Number(j.payment ?? 0);
         const isImmediate = !j.job_date;
-        // Score: distance is primary (×10), payment subtracts (₪/3), immediate gets -5 bonus, quote +3 penalty.
         const score =
-          distToPickup * 10 -
+          (distToPickup ?? 8) * 10 -
           (pay > 0 ? pay / 3 : 0) +
           (isImmediate ? -5 : 0) +
-          (j.__kind === "quote" ? 3 : 0);
+          (j.__kind === "quote" ? 3 : 0) +
+          (hasPickup ? 0 : 4);
         return { job: j, score, distToPickup };
       })
       .sort((a, b) => a.score - b.score);
@@ -316,6 +336,16 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     mapRef.current.panTo(myPos);
   }, [myPos, activeId]);
 
+  // Keep the map focused on the selected offer's pickup.
+  useEffect(() => {
+    if (!mapRef.current || !active) return;
+    if (active.pickup_lat == null || active.pickup_lng == null) return;
+    mapRef.current.panTo({
+      lat: Number(active.pickup_lat),
+      lng: Number(active.pickup_lng),
+    });
+  }, [active?.id]);
+
   useEffect(() => {
     if (!mapRef.current || !window.google) return;
     if (meMarkerRef.current) { meMarkerRef.current.setMap(null); meMarkerRef.current = null; }
@@ -355,6 +385,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     if (myPos) bounds.extend(myPos);
 
     for (const j of visibleJobs) {
+      if (j.pickup_lat == null || j.pickup_lng == null) continue;
       const pos = { lat: Number(j.pickup_lat), lng: Number(j.pickup_lng) };
       const priceLabel = j.__kind === "quote" ? "₪?" : `₪${Number(j.payment ?? 0).toFixed(0)}`;
       const accent = j.__kind === "quote" ? "#f59e0b" : "#35AD29";
@@ -470,48 +501,43 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
           />
         )}
 
-        {/* Floating right rail — offset below status card overlay */}
-        <div className="absolute top-[6.75rem] right-3 flex flex-col gap-2 z-10">
-          <button onClick={cycleMapType} className="size-10 rounded-2xl bg-white shadow-md flex items-center justify-center text-slate-700 active:scale-95" aria-label="שכבות">
+        {/* Floating map controls — below header overlay */}
+        <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+          <button onClick={cycleMapType} className="size-10 rounded-card bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95" aria-label="שכבות">
             <Layers className="size-4" />
           </button>
           {myPos && (
             <button
               onClick={() => { mapRef.current?.panTo(myPos); mapRef.current?.setZoom(14); }}
-              className="size-10 rounded-2xl bg-white shadow-md flex items-center justify-center text-slate-700 active:scale-95"
+              className="size-10 rounded-card bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95"
               aria-label="מרכז עליי"
             >
               <Crosshair className="size-4" />
             </button>
           )}
-          <div className="rounded-2xl bg-white shadow-md overflow-hidden flex flex-col">
-            <button onClick={() => zoomBy(1)} className="size-10 flex items-center justify-center text-slate-700 active:scale-95 border-b border-slate-100" aria-label="הגדל">
+          <div className="rounded-card bg-surface shadow-card border border-border overflow-hidden flex flex-col">
+            <button onClick={() => zoomBy(1)} className="size-10 flex items-center justify-center text-text-strong active:scale-95 border-b border-border" aria-label="הגדל">
               <Plus className="size-4" />
             </button>
-            <button onClick={() => zoomBy(-1)} className="size-10 flex items-center justify-center text-slate-700 active:scale-95" aria-label="הקטן">
+            <button onClick={() => zoomBy(-1)} className="size-10 flex items-center justify-center text-text-strong active:scale-95" aria-label="הקטן">
               <Minus className="size-4" />
             </button>
           </div>
         </div>
 
-        {/* Floating offer carousel — swipeable, with visible arrows */}
+        {/* Compact offer carousel — map stays dominant */}
         {scoredJobs.length > 0 && active && (() => {
           const renderCard = (j: MapJob, distToPickupKm: number | null) => {
             const businessName = j.customer_name?.trim() || "לקוח פרטי";
-            const customerAddr =
-              [j.dropoff_address, j.dropoff_area].filter(Boolean).join(", ")
-              || [j.pickup_address, j.pickup_area].filter(Boolean).join(", ")
-              || "—";
             const jIsQuote = j.__kind === "quote";
             const jIsMove = j.service_category === "small_move" || j.service_category === "big_move" || t.kind === "mover";
-            const paymentType = j.requires_cash ? "מזומן" : "אשראי";
+            const kindLabel = jIsMove ? "הובלה" : (j.job_type?.trim() || "משלוח מהיר");
             const distLabel =
               distToPickupKm != null && Number.isFinite(distToPickupKm)
-                ? `${distToPickupKm < 10 ? distToPickupKm.toFixed(1) : distToPickupKm.toFixed(0)} ק״מ ממך`
+                ? `${distToPickupKm < 10 ? distToPickupKm.toFixed(1) : Math.round(distToPickupKm)} ק״מ`
                 : null;
-
-            // Offer expiry lives at __raw.offer.expires_at for offers,
-            // and __raw.quote_deadline_at for quote jobs.
+            const pickupLine = shortLine(j.pickup_address ?? j.pickup_area);
+            const dropoffLine = shortLine(j.dropoff_address ?? j.dropoff_area);
             const offerExpiresAt =
               (j.__raw?.offer?.expires_at as string | undefined)
               ?? (j.__raw?.expires_at as string | undefined)
@@ -524,96 +550,85 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 key={j.id}
                 data-job-id={j.id}
                 dir="rtl"
-                className="snap-center shrink-0 w-full rounded-[18px] overflow-hidden border border-slate-200/80 shadow-[0_12px_32px_-16px_rgba(15,23,42,0.28)] bg-white text-slate-900"
+                className="snap-center shrink-0 w-full rounded-card border border-border bg-surface shadow-card-strong p-4 space-y-3"
               >
-                {/* Header: logo + name/distance + price */}
-                <div className="px-4 pt-3.5 pb-3 flex items-start gap-3">
-                  <BusinessLogo path={j.customer_logo_path} name={businessName} size={44} />
-                  <div className="flex-1 min-w-0 text-right">
-                    <h3 className="font-bold text-slate-900 text-[15px] leading-tight truncate">{businessName}</h3>
-                    <div className="mt-1 flex items-center justify-end gap-2 flex-wrap">
-                      {distLabel && (
-                        <span className="text-[12px] text-slate-500 font-medium">{distLabel}</span>
-                      )}
-                      <AcceptTimerChip expiresAt={offerExpiresAt} />
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-left min-w-[4.5rem]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="shrink-0 text-left min-w-[4.25rem]">
                     {jIsQuote ? (
-                      <>
-                        <div className="text-[22px] font-extrabold text-amber-600 leading-none tracking-tight">₪?</div>
-                        <div className="text-[11px] text-slate-500 font-medium mt-1">הצעת מחיר</div>
-                      </>
+                      <p className="text-xl font-extrabold text-warning tabular-nums leading-none">₪?</p>
                     ) : (
-                      <>
-                        <div className="leading-none">
-                          <span className="text-[22px] font-extrabold text-[#35AD29] tracking-tight">
-                            {Number(j.payment ?? 0).toFixed(0)}
-                          </span>
-                          <span className="text-[14px] font-extrabold text-[#35AD29] mr-0.5">₪</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-medium mt-1">
-                          {jIsMove ? "מחיר ההובלה" : "מחיר המשלוח"}
-                        </div>
-                      </>
+                      <p className="text-xl font-extrabold text-primary tabular-nums leading-none">
+                        ₪{Number(j.payment ?? 0).toFixed(0)}
+                      </p>
                     )}
                   </div>
-                </div>
-
-                <div className="mx-4 border-t border-slate-100" />
-
-                {/* Quiet details */}
-                <div className="px-4 py-3 space-y-1.5 text-right">
-                  <div className="text-[13px] text-slate-700 leading-snug">
-                    <span className="text-slate-500">כתובת הלקוח: </span>
-                    <span className="font-semibold text-slate-900">{customerAddr}</span>
-                  </div>
-                  <div className="text-[13px] text-slate-700 leading-snug">
-                    <span className="text-slate-500">סוג התשלום: </span>
-                    <span className="font-semibold text-slate-900">{paymentType}</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="min-w-0 text-right">
+                      <h3 className="font-bold text-text-strong text-[15px] leading-tight truncate">{businessName}</h3>
+                      <p className="text-[11px] text-text-subtle mt-0.5 truncate">
+                        {[distLabel, kindLabel].filter(Boolean).join(" • ")}
+                      </p>
+                    </div>
+                    <BusinessLogo path={j.customer_logo_path} name={businessName} size={36} />
                   </div>
                 </div>
 
-                {/* Primary outline CTA + de-emphasized secondary actions */}
-                <div className="px-4 pb-3.5 space-y-2">
+                <div className="border-t border-border" />
+
+                <div className="space-y-2 text-right">
+                  <div className="flex items-center gap-2 justify-end">
+                    <p className="flex-1 text-[13px] text-text-strong truncate">
+                      איסוף: {pickupLine}
+                    </p>
+                    <span className="size-2 rounded-full bg-primary shrink-0" aria-hidden />
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <p className="flex-1 text-[13px] text-text-subtle truncate">
+                      מסירה: {dropoffLine}
+                    </p>
+                    <span className="size-2 rounded-full bg-destructive shrink-0" aria-hidden />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {!jIsQuote && <AcceptTimerBox expiresAt={offerExpiresAt} />}
                   {jIsQuote ? (
                     <Button
-                      variant="outline"
-                      className="w-full h-12 rounded-xl border-[1.5px] border-[#35AD29] text-[#35AD29] bg-white hover:bg-[#ecf8ea] hover:text-[#2d9623] font-bold text-[15px]"
+                      className="flex-1 min-h-11 rounded-card bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm shadow-fab"
                       onClick={() => onQuote(j)}
                     >
-                      {jIsMove ? "אני מציע מחיר להובלה" : "אני מציע מחיר"}
+                      הגש הצעת מחיר
                     </Button>
                   ) : (
                     <Button
-                      variant="outline"
-                      className="w-full h-12 rounded-xl border-[1.5px] border-[#35AD29] text-[#35AD29] bg-white hover:bg-[#ecf8ea] hover:text-[#2d9623] font-bold text-[15px]"
+                      className="flex-1 min-h-11 rounded-card bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm shadow-fab"
                       disabled={claiming}
                       onClick={() => onClaim(j)}
                     >
                       {claiming && <Loader2 className="size-4 animate-spin" />}
-                      {t.takeJob}
+                      {jIsMove ? "קבל הובלה" : "קבל משלוח"}
                     </Button>
                   )}
-                  <div className="flex items-center justify-center gap-4">
-                    {onDetails && (
-                      <button
-                        type="button"
-                        className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 py-1"
-                        onClick={() => onDetails(j)}
-                      >
-                        פרטים
-                      </button>
-                    )}
+                </div>
+
+                <div className="flex items-center justify-center gap-4 pt-0.5">
+                  {onDetails && (
                     <button
                       type="button"
-                      className="text-[12px] font-semibold text-rose-500/80 hover:text-rose-600 py-1"
-                      onClick={() => onDecline(j)}
-                      aria-label="דלג"
+                      className="text-xs font-semibold text-text-muted hover:text-text-strong py-1"
+                      onClick={() => onDetails(j)}
                     >
-                      דלג
+                      פרטים
                     </button>
-                  </div>
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-destructive/80 hover:text-destructive py-1"
+                    onClick={() => onDecline(j)}
+                    aria-label="דלג"
+                  >
+                    דלג
+                  </button>
                 </div>
               </div>
             );
@@ -622,21 +637,20 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
           const hasMultiple = scoredJobs.length >= 2;
 
           return (
-            <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:bottom-3 z-10 pointer-events-none">
-              {/* Toolbar: prev · counter+dots · next — sits above the card so it never overlaps content */}
+            <div className="absolute inset-x-3 bottom-3 z-10 pointer-events-none">
               {hasMultiple && (
                 <div dir="rtl" className="pointer-events-auto flex items-center justify-between gap-2 mb-2">
                   <button
                     type="button"
                     onClick={() => goToIdx(activeIdx - 1)}
-                    className="size-8 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-700 active:scale-95"
+                    className="size-8 rounded-full bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95"
                     aria-label="הצעה קודמת"
                   >
                     <ChevronRight className="size-4" />
                   </button>
 
-                  <div className="flex items-center gap-2 bg-white/95 border border-slate-200 shadow-sm rounded-full px-2.5 py-1">
-                    <span className="text-[11px] font-extrabold text-slate-800">
+                  <div className="flex items-center gap-2 bg-surface/95 border border-border shadow-card rounded-pill px-2.5 py-1">
+                    <span className="text-[11px] font-extrabold text-text-strong">
                       {activeIdx + 1} / {scoredJobs.length}
                     </span>
                     <div className="flex gap-1">
@@ -645,7 +659,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                           key={s.job.id}
                           onClick={() => goToIdx(i)}
                           className={`h-1.5 rounded-full transition-all ${
-                            i === activeIdx ? "w-5 bg-[#35AD29]" : "w-1.5 bg-slate-300"
+                            i === activeIdx ? "w-5 bg-primary" : "w-1.5 bg-border-strong"
                           }`}
                           aria-label={`הצעה ${i + 1}`}
                         />
@@ -656,7 +670,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                   <button
                     type="button"
                     onClick={() => goToIdx(activeIdx + 1)}
-                    className="size-8 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-700 active:scale-95"
+                    className="size-8 rounded-full bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95"
                     aria-label="הצעה הבאה"
                   >
                     <ChevronLeft className="size-4" />
@@ -664,7 +678,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 </div>
               )}
 
-              {/* Horizontal snap carousel — one card per viewport width */}
               <div
                 dir="rtl"
                 ref={carouselRef}
@@ -680,7 +693,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 className="pointer-events-auto flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
                 style={{ scrollbarWidth: "none" }}
               >
-                {scoredJobs.map((s) => renderCard(s.job, myPos ? s.distToPickup : null))}
+                {scoredJobs.map((s) => renderCard(s.job, s.distToPickup))}
               </div>
             </div>
           );
@@ -689,12 +702,12 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
         {scoredJobs.length === 0 && (
           <div
             dir="rtl"
-            className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:bottom-3 z-10 rounded-[18px] bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] px-5 py-5 text-center"
+            className="absolute inset-x-3 bottom-3 z-10 rounded-card bg-surface/95 backdrop-blur-md border border-border shadow-card px-5 py-5 text-center"
           >
-            <div className="text-[14px] font-bold text-slate-800">
+            <div className="text-sm font-bold text-text-strong">
               {t.kind === "mover" ? "אין כרגע הובלות באזורכם" : "אין כרגע משלוחים באזורכם"}
             </div>
-            <div className="text-[12px] text-slate-500 mt-1 leading-snug">
+            <div className="text-xs text-text-subtle mt-1 leading-snug">
               משכו למטה לרענון, או נסעו לאזור עמוס יותר.
             </div>
           </div>
