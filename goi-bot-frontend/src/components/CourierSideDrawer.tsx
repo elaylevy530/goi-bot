@@ -1,11 +1,28 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { CourierAvatar } from "@/components/CourierAvatar";
+import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { termsFor } from "@/lib/courier-kind";
-import { Bell, ChevronLeft, Clock3, Globe, Home, LogOut, Menu, User } from "lucide-react";
-import { toast } from "sonner";
+import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
+import {
+  nestCourierActiveJobCount,
+  nestListCourierDeclines,
+  nestListCourierOffers,
+  nestListOpenBroadcastJobs,
+} from "@/lib/nest-jobs";
+import {
+  History,
+  Inbox,
+  LogOut,
+  Menu,
+  MessageSquare,
+  Navigation,
+  User,
+  Wallet,
+  X,
+} from "lucide-react";
 
 function useDrawerCourier() {
   return useQuery({
@@ -16,6 +33,40 @@ function useDrawerCourier() {
       return nestMyCourier();
     },
     staleTime: 10_000,
+  });
+}
+
+function useDrawerNavCounts(courier?: { id?: string } | null) {
+  const courierId = courier?.id ?? null;
+  return useQuery({
+    queryKey: ["courier-nav-counts", courierId],
+    enabled: !!courierId,
+    refetchInterval: 15_000,
+    staleTime: 5_000,
+    queryFn: async () => {
+      const [pendingOffers, openJobs, activeJobs, declinedRows] = await Promise.all([
+        nestListCourierOffers("pending"),
+        nestListOpenBroadcastJobs(),
+        nestCourierActiveJobCount(),
+        nestListCourierDeclines(),
+      ]);
+      const declined = new Set(declinedRows.map((r) => r.job_id));
+      const unique = new Set<string>();
+      for (const o of pendingOffers) {
+        if (isLivePendingOffer(o, courier)) {
+          const jobId = (o.jobs as { id?: string } | null)?.id ?? o.job_id;
+          if (jobId && !declined.has(jobId)) unique.add(jobId);
+        }
+      }
+      for (const j of openJobs) {
+        if (declined.has(j.id)) continue;
+        if (isOpenBroadcastJobForCourier(j, courier)) unique.add(j.id);
+      }
+      return {
+        pendingOffers: unique.size,
+        activeJobs,
+      };
+    },
   });
 }
 
@@ -56,19 +107,20 @@ export function CourierMenuProvider({ children }: { children: ReactNode }) {
   );
 }
 
-type MenuItem = {
-  key: string;
-  label: string;
-  to?: string;
-  meta?: string;
-  icon: typeof Home;
-  danger?: boolean;
-  onClick?: () => void;
-};
+function NavBadge({ value }: { value: number }) {
+  if (!value || value <= 0) return null;
+  return (
+    <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary text-primary-foreground text-[10px] font-extrabold">
+      {value > 99 ? "99+" : value}
+    </span>
+  );
+}
 
 function CourierSideDrawer() {
   const { open, setOpen, closeMenu } = useCourierMenu();
   const { data: me } = useDrawerCourier();
+  const { data: counts } = useDrawerNavCounts(me);
+  const path = useRouterState({ select: (r) => r.location.pathname });
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -97,115 +149,138 @@ function CourierSideDrawer() {
     navigate({ to: "/auth", replace: true });
   };
 
-  const items: MenuItem[] = [
-    { key: "home", label: "מסך הבית", to: "/courier/new-jobs", icon: Home },
-    { key: "profile", label: "פרופיל אישי", to: "/courier/profile", icon: User },
+  const items = [
+    {
+      key: "new-jobs",
+      label: t.kind === "mover" ? "הובלות פנויות" : "משלוחים פנויים",
+      to: "/courier/new-jobs",
+      icon: Inbox,
+      badge: (counts?.pendingOffers ?? 0),
+    },
+    {
+      key: "active",
+      label: "פעילים",
+      to: "/courier/active",
+      icon: Navigation,
+      badge: counts?.activeJobs ?? 0,
+    },
     {
       key: "history",
-      label: t.kind === "mover" ? "היסטוריית הובלות" : "היסטוריית משלוחים",
+      label: t.kind === "mover" ? "ההובלות שלי" : "המשלוחים שלי",
       to: "/courier/history",
-      icon: Clock3,
+      icon: History,
+      badge: 0,
     },
-    { key: "messages", label: "התראות ועדכונים", to: "/courier/messages", icon: Bell, meta: "חדש" },
     {
-      key: "lang",
-      label: "שפת האפליקציה",
-      icon: Globe,
-      meta: "עברית",
-      onClick: () => toast.message("האפליקציה בעברית"),
+      key: "messages",
+      label: "הודעות",
+      to: "/courier/messages",
+      icon: MessageSquare,
+      badge: 0,
     },
-    { key: "logout", label: "התנתקות", icon: LogOut, danger: true, onClick: () => void handleSignOut() },
-  ];
+    {
+      key: "wallet",
+      label: "רווחים",
+      to: "/courier/wallet",
+      icon: Wallet,
+      badge: 0,
+    },
+    {
+      key: "profile",
+      label: "אזור אישי",
+      to: "/courier/profile",
+      icon: User,
+      badge: 0,
+    },
+  ] as const;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent
         side="right"
         dir="rtl"
-        className="w-[min(280px,85vw)] max-w-[280px] p-0 gap-0 border-0 bg-surface shadow-card-strong [&>button]:hidden"
+        className="w-[min(300px,88vw)] max-w-[300px] p-0 gap-0 border-0 bg-surface shadow-card-strong [&>button]:hidden"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
-        <SheetTitle className="sr-only">תפריט שליח</SheetTitle>
+        <SheetTitle className="sr-only">תפריט {t.panel}</SheetTitle>
 
         <div className="flex h-full flex-col">
-          <div className="border-b border-border px-6 py-6">
-            <div className="flex items-center gap-3 justify-end">
-              <div className="min-w-0 text-right">
-                <p className="text-base font-bold text-text-strong truncate">
-                  {me?.full_name?.trim() || t.worker}
-                </p>
-                <p className="text-xs text-text-subtle mt-0.5">{roleLabel}</p>
+          <div className="border-b border-border px-5 py-5">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={closeMenu}
+                aria-label="סגור תפריט"
+                className="size-10 grid place-items-center rounded-pill bg-muted text-text-strong active:bg-border transition-colors shrink-0"
+              >
+                <X className="size-5" />
+              </button>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0 text-right">
+                  <p className="text-base font-bold text-text-strong truncate">
+                    {me?.full_name?.trim() || t.worker}
+                  </p>
+                  <p className="text-xs text-text-subtle mt-0.5">{roleLabel}</p>
+                  <p className="text-[11px] text-text-muted mt-1">{t.panel}</p>
+                </div>
+                <CourierAvatar
+                  path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
+                  name={me?.full_name}
+                  size={48}
+                />
               </div>
-              <CourierAvatar
-                path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
-                name={me?.full_name}
-                size={48}
-              />
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto overscroll-y-contain py-3" aria-label="תפריט צד">
+          <nav className="flex-1 overflow-y-auto overscroll-y-contain px-3 py-3 space-y-1" aria-label="תפריט צד">
             {items.map((item) => {
               const Icon = item.icon;
-              const content = (
-                <>
-                  <ChevronLeft className="size-3.5 text-text-muted shrink-0" aria-hidden />
-                  {item.meta ? (
-                    <span className="text-sm text-text-subtle shrink-0">{item.meta}</span>
-                  ) : null}
-                  <span
-                    className={`flex-1 text-right text-base font-medium truncate ${
-                      item.danger ? "text-destructive" : "text-text-strong"
-                    }`}
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    className={`size-[34px] grid place-items-center rounded-full shrink-0 ${
-                      item.danger ? "bg-danger-bg text-destructive" : "bg-bg text-text-strong"
-                    }`}
-                  >
-                    <Icon className="size-[18px]" strokeWidth={2} />
-                  </span>
-                </>
-              );
-
-              const rowClass =
-                "flex w-full min-h-14 items-center gap-3 px-5 py-4 border-b border-border bg-surface active:bg-muted transition-colors text-right";
-
-              if (item.to) {
-                return (
-                  <Link
-                    key={item.key}
-                    to={item.to}
-                    onClick={closeMenu}
-                    className={rowClass}
-                  >
-                    {content}
-                  </Link>
-                );
-              }
-
+              const active =
+                item.to === "/courier/profile"
+                  ? path.startsWith("/courier/profile")
+                  : path === item.to ||
+                    (item.to === "/courier/new-jobs" &&
+                      (path === "/courier" || path === "/courier/dashboard"));
               return (
-                <button
+                <Link
                   key={item.key}
-                  type="button"
-                  onClick={() => {
-                    closeMenu();
-                    item.onClick?.();
-                  }}
-                  className={rowClass}
+                  to={item.to}
+                  onClick={closeMenu}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-fab"
+                      : "text-text-strong hover:bg-muted active:bg-muted"
+                  }`}
                 >
-                  {content}
-                </button>
+                  <Icon className="size-4 shrink-0" strokeWidth={active ? 2.5 : 2} />
+                  <span className="flex-1 text-right truncate">{item.label}</span>
+                  {item.badge > 0 && (
+                    active ? (
+                      <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary-foreground/20 text-primary-foreground text-[10px] font-extrabold">
+                        {item.badge > 99 ? "99+" : item.badge}
+                      </span>
+                    ) : (
+                      <NavBadge value={item.badge} />
+                    )
+                  )}
+                </Link>
               );
             })}
           </nav>
 
-          <div
-            className="pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
-            aria-hidden
-          />
+          <div className="border-t border-border pt-1">
+            <InstallAppSidebarItem variant="light" />
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              className="m-3 mt-1 flex w-[calc(100%-1.5rem)] items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold text-destructive hover:bg-danger-bg active:bg-danger-bg transition-colors"
+            >
+              <LogOut className="size-4 shrink-0" />
+              <span className="flex-1 text-right">יציאה</span>
+            </button>
+            <div className="pb-[max(0.5rem,env(safe-area-inset-bottom))]" aria-hidden />
+          </div>
         </div>
       </SheetContent>
     </Sheet>
