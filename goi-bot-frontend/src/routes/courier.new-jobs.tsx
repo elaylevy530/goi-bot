@@ -567,7 +567,7 @@ function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean 
           toggle.mutate(next);
         }}
         aria-label={title}
-        className={`shrink-0 data-[state=checked]:bg-primary ${
+        className={`shrink-0 overflow-hidden data-[state=checked]:bg-primary ${
           compact
             ? "h-7 w-12 [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5"
             : "h-8 w-[3.25rem] [&>span]:size-6 data-[state=checked]:[&>span]:translate-x-[1.35rem]"
