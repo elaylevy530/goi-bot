@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { termsFor } from "@/lib/courier-kind";
@@ -26,6 +26,7 @@ import { isCourierApproved, isLivePendingOffer, isOpenBroadcastJobForCourier, is
 import { ContactBlock, ActiveJobs } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
+import { PullToRefresh } from "@/components/courier/PullToRefresh";
 
 export const Route = createFileRoute("/courier/new-jobs")({
   head: () => ({ meta: [{ title: "עבודות חדשות — Goi" }] }),
@@ -322,9 +323,25 @@ function NewJobsPage() {
   const displayName = me?.full_name?.trim() || "שליח";
   const availableCount = mapJobs.length;
 
+  const refreshJobs = useCallback(async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["new-jobs"] }),
+      qc.refetchQueries({ queryKey: ["courier-open-jobs"] }),
+      qc.refetchQueries({ queryKey: ["courier-quote-requests"] }),
+      qc.refetchQueries({ queryKey: ["courier-active-count"] }),
+      qc.refetchQueries({ queryKey: ["active-jobs"] }),
+      qc.refetchQueries({ queryKey: ["my-courier-me"] }),
+    ]);
+  }, [qc]);
+
   return (
     <CourierShell fullBleed>
-      <div dir="rtl" className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-bg">
+      <PullToRefresh
+        onRefresh={refreshJobs}
+        ignoreSelector=".gm-style"
+        className="flex-1 min-h-0 h-full overflow-hidden bg-bg"
+      >
+      <div dir="rtl" className="relative h-full min-h-0 flex flex-col overflow-hidden">
         {/* Compact top chrome — keeps the map dominant */}
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
           <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/95 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3 space-y-2.5">
@@ -380,7 +397,10 @@ function NewJobsPage() {
         </div>
 
         {tab === "active" ? (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[11.5rem] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+          <div
+            data-ptr-scroll
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[11.5rem] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
+          >
             <ActiveJobs />
           </div>
         ) : isLoading && availableCount === 0 ? (
@@ -400,6 +420,7 @@ function NewJobsPage() {
           </div>
         )}
       </div>
+      </PullToRefresh>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent dir="rtl">
