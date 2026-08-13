@@ -22,6 +22,7 @@ const GROUPS: Group[] = [
     title: "המשלוחים שלי",
     items: [
       { to: "/business/orders", label: "כל ההזמנות", icon: Package, desc: "היסטוריה ומצב חי" },
+      { to: "/business/active", label: "מעקב חי", icon: MapPin, desc: "שליחים על המפה" },
       { to: "/business/quotes", label: "הצעות משליחים", icon: HandCoins, desc: "מכרזי מחיר פתוחים" },
       { to: "/business/recurring-orders", label: "משלוחים חוזרים", icon: Repeat, desc: "קווי חלוקה ומשמרות" },
     ],

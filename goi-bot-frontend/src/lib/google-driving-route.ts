@@ -49,6 +49,7 @@ export function nextLegEndpoints(input: {
 export async function fetchDrivingRoute(
   origin: LatLng,
   destination: LatLng,
+  waypoints: LatLng[] = [],
 ): Promise<DrivingRoute | null> {
   if (typeof window === "undefined" || !window.google?.maps) return null;
 
@@ -68,6 +69,7 @@ export async function fetchDrivingRoute(
       {
         origin,
         destination,
+        waypoints: waypoints.map((p) => ({ location: p, stopover: true })),
         travelMode: window.google.maps.TravelMode.DRIVING,
         region: "il",
         provideRouteAlternatives: false,
@@ -79,12 +81,12 @@ export async function fetchDrivingRoute(
   });
 
   const route = result?.routes?.[0];
-  const leg = route?.legs?.[0];
+  const legs = route?.legs;
   const overview = route?.overview_path;
-  if (!leg || !overview?.length) return null;
+  if (!legs?.length || !overview?.length) return null;
 
-  const meters = leg.distance?.value ?? 0;
-  const seconds = leg.duration?.value ?? 0;
+  const meters = legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
+  const seconds = legs.reduce((sum, leg) => sum + (leg.duration?.value ?? 0), 0);
 
   return {
     path: overview.map((p) => ({ lat: p.lat(), lng: p.lng() })),

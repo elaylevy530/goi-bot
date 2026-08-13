@@ -7,7 +7,7 @@ import {
   CreditCard,
   Home,
   MapPin,
-  MessageSquare,
+  Menu,
   Package,
   Plus,
   PlusCircle,
@@ -15,6 +15,7 @@ import {
   Settings,
   Truck,
   UserCircle2,
+  X,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PaymentBanner } from "@/components/PaymentGate";
@@ -136,7 +137,7 @@ const MOBILE_NAV = [
   { to: "/business/dashboard", label: "בית", icon: Home, exact: true },
   { to: "/business/orders", label: "הזמנות", icon: Package },
   { to: "/business/new-delivery", label: "הזמן", icon: Plus, highlight: true },
-  { to: "/business/messages", label: "הודעות", icon: MessageSquare },
+  { to: "/business/active", label: "מעקב", icon: MapPin },
   { to: "/business/account", label: "אזור אישי", icon: UserCircle2 },
 ] as const;
 
@@ -150,7 +151,6 @@ const DESKTOP_NAV = [
 ] as const;
 
 const HIDE_MOBILE_HEADER = [
-  "/business/new-delivery",
   "/business/new-multi-delivery",
   "/business/new-route",
   "/business/new-shift",
@@ -160,7 +160,7 @@ const TOP_LEVEL = [
   "/business/dashboard",
   "/business/orders",
   "/business/new-delivery",
-  "/business/messages",
+  "/business/active",
   "/business/account",
   "/business",
   "/business/",
@@ -193,6 +193,11 @@ export function BusinessShell({
   const { data: me } = useMyBusiness();
   const { data: balance } = useWalletBalance(me?.id);
   const [query, setQuery] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   const showBack = !TOP_LEVEL.includes(pathname);
   const goBack = () => {
@@ -224,12 +229,35 @@ export function BusinessShell({
 
   return (
     <div dir="rtl" className="biz-panel rtl-panel min-h-screen bg-bg text-text-strong lg:pb-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-      <aside className="fixed inset-y-0 start-0 z-40 hidden w-60 flex-col bg-sidebar text-sidebar-foreground lg:flex">
-        <div className="flex items-center gap-2.5 px-4 pt-8">
-          <div className="grid size-8 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <Truck className="size-[18px]" strokeWidth={2.2} />
+      {navOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-text-strong/40 lg:hidden"
+          aria-label="סגור תפריט"
+          onClick={() => setNavOpen(false)}
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed inset-y-0 start-0 z-50 w-60 flex-col bg-sidebar text-sidebar-foreground",
+          navOpen ? "flex" : "hidden lg:flex",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 px-4 pt-8">
+          <div className="flex items-center gap-2.5">
+            <div className="grid size-8 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+              <Truck className="size-[18px]" strokeWidth={2.2} />
+            </div>
+            <span className="text-lg font-extrabold tracking-tight text-white">Goi</span>
           </div>
-          <span className="text-lg font-extrabold tracking-tight text-white">Goi</span>
+          <button
+            type="button"
+            className="grid size-9 place-items-center rounded-lg text-sidebar-muted hover:bg-sidebar-accent hover:text-white lg:hidden"
+            aria-label="סגור תפריט"
+            onClick={() => setNavOpen(false)}
+          >
+            <X className="size-5" />
+          </button>
         </div>
 
         <nav className="mt-8 flex flex-1 flex-col gap-1 px-4" aria-label="ניווט עסקי">
@@ -241,6 +269,7 @@ export function BusinessShell({
                 key={item.to}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
+                onClick={() => setNavOpen(false)}
                 className={cn(
                   "relative flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] transition",
                   active
@@ -303,15 +332,26 @@ export function BusinessShell({
         {!hideMobileHeader && (
           <header className="sticky top-0 z-30 border-b border-border bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur lg:hidden">
             <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3 px-4">
-              <Link to="/business/dashboard" className="flex min-w-0 shrink-0 items-center gap-2.5" aria-label="בית">
-                <BusinessLogo path={logoPath} name={displayName} size={34} />
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold leading-none tracking-wide text-text-muted">Goi · עסקים</div>
-                  <div className="mt-0.5 max-w-[180px] truncate text-[13px] font-black leading-tight text-text-strong">
-                    {displayName}
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  className="grid size-10 shrink-0 place-items-center rounded-pill border border-border bg-muted text-text-strong"
+                  aria-label="תפריט"
+                  aria-expanded={navOpen}
+                  onClick={() => setNavOpen(true)}
+                >
+                  <Menu className="size-5" />
+                </button>
+                <Link to="/business/dashboard" className="flex min-w-0 shrink-0 items-center gap-2.5" aria-label="בית">
+                  <BusinessLogo path={logoPath} name={displayName} size={34} />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold leading-none tracking-wide text-text-muted">Goi · עסקים</div>
+                    <div className="mt-0.5 max-w-[180px] truncate text-[13px] font-black leading-tight text-text-strong">
+                      {displayName}
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
               <div className="flex items-center gap-2">
                 <NotificationsBell businessId={me?.id} />
                 {showBack && (

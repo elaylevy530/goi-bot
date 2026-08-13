@@ -299,20 +299,25 @@ function BusinessDashboard() {
 
           <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
             <div className="flex items-center justify-between px-5 py-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-success-text">
-                <span>בזמן אמת</span>
-                <span className="size-1.5 rounded-full bg-success" />
+              <Link to="/business/active" className="text-xs font-semibold text-primary hover:underline">
+                למסך המלא
+              </Link>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-success-text">
+                  <span>בזמן אמת</span>
+                  <span className="size-1.5 rounded-full bg-success" />
+                </div>
+                <h2 className="text-sm font-bold text-text-strong">מעקב חי - שליחים בתנועה</h2>
               </div>
-              <h2 className="text-sm font-bold text-text-strong">מעקב חי - שליחים בתנועה</h2>
             </div>
-            <div className="relative min-h-0 flex-1">
+            <Link to="/business/active" className="relative min-h-0 flex-1" aria-label="מעקב חי">
               <LiveJobsMap pins={pins} />
               {active.length === 0 && (
                 <div className="pointer-events-none absolute inset-0 grid place-items-center bg-muted/40 text-sm text-text-muted">
                   אין שליחים פעילים כרגע
                 </div>
               )}
-            </div>
+            </Link>
           </section>
         </div>
 
