@@ -24,11 +24,6 @@ export class UpdateCustomerAdminDto extends UpdateCustomerSelfDto {
   business_niche?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  business_tax_id?: string | null;
-
-  @IsOptional()
   @IsBoolean()
   invoice_required?: boolean;
 
@@ -40,8 +35,4 @@ export class UpdateCustomerAdminDto extends UpdateCustomerSelfDto {
   @IsString()
   @MaxLength(64)
   whatsapp_provider?: string | null;
-
-  @IsOptional()
-  @IsString()
-  notes?: string | null;
 }

@@ -148,7 +148,7 @@ export class JobsController {
     @CurrentUser() auth: AuthUserContext,
     @Param("id", ParseUUIDPipe) id: string,
   ) {
-    return this.jobs.getForUser(id, auth.userId, auth.roles);
+    return this.jobs.getForUserWithCourier(id, auth.userId, auth.roles);
   }
 
   @Post()

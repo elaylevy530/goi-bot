@@ -11,7 +11,7 @@ primary_region = 'ams'
 [env]
   PORT = "8080"
   NODE_ENV = "production"
-  DB_SYNCHRONIZE = "false"
+  DB_SYNCHRONIZE = "true"
 
 [http_service]
   internal_port = 8080

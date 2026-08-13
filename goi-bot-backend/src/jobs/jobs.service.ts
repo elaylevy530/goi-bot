@@ -322,23 +322,27 @@ export class JobsService {
     limit = 100,
   ) {
     if (roles.includes("admin") || roles.includes("manager")) {
-      return this.jobs.find({
-        where: status ? { status } : {},
-        order: { created_at: "DESC" },
-        take: limit,
-      });
+      return this.attachCouriers(
+        await this.jobs.find({
+          where: status ? { status } : {},
+          order: { created_at: "DESC" },
+          take: limit,
+        }),
+      );
     }
 
     if (roles.includes("business") || roles.includes("customer")) {
       const customer = await this.findCustomerForUser(userId);
       if (!customer) return [];
-      return this.jobs.find({
-        where: status
-          ? { customer_id: customer.id, status }
-          : { customer_id: customer.id },
-        order: { created_at: "DESC" },
-        take: limit,
-      });
+      return this.attachCouriers(
+        await this.jobs.find({
+          where: status
+            ? { customer_id: customer.id, status }
+            : { customer_id: customer.id },
+          order: { created_at: "DESC" },
+          take: limit,
+        }),
+      );
     }
 
     if (roles.includes("courier")) {
@@ -356,7 +360,7 @@ export class JobsService {
       });
       const byId = new Map<string, Job>();
       for (const j of [...assigned, ...open]) byId.set(j.id, j);
-      return [...byId.values()].slice(0, limit);
+      return this.attachCouriers([...byId.values()].slice(0, limit));
     }
 
     return [];
@@ -367,6 +371,12 @@ export class JobsService {
     if (!job) throw new NotFoundException("Job not found");
     await this.assertCanRead(job, userId, roles);
     return job;
+  }
+
+  async getForUserWithCourier(id: string, userId: string, roles: AppRole[]) {
+    const job = await this.getForUser(id, userId, roles);
+    const [withCourier] = await this.attachCouriers([job]);
+    return withCourier;
   }
 
   async create(userId: string, roles: AppRole[], dto: CreateJobDto) {
@@ -674,6 +684,34 @@ export class JobsService {
       return this.couriers.findOne({ where: { id: previewId }, select: ["id"] });
     }
     return this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
+  }
+
+  private async attachCouriers(jobs: Job[]) {
+    const ids = [...new Set(jobs.map((j) => j.selected_courier_id).filter(Boolean))] as string[];
+    if (ids.length === 0) {
+      return jobs.map((j) => ({ ...j, couriers: null }));
+    }
+    const rows = await this.couriers.find({
+      where: { id: In(ids) },
+      select: ["id", "full_name", "vehicle_type", "vehicle_label", "last_lat", "last_lng", "avatar_url"],
+    });
+    const byId = new Map(rows.map((c) => [c.id, c]));
+    return jobs.map((j) => {
+      const c = j.selected_courier_id ? byId.get(j.selected_courier_id) : undefined;
+      return {
+        ...j,
+        couriers: c
+          ? {
+              full_name: c.full_name,
+              vehicle_type: c.vehicle_type,
+              vehicle_label: c.vehicle_label,
+              last_lat: c.last_lat,
+              last_lng: c.last_lng,
+              avatar_url: c.avatar_url,
+            }
+          : null,
+      };
+    });
   }
 
   private async findCustomerForUser(

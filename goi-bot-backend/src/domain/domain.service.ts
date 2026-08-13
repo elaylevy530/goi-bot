@@ -865,6 +865,34 @@ export class DomainService {
     return this.favorites.save(row);
   }
 
+  async listFavorites(businessId: string) {
+    const rows = await this.favorites.find({
+      where: { business_id: businessId },
+      order: { created_at: "DESC" },
+    });
+    const ids = [...new Set(rows.map((r) => r.courier_id))];
+    const couriers = ids.length
+      ? await this.couriers.find({
+          where: { id: In(ids) },
+          select: ["id", "full_name", "whatsapp_phone", "vehicle_label", "vehicle_type", "base_city", "avatar_url"],
+        })
+      : [];
+    const byId = new Map(couriers.map((c) => [c.id, c]));
+    return rows.map((r) => ({
+      ...r,
+      couriers: byId.get(r.courier_id)
+        ? {
+            full_name: byId.get(r.courier_id)!.full_name,
+            whatsapp_phone: byId.get(r.courier_id)!.whatsapp_phone,
+            vehicle_label: byId.get(r.courier_id)!.vehicle_label,
+            vehicle_type: byId.get(r.courier_id)!.vehicle_type,
+            base_city: byId.get(r.courier_id)!.base_city,
+            avatar_url: byId.get(r.courier_id)!.avatar_url,
+          }
+        : null,
+    }));
+  }
+
   async listCustomerJobs(customerId: string, limit = 500) {
     return this.jobs.find({
       where: { customer_id: customerId },
@@ -959,6 +987,11 @@ export class DomainService {
   async favoriteForUser(userId: string, courierId: string) {
     const businessId = await this.requireBusinessId(userId);
     return this.getFavorite(businessId, courierId);
+  }
+
+  async favoritesForUser(userId: string) {
+    const businessId = await this.requireBusinessId(userId);
+    return this.listFavorites(businessId);
   }
 
   async setFavoriteForUser(userId: string, courierId: string, status: string | null) {

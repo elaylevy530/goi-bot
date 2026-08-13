@@ -121,6 +121,10 @@ export class AccountsService {
     if (dto.paypal_vault_id) {
       customer.paypal_setup_at = new Date();
     }
+    if (dto.niche_details) {
+      customer.niche_details = { ...(customer.niche_details ?? {}), ...dto.niche_details };
+      delete dto.niche_details;
+    }
     Object.assign(customer, dto);
     return this.customers.save(customer);
   }

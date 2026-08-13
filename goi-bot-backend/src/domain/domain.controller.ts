@@ -315,6 +315,11 @@ export class AccountDomainController {
     return this.domain.ticketsForUser(auth.userId);
   }
 
+  @Get("customers/me/favorites")
+  listFavorites(@CurrentUser() auth: AuthUserContext) {
+    return this.domain.favoritesForUser(auth.userId);
+  }
+
   @Get("customers/me/favorites/:courierId")
   getFavorite(
     @CurrentUser() auth: AuthUserContext,

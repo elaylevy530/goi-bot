@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -14,7 +15,25 @@ export class UpdateCustomerSelfDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)
-  name?: string;
+  email?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  business_tax_id?: string | null;
+
+  @IsOptional()
+  @IsString()
+  notes?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  niche_details?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()
