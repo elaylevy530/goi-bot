@@ -19,13 +19,17 @@ import {
   DONE_STATUSES,
   avgDeliveryMinutes,
   exportJobsCsv,
+  formatDelta,
   formatJobWhen,
   isSameMonth,
-  jobCourierLabel,
+  jobCourierAvatar,
   jobCourierName,
+  jobDurationLabel,
   jobPrice,
+  percentDelta,
   statusPillClass,
 } from "@/lib/business-panel";
+import { CourierAvatar } from "@/components/CourierAvatar";
 import { Calendar, Clock, CreditCard, Download, Eye, MoreHorizontal, Package, Printer, Repeat, Search } from "lucide-react";
 
 type TabKey = "all" | "active" | "done" | "cancelled";
@@ -55,6 +59,10 @@ function OrdersPage() {
   const geocodeFn = useServerFn(geocodeJob);
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState(searchFromUrl);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const pageSize = 7;
 
   useEffect(() => {
     setSearch(searchFromUrl);
@@ -113,6 +121,12 @@ function OrdersPage() {
   const monthJobs = all.filter((j) => isSameMonth(j.created_at));
   const avgMin = avgDeliveryMinutes(monthJobs);
   const monthSpend = Math.round(monthJobs.reduce((s, j) => s + jobPrice(j), 0));
+  const lastMonthJobs = all.filter((j) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return isSameMonth(j.created_at, d);
+  });
+  const monthDelta = percentDelta(monthJobs.length, lastMonthJobs.length);
 
   const filtered = useMemo(() => {
     const matcher = TABS.find((t) => t.key === tab)?.match ?? (() => true);
@@ -126,8 +140,20 @@ function OrdersPage() {
         (jobCourierName(j) || "").toLowerCase().includes(q),
       );
     }
+    if (statusFilter !== "all") {
+      list = list.filter((j) => j.status === statusFilter);
+    }
     return list;
-  }, [all, tab, search]);
+  }, [all, tab, search, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const statuses = useMemo(() => Array.from(new Set(all.map((j) => j.status))).filter(Boolean), [all]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, search, statusFilter]);
 
   const counts = {
     all: all.length,
@@ -139,18 +165,19 @@ function OrdersPage() {
   return (
     <BusinessShell title="המשלוחים שלי" subtitle={`${all.length} משלוחים בסך הכל`}>
       <div className="space-y-4 p-4 lg:space-y-6 lg:p-8">
-        <div className="hidden gap-4 lg:flex">
+        <div className="hidden gap-6 lg:flex">
           <KpiCard
             title="סה״כ הזמנות החודש"
             value={String(monthJobs.length)}
+            delta={formatDelta(monthDelta)}
             icon={Package}
-            iconClass="bg-kpi-volume-bg text-info-text"
+            iconClass="bg-kpi-volume-bg text-primary"
           />
           <KpiCard
             title="סה״כ עלות משלוחים"
             value={`₪${monthSpend.toLocaleString("he-IL")}`}
             icon={CreditCard}
-            iconClass="bg-kpi-cost-bg text-danger-text"
+            iconClass="bg-kpi-fleet-bg text-success-text"
           />
           <KpiCard
             title="זמן ממוצע למשלוח"
@@ -160,7 +187,28 @@ function OrdersPage() {
           />
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
+          <div className="flex gap-1 overflow-x-auto border-b border-border px-4">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  "flex items-center gap-2 whitespace-nowrap px-4 py-3 text-sm transition",
+                  tab === t.key
+                    ? "border-b-2 border-primary font-medium text-text-strong"
+                    : "text-text-muted hover:text-text-strong",
+                )}
+              >
+                {t.label}
+                <span className={cn("rounded-pill px-1.5 py-0.5 text-[11px] font-bold", tab === t.key ? "bg-primary/10 text-primary" : "bg-muted text-text-muted")}>
+                  {counts[t.key]}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative min-w-[12rem] flex-1 md:max-w-xs">
@@ -169,9 +217,20 @@ function OrdersPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="חיפוש מספר הזמנה..."
-                  className="h-9 w-full rounded-lg border border-border bg-muted pe-9 ps-3 text-sm outline-none placeholder:text-text-muted focus:ring-2 focus:ring-primary/30"
+                  className="h-9 w-full rounded-lg border border-border bg-surface pe-9 ps-3 text-sm outline-none placeholder:text-text-muted focus:ring-2 focus:ring-primary/30"
                 />
               </div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 rounded-lg border border-border bg-surface px-3 text-xs text-text-subtle"
+                aria-label="סינון לפי סטטוס"
+              >
+                <option value="all">כל הסטטוסים</option>
+                {statuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
               <span className="hidden items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-text-subtle md:inline-flex">
                 <Calendar className="size-3.5" /> החודש
               </span>
@@ -184,27 +243,6 @@ function OrdersPage() {
                 <Printer className="size-4" /> הדפס
               </Button>
             </div>
-          </div>
-
-          <div className="flex gap-1 overflow-x-auto border-b border-border px-2">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "flex items-center gap-2 whitespace-nowrap px-4 py-3 text-sm transition",
-                  tab === t.key
-                    ? "border-b-2 border-primary font-bold text-text-strong"
-                    : "text-text-muted hover:text-text-strong",
-                )}
-              >
-                {t.label}
-                <span className={cn("rounded-pill px-1.5 py-0.5 text-[11px] font-bold", tab === t.key ? "bg-primary/10 text-primary" : "bg-muted text-text-muted")}>
-                  {counts[t.key]}
-                </span>
-              </button>
-            ))}
           </div>
 
           {filtered.length === 0 ? (
@@ -246,54 +284,131 @@ function OrdersPage() {
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-xs text-text-muted">
-                      <th className="px-4 py-3 text-right font-semibold">מס׳ הזמנה</th>
-                      <th className="px-4 py-3 text-right font-semibold">תאריך ושעה</th>
-                      <th className="px-4 py-3 text-right font-semibold">כתובת איסוף</th>
-                      <th className="px-4 py-3 text-right font-semibold">יעד מסירה</th>
-                      <th className="px-4 py-3 text-right font-semibold">שליח</th>
-                      <th className="px-4 py-3 text-right font-semibold">סטטוס</th>
-                      <th className="px-4 py-3 text-right font-semibold">עלות</th>
-                      <th className="px-4 py-3 text-right font-semibold">פעולות</th>
+                    <tr className="border-b border-border bg-muted text-xs text-text-muted">
+                      <th className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-primary"
+                          checked={paged.length > 0 && paged.every((j) => selected.has(j.id))}
+                          onChange={(e) => {
+                            setSelected((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) paged.forEach((j) => next.add(j.id));
+                              else paged.forEach((j) => next.delete(j.id));
+                              return next;
+                            });
+                          }}
+                          aria-label="בחר הכל בעמוד"
+                        />
+                      </th>
+                      <th className="px-3 py-3 text-right font-semibold">מס׳ הזמנה</th>
+                      <th className="px-3 py-3 text-right font-semibold">תאריך ושעה</th>
+                      <th className="px-3 py-3 text-right font-semibold">כתובת איסוף</th>
+                      <th className="px-3 py-3 text-right font-semibold">יעד מסירה</th>
+                      <th className="px-3 py-3 text-right font-semibold">שליח</th>
+                      <th className="px-3 py-3 text-right font-semibold">סטטוס</th>
+                      <th className="px-3 py-3 text-right font-semibold">זמן</th>
+                      <th className="px-3 py-3 text-right font-semibold">עלות</th>
+                      <th className="px-3 py-3 text-right font-semibold">פעולות</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((j) => (
-                      <tr key={j.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                        <td className="px-4 py-3 font-mono text-xs">
-                          <Link to="/business/order/$id" params={{ id: j.id }} className="font-bold text-primary hover:underline">
-                            {j.job_number}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-text-muted">{formatJobWhen(j.created_at)}</td>
-                        <td className="max-w-[10rem] truncate px-4 py-3">{j.pickup_address || j.pickup_area || "—"}</td>
-                        <td className="max-w-[10rem] truncate px-4 py-3">{j.dropoff_address || j.dropoff_area || "—"}</td>
-                        <td className="px-4 py-3">{jobCourierLabel(j)}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn("inline-flex rounded-pill px-2.5 py-1 text-xs font-bold", statusPillClass(j.status))}>
-                            {j.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-bold">₪{jobPrice(j).toLocaleString("he-IL")}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-1">
-                            <Button asChild variant="ghost" size="sm" title="צפה">
-                              <Link to="/business/order/$id" params={{ id: j.id }}><Eye className="size-4" /></Link>
-                            </Button>
-                            <Button variant="ghost" size="sm" title="הזמן שוב" onClick={() => reorder.mutate(j.id)} disabled={reorder.isPending}>
-                              <Repeat className="size-4" />
-                            </Button>
-                            <Button asChild variant="ghost" size="sm" title="עוד">
-                              <Link to="/business/order/$id" params={{ id: j.id }}><MoreHorizontal className="size-4" /></Link>
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {paged.map((j) => {
+                      const name = jobCourierName(j);
+                      return (
+                        <tr key={j.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-primary"
+                              checked={selected.has(j.id)}
+                              onChange={(e) => {
+                                setSelected((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(j.id);
+                                  else next.delete(j.id);
+                                  return next;
+                                });
+                              }}
+                              aria-label={`בחר ${j.job_number}`}
+                            />
+                          </td>
+                          <td className="px-3 py-3 font-mono text-xs">
+                            <Link to="/business/order/$id" params={{ id: j.id }} className="font-bold text-primary hover:underline">
+                              {j.job_number}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-3 text-xs text-text-muted">{formatJobWhen(j.created_at)}</td>
+                          <td className="max-w-[10rem] truncate px-3 py-3">{j.pickup_address || j.pickup_area || "—"}</td>
+                          <td className="max-w-[10rem] truncate px-3 py-3">{j.dropoff_address || j.dropoff_area || "—"}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <CourierAvatar path={jobCourierAvatar(j)} name={name} size={24} />
+                              <span className="truncate">{name || "—"}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={cn("inline-flex rounded-pill px-2.5 py-1 text-xs font-bold", statusPillClass(j.status))}>
+                              {j.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-xs text-text-muted">{jobDurationLabel(j)}</td>
+                          <td className="px-3 py-3 font-bold">₪{jobPrice(j).toLocaleString("he-IL")}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex gap-1">
+                              <Button asChild variant="ghost" size="sm" title="צפה">
+                                <Link to="/business/order/$id" params={{ id: j.id }}><Eye className="size-4" /></Link>
+                              </Button>
+                              <Button variant="ghost" size="sm" title="הזמן שוב" onClick={() => reorder.mutate(j.id)} disabled={reorder.isPending}>
+                                <Repeat className="size-4" />
+                              </Button>
+                              <Button asChild variant="ghost" size="sm" title="עוד">
+                                <Link to="/business/order/$id" params={{ id: j.id }}><MoreHorizontal className="size-4" /></Link>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                <div className="border-t border-border px-4 py-3 text-xs text-text-muted">
-                  מציג {filtered.length} מתוך {all.length} הזמנות
+                <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-text-muted">
+                  <span>
+                    מציג {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filtered.length)} מתוך {filtered.length} הזמנות
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={currentPage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="rounded-md border border-border px-3 py-1.5 disabled:opacity-40"
+                    >
+                      הקודם
+                    </button>
+                    {Array.from({ length: pageCount }, (_, i) => i + 1)
+                      .slice(Math.max(0, currentPage - 3), Math.max(0, currentPage - 3) + 5)
+                      .map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setPage(n)}
+                          className={cn(
+                            "min-w-8 rounded-md px-2 py-1.5 font-bold",
+                            n === currentPage ? "bg-primary text-primary-foreground" : "border border-border",
+                          )}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    <button
+                      type="button"
+                      disabled={currentPage >= pageCount}
+                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                      className="rounded-md border border-border px-3 py-1.5 disabled:opacity-40"
+                    >
+                      הבא
+                    </button>
+                  </div>
                 </div>
               </div>
             </>

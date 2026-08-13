@@ -102,11 +102,11 @@ function BusinessIntegrationsPage() {
   const curlExample = `curl -X POST "${intakeUrl}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "customer_name": "ישראל ישראלי",
-    "customer_phone": "0501234567",
-    "dropoff_address": "הרצל 10, תל אביב",
-    "order_total": 120,
-    "items": "פיצה משפחתית x1"
+    "customer_name": "שם לקוח",
+    "customer_phone": "0500000000",
+    "dropoff_address": "כתובת מסירה",
+    "order_total": 0,
+    "items": "תיאור פריטים"
   }'`;
 
   const widgetSnippet = `<a href="${quickOrderUrl}" target="_blank"

@@ -25,7 +25,7 @@ import { getPartnerBySlugFn } from "@/lib/partners.functions";
 import {
   Bike, Calendar, PackageCheck, Truck, Loader2, ShieldCheck, ArrowRight, Calendar as CalIcon, Car,
   Sofa, Refrigerator, Bed, BedDouble, Armchair, WashingMachine, Tv, Utensils, UtensilsCrossed, Piano, Boxes, Package,
-  Radar, CheckCircle2, Menu, Camera, X, Plus, Minus, User, Phone, FileText, Clock,
+  Radar, CheckCircle2, Menu, Camera, X, Plus, Minus, User, Phone, FileText,
   ShoppingBag, HandPlatter, Store, Wallet, Coffee,
   Lamp, Dumbbell, Monitor, BookOpen, Microwave, Wind, MoreHorizontal, Bath, Baby, Printer,
   Archive, Laptop, Flame, Snowflake, PenTool, Building2,
@@ -887,21 +887,10 @@ function NewOrderPage() {
     return { base, perKm, kmCost: Math.round(kmCost), km, total, minApplied: raw < minPrice, minPrice };
   }, [rule, distanceKm]);
 
-  // Recommended price shown to the customer (formula hidden intentionally):
-  // 15 ₪ base + 5 ₪ per km, rounded (private customers). Business tier TBD.
-  const suggestedPrice = useMemo(() => {
-    if (distanceKm == null) return null;
-    return Math.max(15, Math.round(15 + 5 * distanceKm));
-  }, [distanceKm]);
-
-  // Rough ETA: ~2 min/km + 5 min pickup buffer for same_day; longer for moves.
-  const etaMinutes = useMemo(() => {
-    if (!distanceKm) return null;
-    const perKm = service === "small_move" || service === "big_move" ? 3 : 2;
-    const buffer = service === "same_day" ? 8 : 15;
-    const raw = Math.round(distanceKm * perKm + buffer);
-    return { min: Math.max(15, raw - 10), max: raw + 15 };
-  }, [distanceKm, service]);
+  const suggestedPrice =
+    distanceKm == null || !priceBreakdown || priceBreakdown.total <= 0
+      ? null
+      : priceBreakdown.total;
 
   const isMove = service === "small_move" || service === "big_move";
 
@@ -1923,11 +1912,6 @@ function NewOrderPage() {
               </span>
               <span className="inline-flex items-center gap-3">
                 <span className="font-black text-[#F5C518]">{distanceKm.toFixed(1)} ק״מ</span>
-                {etaMinutes && (
-                  <span className="inline-flex items-center gap-1 text-white/80">
-                    <Clock className="size-3" /> {etaMinutes.min}-{etaMinutes.max} דק׳
-                  </span>
-                )}
               </span>
             </div>
           )}

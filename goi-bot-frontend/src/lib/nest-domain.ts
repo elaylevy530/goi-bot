@@ -1,7 +1,7 @@
 /**
  * Browser helpers for Nest domain endpoints.
  */
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiClientError } from "@/lib/api-client";
 import { getNestAccessToken } from "@/lib/nest-auth";
 
 const options = () => ({ accessToken: getNestAccessToken() });
@@ -78,6 +78,41 @@ export function nestUpdateExpressPricingRule(id: string, body: Record<string, un
   });
 }
 export function nestGetPricing() { return apiFetch<Record<string, unknown>>("/api/pricing/active", options()); }
+
+export type NestPriceBreakdown = {
+  pricing_version: number;
+  pricing_rule_id: string;
+  base_price: number;
+  distance_km: number;
+  distance_price: number;
+  surcharges: number;
+  subtotal: number;
+  business_total: number;
+  platform_fee: number;
+  courier_payout: number;
+  computed_at: string;
+};
+
+export async function nestComputePrice(input: {
+  distanceKm: number;
+  extraStops?: number;
+  isHeavy?: boolean;
+}): Promise<NestPriceBreakdown | null> {
+  try {
+    return await apiFetch<NestPriceBreakdown>("/api/pricing/compute", {
+      method: "POST",
+      ...options(),
+      body: JSON.stringify({
+        distanceKm: input.distanceKm,
+        extraStops: input.extraStops ?? 0,
+        isHeavy: input.isHeavy ?? false,
+      }),
+    });
+  } catch (e) {
+    if (e instanceof ApiClientError && e.status === 404) return null;
+    throw e;
+  }
+}
 export function nestUpdatePricing(body: Record<string, unknown>) {
   return apiFetch("/api/pricing/active", { method: "POST", ...options(), body: JSON.stringify(body) });
 }
@@ -152,6 +187,24 @@ export function nestListMySupportTickets() {
 
 export function nestCreateSupportTicket(body: Record<string, unknown>) {
   return apiFetch("/api/support/tickets", { method: "POST", ...options(), body: JSON.stringify(body) });
+}
+
+export type NestFavoriteCourier = {
+  id: string;
+  courier_id: string;
+  status: string;
+  couriers: {
+    full_name?: string | null;
+    whatsapp_phone?: string | null;
+    vehicle_label?: string | null;
+    vehicle_type?: string | null;
+    base_city?: string | null;
+    avatar_url?: string | null;
+  } | null;
+};
+
+export function nestListMyFavorites() {
+  return apiFetch<NestFavoriteCourier[]>("/api/accounts/customers/me/favorites", options());
 }
 
 export function nestGetFavoriteCourier(courierId: string) {

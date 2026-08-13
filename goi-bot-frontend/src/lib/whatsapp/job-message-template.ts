@@ -266,29 +266,3 @@ export function buildJobMessage(job: JobMessageInput, opts: BuildOptions = {}): 
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
-
-/** Sample job used for the live preview in the partner panel. */
-export const SAMPLE_JOB: JobMessageInput = {
-  job_number: 1042,
-  short_code: "ab3k9d",
-  service_category: "small_move",
-  package_type: "הובלת דירה",
-  package_size: "3 חדרים",
-  number_of_packages: 1,
-  description: "מוביל: היום · 14:00–16:00 · ספה 3 מושבים, מקרר, 8 קרטונים, מיטה זוגית",
-  pickup_address: "הרצל 12, תל אביב, ישראל",
-  pickup_area: "תל אביב",
-  pickup_floor: 3,
-  pickup_notes: "יש מעלית",
-  dropoff_address: "ויצמן 8",
-  dropoff_area: "חיפה",
-  dropoff_floor: 1,
-  dropoff_notes: "חניה בחצר",
-  recipient_name: "דנה כהן",
-  recipient_phone: "054-8127396",
-  estimated_distance_km: 92.4,
-  vehicle_required: "משאית",
-  job_date: new Date().toISOString().slice(0, 10),
-  job_time: "14:00",
-  suggested_courier_payment: 1200,
-};

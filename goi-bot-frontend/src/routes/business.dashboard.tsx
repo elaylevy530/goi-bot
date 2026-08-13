@@ -26,6 +26,7 @@ import {
   statusPillClass,
 } from "@/lib/business-panel";
 import {
+  Bike,
   Clock,
   CreditCard,
   MapPin,
@@ -97,6 +98,7 @@ function BusinessDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<OpsTab>("waiting");
   const [dropoffText, setDropoffText] = useState("");
+  const [quickVehicle, setQuickVehicle] = useState("אופנוע");
   const prevStatusesRef = useRef<Map<string, string> | null>(null);
   const primedRef = useRef(false);
 
@@ -152,7 +154,11 @@ function BusinessDashboard() {
   const goQuickOrder = () => {
     navigate({
       to: "/business/new-delivery",
-      search: dropoffText.trim() ? { to: dropoffText.trim() } : { to: undefined, timing: undefined },
+      search: {
+        to: dropoffText.trim() || undefined,
+        timing: undefined,
+        vehicle: quickVehicle,
+      },
     });
   };
 
@@ -220,7 +226,7 @@ function BusinessDashboard() {
       </div>
 
       <div className="hidden space-y-6 p-8 lg:block">
-        <div className="flex gap-4">
+        <div className="flex gap-6">
           <KpiCard
             title="משלוחים היום"
             value={String(kpis.todayCount)}
@@ -250,39 +256,52 @@ function BusinessDashboard() {
         </div>
 
         <div className="flex h-[22.5rem] gap-6">
-          <section className="flex w-[22.5rem] shrink-0 flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-card">
+          <section className="flex w-[22.5rem] shrink-0 flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-panel">
             <div className="flex items-center justify-between">
-              <span className="rounded-md bg-kpi-volume-bg px-2 py-1 text-xs font-bold text-info-text">מהיר</span>
+              <span className="rounded-md bg-kpi-volume-bg px-2 py-1 text-xs font-bold text-primary">מהיר</span>
               <h2 className="text-lg font-bold text-text-strong">הזמנה מהירה</h2>
             </div>
             <div className="flex flex-1 flex-col gap-3">
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted px-4 py-2.5 text-sm text-text-subtle">
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-4 py-2.5 text-sm text-text-subtle">
                 <MapPin className="size-4 shrink-0 text-primary" />
                 <span className="truncate">{pickupAddress || "כתובת האיסוף מהפרופיל"}</span>
               </div>
               <AddressAutocomplete
                 label="כתובת מסירה"
-                placeholder="לאן לשלוח? (הקלד כתובת מסירה)"
+                placeholder="לאן לשלוח?"
                 value={dropoffText}
                 onChange={setDropoffText}
                 onSelect={(p) => setDropoffText(p.address)}
                 accent="red"
               />
+              <div className="relative">
+                <Bike className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
+                <select
+                  value={quickVehicle}
+                  onChange={(e) => setQuickVehicle(e.target.value)}
+                  className="biz-input appearance-none pe-9"
+                  aria-label="סוג רכב"
+                >
+                  <option value="אופנוע">קטנוע (משלוח מהיר)</option>
+                  <option value="רכב">רכב</option>
+                  <option value="טנדר">טנדר / משא</option>
+                </select>
+              </div>
             </div>
             <button
               type="button"
               onClick={goQuickOrder}
-              className="h-11 w-full rounded-lg bg-primary text-sm font-bold text-primary-foreground transition hover:bg-primary/90"
+              className="h-12 w-full rounded-lg bg-primary text-sm font-bold text-primary-foreground transition hover:bg-primary/90"
             >
               הזמן שליח עכשיו
             </button>
           </section>
 
-          <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+          <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
             <div className="flex items-center justify-between px-5 py-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-success-text">
                 <span>בזמן אמת</span>
-                <span className="size-1.5 rounded-full bg-primary" />
+                <span className="size-1.5 rounded-full bg-success" />
               </div>
               <h2 className="text-sm font-bold text-text-strong">מעקב חי - שליחים בתנועה</h2>
             </div>
@@ -297,9 +316,9 @@ function BusinessDashboard() {
           </section>
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
           <div className="flex items-center justify-between px-6 py-4">
-            <Link to="/business/orders" className="text-sm font-semibold text-text-muted hover:text-text-strong">
+            <Link to="/business/orders" className="text-sm font-semibold text-primary hover:underline">
               הצג את כל ההזמנות ←
             </Link>
             <h2 className="text-base font-bold text-text-strong">הזמנות אחרונות</h2>
@@ -309,7 +328,7 @@ function BusinessDashboard() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-y border-border text-xs text-text-muted">
+                <tr className="border-y border-border bg-muted text-xs text-text-muted">
                   <th className="px-4 py-3 text-right font-semibold">מס׳ הזמנה</th>
                   <th className="px-4 py-3 text-right font-semibold">תאריך ושעה</th>
                   <th className="px-4 py-3 text-right font-semibold">יעד מסירה</th>

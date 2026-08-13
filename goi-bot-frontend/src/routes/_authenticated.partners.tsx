@@ -11,7 +11,6 @@ import {
   DEFAULT_SECTIONS,
   normalizeSections,
   buildJobMessage,
-  SAMPLE_JOB,
   type SectionKey,
 } from "@/lib/whatsapp/job-message-template";
 import { getPartnerLastJobFn } from "@/lib/partners.functions";
@@ -275,7 +274,6 @@ function MessageTemplateEditor({
   saving: boolean;
 }) {
   const lastJob = useServerFn(getPartnerLastJobFn);
-  const [useReal, setUseReal] = useState(true);
   const jobQ = useQuery({
     queryKey: ["partner-preview-job", value.id || "new"],
     queryFn: () => lastJob({ data: { partnerId: value.id || null } }),
@@ -285,33 +283,25 @@ function MessageTemplateEditor({
   const setSection = (key: SectionKey, on: boolean) =>
     onChange({ ...value, message_sections: { ...sections, [key]: on } });
 
-  const job = useReal && jobQ.data ? jobQ.data : SAMPLE_JOB;
+  const job = jobQ.data ?? null;
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://goi.app";
-  const link = job.short_code
-    ? `${origin}/g/${job.short_code}`
-    : `${origin}/g/ab3k9d`;
+  const link = job?.short_code ? `${origin}/g/${job.short_code}` : "";
 
-  const preview = buildJobMessage(job, {
-    sections,
-    link,
-    cta: value.message_cta,
-    partnerNote: value.dispatch_note,
-  });
+  const preview = job
+    ? buildJobMessage(job, {
+        sections,
+        link,
+        cta: value.message_cta,
+        partnerNote: value.dispatch_note,
+      })
+    : "";
 
   return (
     <div className="rounded-2xl bg-muted/40 ring-1 ring-border p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-bold">תבנית ההודעה לקבוצת הוואטסאפ</h3>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={useReal}
-              onChange={(e) => setUseReal(e.target.checked)}
-            />
-            תצוגה לפי הזמנה אמיתית אחרונה
-          </label>
           <button
             type="button"
             onClick={() => onChange({ ...value, message_sections: { ...DEFAULT_SECTIONS } })}
@@ -358,11 +348,19 @@ function MessageTemplateEditor({
 
       <div className="space-y-1">
         <span className="text-xs font-bold text-muted-foreground">
-          תצוגה מקדימה {useReal && jobQ.data ? "(הזמנה אחרונה מהפאנל)" : "(דוגמה)"}
+          תצוגה מקדימה {job ? "(הזמנה אחרונה מהפאנל)" : ""}
         </span>
+        {jobQ.isLoading ? (
+          <p className="rounded-xl bg-muted px-3 py-4 text-sm text-muted-foreground">טוען הזמנה אחרונה…</p>
+        ) : preview ? (
         <pre className="whitespace-pre-wrap break-words rounded-xl bg-[#e7f7d8] text-[#0b1b12] p-3 text-[13px] leading-relaxed ring-1 ring-emerald-600/20">
 {preview}
         </pre>
+        ) : (
+          <p className="rounded-xl bg-muted px-3 py-4 text-sm text-muted-foreground">
+            אין הזמנה אחרונה לתצוגה. אחרי שתישלח הזמנה אמיתית — התבנית תופיע כאן.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-2 pt-1">

@@ -40,6 +40,30 @@ export function jobCourierLabel(job: NestJob): string {
   return name || "—";
 }
 
+export function jobCourierAvatar(job: NestJob): string | null {
+  const nested = (job as { couriers?: { avatar_url?: string | null } | null }).couriers;
+  return nested?.avatar_url || null;
+}
+
+export function jobDurationLabel(job: NestJob): string {
+  const start = job.created_at ? new Date(job.created_at).getTime() : NaN;
+  const end = new Date(String((job as { updated_at?: string }).updated_at || job.created_at || "")).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return "—";
+  const min = Math.round((end - start) / 60_000);
+  if (min < 1) return "<1 דק׳";
+  return `${min} דק׳`;
+}
+
+export function jobEtaMinutes(job: NestJob): number | null {
+  const snap = (job as { pricing_snapshot?: { delivery_deadline?: string | null } | null }).pricing_snapshot;
+  const deadline = snap?.delivery_deadline;
+  if (!deadline) return null;
+  const t = new Date(deadline).getTime();
+  if (!Number.isFinite(t)) return null;
+  const remaining = Math.round((t - Date.now()) / 60_000);
+  return remaining > 0 ? remaining : null;
+}
+
 export function formatHebrewDate(d = new Date()): string {
   return d.toLocaleDateString("he-IL", {
     weekday: "long",

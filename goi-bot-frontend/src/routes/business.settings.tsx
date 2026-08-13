@@ -9,8 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { nestUpdatePassword } from "@/lib/nest-auth";
 import { nestUpdateMyCustomer } from "@/lib/nest-accounts";
-import { ChevronLeft, Code2, Heart, Loader2, LogOut, Shield, Trash2, Users } from "lucide-react";
+import { nestListMyFavorites, nestSetFavoriteCourier } from "@/lib/nest-domain";
+import { ChevronLeft, Code2, Heart, Loader2, LogOut, Shield, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/business/settings")({
   head: () => ({ meta: [{ title: "הגדרות — Goi עסקים" }] }),
@@ -32,6 +35,13 @@ function SettingsPage() {
   const [notifyRecipient, setNotifyRecipient] = useState(true);
   const [favFirst, setFavFirst] = useState(true);
   const [favFallback, setFavFallback] = useState(3);
+  const [bizName, setBizName] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupInstructions, setPickupInstructions] = useState("");
+  const [hours, setHours] = useState<HoursMap>(emptyHours());
 
   useEffect(() => {
     if (me) {
@@ -44,6 +54,14 @@ function SettingsPage() {
       setNotifyRecipient((me as any).notify_recipient_enabled ?? true);
       setFavFirst((me as any).favorites_first_enabled ?? true);
       setFavFallback((me as any).favorites_fallback_minutes ?? 3);
+      setBizName((me as any).business_name || me.name || "");
+      setTaxId((me as any).business_tax_id || "");
+      setPhone(me.phone || "");
+      setEmail((me as any).email || "");
+      setPickupAddress((me as any).pickup_address || (me as any).address || "");
+      setPickupInstructions((me as any).pickup_instructions || (me as any).permanent_courier_notes || "");
+      const niche = (me as any).niche_details as { operating_hours?: unknown } | null;
+      setHours(parseHours(niche?.operating_hours));
     }
   }, [me]);
 
@@ -53,6 +71,23 @@ function SettingsPage() {
       await nestUpdatePassword(newPwd);
     },
     onSuccess: () => { toast.success("הסיסמה עודכנה"); setNewPwd(""); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveProfile = useMutation({
+    mutationFn: async () => {
+      if (!me) return;
+      await nestUpdateMyCustomer({
+        business_name: bizName || null,
+        business_tax_id: taxId || null,
+        phone: phone || null,
+        email: email || null,
+        pickup_address: pickupAddress || null,
+        pickup_instructions: pickupInstructions || null,
+        niche_details: { operating_hours: hours },
+      });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["business-me"] }); toast.success("הפרטים נשמרו"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -84,14 +119,12 @@ function SettingsPage() {
   // Favorites list
   const favorites = useQuery({
     queryKey: ["business-favorites", me?.id],
-    enabled: false,
-    queryFn: async () => {
-      throw new Error("Business favorites — migrate to Nest /api/accounts/customers/me/favorites");
-    },
+    enabled: !!me?.id,
+    queryFn: nestListMyFavorites,
   });
   const removeFavorite = useMutation({
-    mutationFn: async () => {
-      throw new Error("Business favorites — migrate to Nest /api/accounts/customers/me/favorites");
+    mutationFn: async (courierId: string) => {
+      await nestSetFavoriteCourier(courierId, null);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["business-favorites", me?.id] }); toast.success("הוסר"); },
     onError: (e: Error) => toast.error(e.message),
@@ -106,21 +139,21 @@ function SettingsPage() {
 
   return (
     <BusinessShell title="הגדרות" subtitle="חשבון, התראות וצוות">
-      <div className="flex flex-col gap-6 p-4 lg:flex-row lg:p-8">
-        <aside className="w-full shrink-0 space-y-4 lg:w-[22.5rem]">
-          <nav className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+      <div className="flex flex-col gap-6 p-4 pb-24 lg:flex-row lg:p-8">
+        <aside className="w-full shrink-0 space-y-4 lg:order-2 lg:w-[17.5rem]">
+          <nav className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
             {[
-              { href: "/business/profile", label: "פרטי עסק", to: "/business/profile" },
+              { href: "#biz-details", label: "פרטי עסק", active: true },
               { href: "/business/team", label: "משתמשים והרשאות", to: "/business/team" },
               { href: "#biz-notify", label: "התראות וסמס" },
-              { href: "/business/integrations", label: "מפתחים ו-API", to: "/business/integrations" },
+              { href: "/business/integrations", label: "מפתחות ו-API", to: "/business/integrations" },
               { href: "#biz-security", label: "אבטחת חשבון" },
             ].map((item) =>
               item.to ? (
                 <Link
                   key={item.label}
                   to={item.to as never}
-                  className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-semibold text-text-strong last:border-0 hover:bg-muted"
+                  className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-medium text-text-subtle last:border-0 hover:bg-muted"
                 >
                   {item.label}
                   <ChevronLeft className="size-4 text-text-muted" />
@@ -129,15 +162,17 @@ function SettingsPage() {
                 <a
                   key={item.label}
                   href={item.href}
-                  className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-semibold text-text-strong last:border-0 hover:bg-muted"
+                  className={cn(
+                    "flex items-center justify-between border-b border-border px-4 py-3 text-sm last:border-0 hover:bg-muted",
+                    item.active ? "font-bold text-primary" : "font-medium text-text-subtle",
+                  )}
                 >
                   {item.label}
-                  <ChevronLeft className="size-4 text-text-muted" />
                 </a>
               ),
             )}
           </nav>
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+          <div className="rounded-xl border border-border bg-surface p-5 shadow-panel">
             <div className="mb-3 flex items-center justify-between">
               <Code2 className="size-4 text-primary" />
               <p className="text-sm font-bold text-text-strong">חיבור ה-API שלך</p>
@@ -148,16 +183,97 @@ function SettingsPage() {
             </Button>
           </div>
         </aside>
-        <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 lg:order-1">
+        <section id="biz-details" className="scroll-mt-24 space-y-4 rounded-xl border border-border bg-surface p-6 shadow-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-bold text-text-strong">עדכון פרטי עסק</h2>
+            <div className="flex items-center gap-2">
+              <button type="button" className="text-sm font-semibold text-destructive" disabled>
+                הסר לוגו
+              </button>
+              <Button type="button" variant="outline" size="sm" className="text-primary" onClick={() => toast.info("העלאת לוגו תחזור לאחר Storage ב-Nest")}>
+                <Upload className="size-4" /> העלה קובץ חדש
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-right">
+              <span className="text-xs font-medium text-text-subtle">שם העסק</span>
+              <Input value={bizName} onChange={(e) => setBizName(e.target.value)} className="h-11 rounded-lg" />
+            </label>
+            <label className="flex flex-col gap-1.5 text-right">
+              <span className="text-xs font-medium text-text-subtle">מספר ח.פ. / עוסק מורשה</span>
+              <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} className="h-11 rounded-lg" />
+            </label>
+            <label className="flex flex-col gap-1.5 text-right">
+              <span className="text-xs font-medium text-text-subtle">טלפון לתיאום משלוחים</span>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11 rounded-lg" dir="ltr" />
+            </label>
+            <label className="flex flex-col gap-1.5 text-right">
+              <span className="text-xs font-medium text-text-subtle">אימייל לקבלת קבלות</span>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} className="h-11 rounded-lg" dir="ltr" />
+            </label>
+            <label className="flex flex-col gap-1.5 text-right sm:col-span-2">
+              <span className="text-xs font-medium text-text-subtle">כתובת העסק (איסוף משלוחים)</span>
+              <Input value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} className="h-11 rounded-lg" />
+            </label>
+            <label className="flex flex-col gap-1.5 text-right sm:col-span-2">
+              <span className="text-xs font-medium text-text-subtle">הוראות איסוף קבועות לשליח</span>
+              <Textarea value={pickupInstructions} onChange={(e) => setPickupInstructions(e.target.value)} className="min-h-24 rounded-lg" />
+            </label>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-panel">
+          <h2 className="mb-4 text-base font-bold text-text-strong">שעות פעילות למשלוחים</h2>
+          <div className="divide-y divide-border">
+            {WEEK_DAYS.map((day) => {
+              const row = hours[day.key];
+              return (
+                <div key={day.key} className="flex items-center justify-between gap-3 py-3">
+                  <span className={cn("rounded-pill px-2.5 py-1 text-[11px] font-bold", row.open ? "bg-success-bg text-success-text" : "bg-danger-bg text-danger-text")}>
+                    {row.open ? "פעיל" : "סגור"}
+                  </span>
+                  <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                    {row.open ? (
+                      <div className="flex items-center gap-2" dir="ltr">
+                        <Input
+                          type="time"
+                          value={row.from}
+                          onChange={(e) => setHours((prev) => ({ ...prev, [day.key]: { ...prev[day.key], from: e.target.value } }))}
+                          className="h-9 w-[7.5rem] rounded-lg"
+                        />
+                        <span className="text-text-muted">–</span>
+                        <Input
+                          type="time"
+                          value={row.to}
+                          onChange={(e) => setHours((prev) => ({ ...prev, [day.key]: { ...prev[day.key], to: e.target.value } }))}
+                          className="h-9 w-[7.5rem] rounded-lg"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-text-muted">—</span>
+                    )}
+                    <span className="w-24 text-sm font-semibold text-text-strong">{day.label}</span>
+                    <Switch
+                      checked={row.open}
+                      onCheckedChange={(v) => setHours((prev) => ({ ...prev, [day.key]: { ...prev[day.key], open: v } }))}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         <Card id="biz-account" className="scroll-mt-24 rounded-2xl border-border shadow-card lg:col-span-2">
           <CardHeader><CardTitle>סוג חשבון</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => changeMode("private")} className={`text-right rounded-xl border-2 p-4 transition ${accountMode === "private" ? "border-[#35AD29] bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
+              <button onClick={() => changeMode("private")} className={`text-right rounded-xl border-2 p-4 transition ${accountMode === "private" ? "border-primary bg-primary-soft" : "border-border hover:border-border-strong"}`}>
                 <div className="font-extrabold text-slate-900">חשבון אישי</div>
                 <div className="text-xs text-slate-500 mt-1">למשתמש פרטי — משלוח חבילה / מתנה / מסמך פעם בכמה זמן.</div>
               </button>
-              <button onClick={() => changeMode("business")} className={`text-right rounded-xl border-2 p-4 transition ${accountMode === "business" ? "border-[#35AD29] bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
+              <button onClick={() => changeMode("business")} className={`text-right rounded-xl border-2 p-4 transition ${accountMode === "business" ? "border-primary bg-primary-soft" : "border-border hover:border-border-strong"}`}>
                 <div className="font-extrabold text-slate-900">חשבון עסקי</div>
                 <div className="text-xs text-slate-500 mt-1">לעסק — סניפים, משמרות, קווי חלוקה, חיוב חודשי וחשבוניות.</div>
               </button>
@@ -223,7 +339,7 @@ function SettingsPage() {
             </div>
             <div className="border-t border-slate-100 pt-3">
               <div className="text-sm font-semibold text-slate-700 mb-2">
-                הרשימה שלי ({favorites.data?.filter((f) => f.status === "preferred").length ?? 0} מועדפים)
+                הרשימה שלי ({favorites.data?.filter((f) => f.status !== "blocked").length ?? 0} מועדפים)
               </div>
               {favorites.isLoading ? (
                 <div className="text-sm text-slate-500">טוען...</div>
@@ -237,13 +353,13 @@ function SettingsPage() {
                         <div className="font-semibold text-slate-900 text-sm truncate">
                           {f.couriers?.full_name || "—"}
                           {f.status === "blocked" && <span className="mr-2 text-xs text-red-600">(חסום)</span>}
-                          {f.status === "preferred" && <span className="mr-2 text-xs text-rose-600">❤️ מועדף</span>}
+                          {f.status !== "blocked" && <span className="mr-2 text-xs text-rose-600">❤️ מועדף</span>}
                         </div>
                         <div className="text-xs text-slate-500 truncate">
                           {f.couriers?.vehicle_label || ""} {f.couriers?.base_city ? `· ${f.couriers.base_city}` : ""} {f.couriers?.whatsapp_phone ? `· ${f.couriers.whatsapp_phone}` : ""}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => removeFavorite.mutate(f.id)} className="text-slate-500 hover:text-red-600">
+                      <Button variant="ghost" size="sm" onClick={() => removeFavorite.mutate(f.courier_id)} className="text-slate-500 hover:text-red-600">
                         <Trash2 className="size-4" />
                       </Button>
                     </li>
@@ -296,7 +412,7 @@ function SettingsPage() {
           <CardHeader className="flex flex-row items-center gap-2"><Shield className="size-4" /><CardTitle>שינוי סיסמה</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div><Label>סיסמה חדשה</Label><Input type="password" minLength={6} value={newPwd} onChange={(e) => setNewPwd(e.target.value)} /></div>
-            <Button onClick={() => pwd.mutate()} disabled={!newPwd || pwd.isPending} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+            <Button onClick={() => pwd.mutate()} disabled={!newPwd || pwd.isPending}>
               {pwd.isPending && <Loader2 className="size-4 animate-spin" />} עדכן סיסמה
             </Button>
           </CardContent>
@@ -305,7 +421,10 @@ function SettingsPage() {
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-4" /> משתמשים בצוות</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-500">בקרוב — אפשרות להוסיף משתמשים נוספים לעסק.</p>
+            <p className="text-sm text-slate-500 mb-3">ניהול הרשאות ומשתמשים נוספים לעסק.</p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/business/team">למסך הצוות</Link>
+            </Button>
           </CardContent>
         </Card>
 
@@ -319,6 +438,55 @@ function SettingsPage() {
         </Card>
         </div>
       </div>
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-20 flex justify-center pb-3 lg:bottom-0 lg:pb-6">
+        <div className="pointer-events-auto rounded-xl bg-sidebar px-4 py-3 shadow-panel">
+          <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending} className="min-w-48 rounded-lg bg-primary text-primary-foreground">
+            {saveProfile.isPending && <Loader2 className="size-4 animate-spin" />} שמור שינויים
+          </Button>
+        </div>
+      </div>
     </BusinessShell>
   );
+}
+
+const WEEK_DAYS = [
+  { key: "sun", label: "יום ראשון" },
+  { key: "mon", label: "יום שני" },
+  { key: "tue", label: "יום שלישי" },
+  { key: "wed", label: "יום רביעי" },
+  { key: "thu", label: "יום חמישי" },
+  { key: "fri", label: "יום שישי" },
+  { key: "sat", label: "יום שבת" },
+] as const;
+
+type HoursMap = Record<string, { open: boolean; from: string; to: string }>;
+
+function emptyHours(): HoursMap {
+  return Object.fromEntries(
+    WEEK_DAYS.map((d) => [d.key, { open: false, from: "09:00", to: "23:00" }]),
+  );
+}
+
+function parseHours(raw: unknown): HoursMap {
+  const fallback = emptyHours();
+  if (!raw) return fallback;
+  if (typeof raw === "string") {
+    try {
+      return parseHours(JSON.parse(raw));
+    } catch {
+      return fallback;
+    }
+  }
+  if (typeof raw !== "object") return fallback;
+  const next = { ...fallback };
+  for (const day of WEEK_DAYS) {
+    const row = (raw as Record<string, { open?: boolean; from?: string; to?: string }>)[day.key];
+    if (!row) continue;
+    next[day.key] = {
+      open: Boolean(row.open),
+      from: row.from || "09:00",
+      to: row.to || "23:00",
+    };
+  }
+  return next;
 }

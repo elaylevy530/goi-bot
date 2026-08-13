@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness, useWalletBalance } from "@/components/BusinessShell";
 import { Button } from "@/components/ui/button";
 import { nestListMyBillingRecords, nestListWalletTransactions } from "@/lib/nest-domain";
-import { CreditCard, Loader2, Lock, Trash2, Wallet } from "lucide-react";
+import { CreditCard, Download, Loader2, Lock, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "./business.dashboard";
 import { createSetupTokenFn, confirmVaultFn, removeVaultFn } from "@/lib/paypal-billing.functions";
@@ -16,14 +16,6 @@ export const Route = createFileRoute("/business/billing")({
   ssr: false,
   component: BillingPage,
 });
-
-const STATUS_STYLE: Record<string, string> = {
-  pending: "bg-warning-bg text-warning-text",
-  open: "bg-kpi-volume-bg text-info-text",
-  paid: "bg-success-bg text-success-text",
-  cancelled: "bg-muted text-text-muted",
-};
-const STATUS_HE: Record<string, string> = { pending: "ממתין", open: "פתוח", paid: "שולם", cancelled: "בוטל" };
 
 function PaymentMethodCard() {
   const qc = useQueryClient();
@@ -81,17 +73,17 @@ function PaymentMethodCard() {
 
   if (m?.payment_method_on_file) {
     return (
-      <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-card">
+      <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
         <div className="flex items-center justify-between gap-3">
-          <div className="grid size-9 place-items-center rounded-md bg-kpi-volume-bg text-info-text">
+          <div className="grid size-9 place-items-center rounded-md bg-kpi-volume-bg text-primary">
             <CreditCard className="size-5" />
           </div>
           <p className="text-sm font-medium text-text-subtle">אמצעי תשלום</p>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <Button variant="ghost" size="sm" onClick={() => remove.mutate()} disabled={remove.isPending}>
-            {remove.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />} הסר
-          </Button>
+          <button type="button" onClick={() => remove.mutate()} disabled={remove.isPending} className="text-sm font-semibold text-primary hover:underline">
+            {remove.isPending ? "מסיר…" : "שנה כרטיס"}
+          </button>
           <div className="text-right">
             <p className="text-lg font-bold text-text-strong">
               {m.payment_method_brand}
@@ -149,28 +141,28 @@ function BillingPage() {
   const monthSpend = monthRecords.reduce((s, b) => s + Number((b as { customer_price?: number }).customer_price || 0), 0);
 
   const monthly = useMemo(() => spendByMonth(data ?? []), [data]);
+  const invoiceMonths = useMemo(() => groupInvoicesByMonth(data ?? []), [data]);
+  const walletRows = useMemo(
+    () => withRunningBalance(txs as Array<{ id: string; amount?: number; description?: string; kind?: string; created_at: string }>),
+    [txs],
+  );
 
   return (
     <BusinessShell title="חיובים ותשלומים" subtitle="סיכום הוצאה והיסטוריית חיובים">
       <div className="space-y-6 p-4 lg:p-8">
-        <div className="flex flex-col gap-4 lg:flex-row">
-          <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-card">
-            <div className="flex items-center justify-between gap-3">
-              <div className="grid size-9 place-items-center rounded-md bg-kpi-fleet-bg text-success-text">
-                <Wallet className="size-5" />
-              </div>
-              <p className="text-sm font-medium text-text-subtle">יתרה נוכחית</p>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Button asChild size="sm">
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
+            <p className="text-sm font-medium text-text-subtle">יתרה נוכחית</p>
+            <div className="flex items-end justify-between gap-3">
+              <Button asChild className="rounded-lg">
                 <Link to="/business/wallet">טען יתרה</Link>
               </Button>
               <p className="text-[1.75rem] font-bold text-text-strong">₪{Math.round(balance).toLocaleString("he-IL")}</p>
             </div>
-            <p className="text-xs text-text-muted">כל משלוח יורד מהיתרה אוטומטית כשיש כיסוי.</p>
+            <p className="text-xs text-text-muted">טעינה אוטומטית כשהיתרה יורדת מתחת לכיסוי משלוח.</p>
           </article>
 
-          <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-card">
+          <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
             <div className="flex items-center justify-between gap-3">
               <span className="rounded-md bg-success-bg px-2 py-1 text-[10px] font-bold text-success-text">החודש</span>
               <p className="text-sm font-medium text-text-subtle">הוצאה חודשית</p>
@@ -182,29 +174,35 @@ function BillingPage() {
           <PaymentMethodCard />
         </div>
 
-        <div className="flex flex-col gap-4 lg:flex-row">
-          <section className="w-full rounded-xl border border-border bg-surface p-5 shadow-card lg:w-[25rem]">
-            <h2 className="mb-4 text-base font-bold text-text-strong">חיובים אחרונים</h2>
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <section className="w-full rounded-xl border border-border bg-surface p-5 shadow-panel lg:w-[25rem]">
+            <h2 className="mb-4 text-base font-bold text-text-strong">חשבוניות אחרונות להורדה</h2>
             <div className="space-y-2">
-              {(data ?? []).slice(0, 5).map((b) => {
-                const rec = b as { id: string; created_at: string; customer_price?: number; jobs?: { job_number?: string } };
-                return (
-                  <div key={rec.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-3">
-                    <span className="text-sm font-bold">₪{Number(rec.customer_price || 0).toLocaleString("he-IL")}</span>
-                    <div className="min-w-0 text-right">
-                      <div className="truncate text-sm font-semibold">{rec.jobs?.job_number ?? "חיוב"}</div>
-                      <div className="text-xs text-text-muted">{new Date(rec.created_at).toLocaleDateString("he-IL")}</div>
+              {invoiceMonths.length === 0 && (
+                <p className="py-6 text-center text-sm text-text-muted">אין חשבוניות עדיין</p>
+              )}
+              {invoiceMonths.map((inv) => (
+                <div key={inv.key} className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-3">
+                  <button
+                    type="button"
+                    onClick={() => downloadInvoiceMonth(inv)}
+                    className="grid size-9 place-items-center rounded-full bg-surface text-primary shadow-kpi"
+                    aria-label={`הורד ${inv.label}`}
+                  >
+                    <Download className="size-4" />
+                  </button>
+                  <div className="min-w-0 text-right">
+                    <div className="truncate text-sm font-semibold">{inv.label}</div>
+                    <div className="text-xs text-text-muted">
+                      {inv.count} חיובים · ₪{Math.round(inv.total).toLocaleString("he-IL")}
                     </div>
                   </div>
-                );
-              })}
-              {(data ?? []).length === 0 && (
-                <p className="py-6 text-center text-sm text-text-muted">אין חיובים עדיין</p>
-              )}
+                </div>
+              ))}
             </div>
           </section>
 
-          <section className="min-w-0 flex-1 rounded-xl border border-border bg-surface p-5 shadow-card">
+          <section className="min-w-0 flex-1 rounded-xl border border-border bg-surface p-5 shadow-panel">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-xs text-text-muted">מגמת הוצאות בחצי שנה האחרונה</p>
               <h2 className="text-base font-bold text-text-strong">הוצאה חודשית ממוצעת</h2>
@@ -225,29 +223,30 @@ function BillingPage() {
           </section>
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
           <div className="flex items-center justify-between px-6 py-4">
-            <Link to="/business/wallet" className="text-sm font-semibold text-text-muted hover:text-text-strong">
-              לארנק המלא ←
-            </Link>
+            <button type="button" onClick={() => downloadWalletCsv(walletRows)} className="text-sm font-semibold text-primary hover:underline">
+              הורד דו״ח אקסל מלא ←
+            </button>
             <h2 className="text-base font-bold text-text-strong">פעילות אחרונה בחשבון</h2>
           </div>
-          {txs.length === 0 && (!data || data.length === 0) ? (
+          {walletRows.length === 0 ? (
             <div className="p-6">
               <EmptyState icon={Wallet} title="אין רשומות חיוב עדיין" desc="כשיושלם משלוח, רשומת חיוב תיווצר אוטומטית." />
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-y border-border text-xs text-text-muted">
+                <tr className="border-y border-border bg-muted text-xs text-text-muted">
                   <th className="px-4 py-3 text-right font-semibold">תאריך ושעה</th>
                   <th className="px-4 py-3 text-right font-semibold">תיאור הפעולה</th>
                   <th className="px-4 py-3 text-right font-semibold">סוג פעולה</th>
                   <th className="px-4 py-3 text-right font-semibold">סכום</th>
+                  <th className="px-4 py-3 text-right font-semibold">יתרה אחרי הפעולה</th>
                 </tr>
               </thead>
               <tbody>
-                {(txs as Array<{ id: string; amount?: number; description?: string; kind?: string; created_at: string }>).map((t) => {
+                {walletRows.map((t) => {
                   const pos = Number(t.amount) >= 0;
                   return (
                     <tr key={t.id} className="border-b border-border last:border-0">
@@ -258,24 +257,10 @@ function BillingPage() {
                           {pos ? "זיכוי" : "חיוב"}
                         </span>
                       </td>
-                      <td className={cn("px-4 py-3.5 font-bold", pos ? "text-success-text" : "text-danger-text")}>
+                      <td className={cn("px-4 py-3.5 font-bold", pos ? "text-success-text" : "text-text-strong")}>
                         {pos ? "+" : ""}₪{Number(t.amount).toLocaleString("he-IL")}
                       </td>
-                    </tr>
-                  );
-                })}
-                {(data ?? []).slice(0, 8).map((b) => {
-                  const rec = b as { id: string; created_at: string; customer_price?: number; billing_status?: string; jobs?: { job_number?: string } };
-                  return (
-                    <tr key={`b-${rec.id}`} className="border-b border-border last:border-0">
-                      <td className="px-4 py-3.5 text-xs text-text-muted">{new Date(rec.created_at).toLocaleDateString("he-IL")}</td>
-                      <td className="px-4 py-3.5">משלוח {rec.jobs?.job_number ?? ""}</td>
-                      <td className="px-4 py-3.5">
-                        <span className={cn("rounded-pill px-2.5 py-1 text-xs font-bold", STATUS_STYLE[rec.billing_status || ""] || "bg-muted")}>
-                          {STATUS_HE[rec.billing_status || ""] || rec.billing_status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 font-bold">₪{Number(rec.customer_price || 0).toLocaleString("he-IL")}</td>
+                      <td className="px-4 py-3.5 font-semibold">₪{Math.round(t.balanceAfter).toLocaleString("he-IL")}</td>
                     </tr>
                   );
                 })}
@@ -308,4 +293,86 @@ function spendByMonth(records: Array<Record<string, unknown>>) {
     if (slot) slot.value += Number(rec.customer_price || 0);
   }
   return months;
+}
+
+type InvoiceMonth = {
+  key: string;
+  label: string;
+  count: number;
+  total: number;
+  rows: Array<Record<string, unknown>>;
+};
+
+function groupInvoicesByMonth(records: Array<Record<string, unknown>>): InvoiceMonth[] {
+  const map = new Map<string, InvoiceMonth>();
+  for (const rec of records) {
+    const created = new Date(String(rec.created_at || ""));
+    if (Number.isNaN(created.getTime())) continue;
+    const key = `${created.getFullYear()}-${created.getMonth()}`;
+    const existing = map.get(key);
+    const amount = Number(rec.customer_price || 0);
+    if (existing) {
+      existing.count += 1;
+      existing.total += amount;
+      existing.rows.push(rec);
+    } else {
+      map.set(key, {
+        key,
+        label: created.toLocaleDateString("he-IL", { month: "long", year: "numeric" }),
+        count: 1,
+        total: amount,
+        rows: [rec],
+      });
+    }
+  }
+  return Array.from(map.values()).slice(0, 6);
+}
+
+function withRunningBalance<T extends { amount?: number; created_at: string }>(txs: T[]) {
+  const sorted = [...txs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  let run = 0;
+  const withBal = sorted.map((t) => {
+    run += Number(t.amount || 0);
+    return { ...t, balanceAfter: run };
+  });
+  return withBal.reverse();
+}
+
+function downloadCsv(filename: string, header: string[], rows: string[][]) {
+  const csv = [header, ...rows]
+    .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadInvoiceMonth(inv: InvoiceMonth) {
+  downloadCsv(
+    `goi-invoices-${inv.key}.csv`,
+    ["תאריך", "מספר הזמנה", "סכום"],
+    inv.rows.map((r) => [
+      r.created_at ? new Date(String(r.created_at)).toLocaleDateString("he-IL") : "",
+      String((r.jobs as { job_number?: string } | undefined)?.job_number || "חיוב"),
+      String(r.customer_price ?? ""),
+    ]),
+  );
+}
+
+function downloadWalletCsv(rows: Array<{ created_at: string; description?: string; kind?: string; amount?: number; balanceAfter: number }>) {
+  downloadCsv(
+    `goi-wallet-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["תאריך", "תיאור", "סוג", "סכום", "יתרה"],
+    rows.map((r) => [
+      new Date(r.created_at).toLocaleString("he-IL"),
+      r.description || r.kind || "",
+      Number(r.amount) >= 0 ? "זיכוי" : "חיוב",
+      String(r.amount ?? ""),
+      String(Math.round(r.balanceAfter)),
+    ]),
+  );
 }

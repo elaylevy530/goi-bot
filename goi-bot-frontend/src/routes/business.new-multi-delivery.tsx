@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { PaymentLockGate } from "@/components/PaymentGate";
@@ -27,6 +27,7 @@ import {
 } from "@/components/MultiStopBuilder";
 import { createMultiStopJob } from "@/lib/multi-stop.functions";
 import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
+import { nestComputePrice, nestGetPricing } from "@/lib/nest-domain";
 
 export const Route = createFileRoute("/business/new-multi-delivery")({
   head: () => ({ meta: [{ title: "משלוח מרובה נקודות — Goi" }] }),
@@ -52,15 +53,60 @@ function NewMultiDeliveryPage() {
   const [notes, setNotes] = useState<string>("");
   const [pricingType, setPricingType] = useState<"fixed_price" | "distance_based" | "quote_request">("fixed_price");
   const [customPrice, setCustomPrice] = useState<string>("");
-  const [basePrice, setBasePrice] = useState<string>("25");
-  const [pricePerKm, setPricePerKm] = useState<string>("4");
+  const [basePrice, setBasePrice] = useState<string>("");
+  const [pricePerKm, setPricePerKm] = useState<string>("");
 
   const pickups = stops.filter((s) => s.stop_type === "pickup");
   const dropoffs = stops.filter((s) => s.stop_type === "dropoff");
 
-  const suggestedPrice = useMemo(() => {
-    return Math.max(40, Math.round(30 + stops.length * 8 + dropoffs.length * 6));
-  }, [stops.length, dropoffs.length]);
+  const routeKm = useMemo(() => {
+    const pts = stops
+      .map((s) => ({ lat: Number(s.lat), lng: Number(s.lng) }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+    if (pts.length < 2) return null;
+    const R = 6371;
+    let sum = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+      const dLon = ((b.lng - a.lng) * Math.PI) / 180;
+      const h =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      sum += R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+    return sum;
+  }, [stops]);
+
+  const extraStopCount = Math.max(0, stops.filter((s) => s.address.trim()).length - 2);
+  const { data: priceQuote } = useQuery({
+    queryKey: ["compute-price-multi", routeKm, extraStopCount],
+    enabled: routeKm != null,
+    queryFn: () =>
+      nestComputePrice({
+        distanceKm: routeKm!,
+        extraStops: extraStopCount,
+      }),
+  });
+  const suggestedPrice =
+    priceQuote?.business_total != null ? Math.round(Number(priceQuote.business_total)) : null;
+
+  const { data: activePricing } = useQuery({
+    queryKey: ["pricing-active"],
+    queryFn: nestGetPricing,
+  });
+  useEffect(() => {
+    if (!activePricing) return;
+    if (!basePrice) {
+      const base = Number(activePricing.base_price);
+      if (Number.isFinite(base)) setBasePrice(String(base));
+    }
+    if (!pricePerKm) {
+      const perKm = Number(activePricing.price_per_km);
+      if (Number.isFinite(perKm)) setPricePerKm(String(perKm));
+    }
+  }, [activePricing, basePrice, pricePerKm]);
 
   const validate = () => {
     if (pickups.length === 0) return "חובה להוסיף לפחות נקודת איסוף אחת";
@@ -88,7 +134,9 @@ function NewMultiDeliveryPage() {
             job_time: when === "scheduled" ? jobTime : null,
           },
           notes: notes || null,
-          payment: pricingType === "fixed_price" && customPrice ? Number(customPrice) : null,
+          payment: pricingType === "fixed_price"
+            ? Number(customPrice) || suggestedPrice || null
+            : null,
           pricing_type: pricingType,
           base_price: pricingType === "distance_based" ? Number(basePrice) || 0 : null,
           price_per_km: pricingType === "distance_based" ? Number(pricePerKm) || 0 : null,
@@ -254,14 +302,14 @@ function NewMultiDeliveryPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm text-slate-600">תשלום לשליח</div>
                   <div className="text-2xl font-extrabold text-[#35AD29]">
-                    ₪{customPrice || suggestedPrice}
+                    ₪{customPrice || (suggestedPrice == null ? "—" : suggestedPrice)}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
                     type="number"
-                    min={20}
-                    placeholder={`מומלץ ₪${suggestedPrice}`}
+                    min={0}
+                    placeholder={suggestedPrice == null ? "מחיר לפי תמחור המערכת" : `מומלץ ₪${suggestedPrice}`}
                     value={customPrice}
                     onChange={(e) => setCustomPrice(e.target.value)}
                     className="flex-1"
@@ -271,7 +319,9 @@ function NewMultiDeliveryPage() {
                   </Button>
                 </div>
                 <div className="text-xs text-slate-500 mt-2">
-                  מחיר אוטומטי לפי {stops.length} עצירות · ניתן לערוך
+                  {suggestedPrice == null
+                    ? "המחיר יחושב אחרי בחירת כתובות עם מיקום"
+                    : `לפי תמחור המערכת · ${stops.length} עצירות · ניתן לערוך`}
                 </div>
               </div>
             )}

@@ -84,12 +84,12 @@ function NotificationsBell({ businessId }: { businessId?: string }) {
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="relative grid size-10 place-items-center rounded-pill border border-border bg-surface text-text-strong transition hover:bg-muted"
+          className="relative grid size-10 place-items-center rounded-full text-text-strong transition hover:bg-muted"
           aria-label="התראות"
         >
-          <Bell className="size-5" strokeWidth={2} />
+          <Bell className="size-5" strokeWidth={1.8} />
           {unread > 0 && (
-            <span className="absolute -top-0.5 -start-0.5 grid h-4 min-w-4 place-items-center rounded-pill bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -top-0.5 -start-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
               {unread > 9 ? "9+" : unread}
             </span>
           )}
@@ -223,13 +223,13 @@ export function BusinessShell({
   };
 
   return (
-    <div dir="rtl" className="rtl-panel min-h-screen bg-bg text-text-strong lg:pb-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+    <div dir="rtl" className="biz-panel rtl-panel min-h-screen bg-bg text-text-strong lg:pb-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <aside className="fixed inset-y-0 start-0 z-40 hidden w-60 flex-col bg-sidebar text-sidebar-foreground lg:flex">
         <div className="flex items-center gap-2.5 px-4 pt-8">
           <div className="grid size-8 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
             <Truck className="size-[18px]" strokeWidth={2.2} />
           </div>
-          <span className="font-wordmark text-lg font-bold tracking-tight">Goi</span>
+          <span className="text-lg font-extrabold tracking-tight text-white">Goi</span>
         </div>
 
         <nav className="mt-8 flex flex-1 flex-col gap-1 px-4" aria-label="ניווט עסקי">
@@ -242,32 +242,35 @@ export function BusinessShell({
                 to={item.to}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition",
+                  "relative flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] transition",
                   active
-                    ? "bg-sidebar-accent font-bold text-sidebar-accent-foreground"
-                    : "font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    ? "bg-sidebar-accent font-medium text-white"
+                    : "font-normal text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-white",
                 )}
               >
+                {active && (
+                  <span className="absolute inset-y-2 start-0 w-[3px] rounded-s-full bg-primary" aria-hidden />
+                )}
                 <Icon className="size-5 shrink-0" strokeWidth={active ? 2.2 : 1.8} />
-                {item.label}
+                <span className="flex-1 text-right">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="mx-4 mb-8 rounded-lg bg-sidebar-accent p-4">
+        <div className="mx-4 mb-8 rounded-xl bg-sidebar-accent p-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-semibold">{displayName}</span>
-            <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">עסק</span>
+            <span className="rounded bg-pro-badge-bg px-1.5 py-0.5 text-[10px] font-bold text-success">עסק</span>
+            <span className="truncate text-sm font-bold text-white">{displayName}</span>
           </div>
-          <p className="mt-2 text-xs text-sidebar-foreground/60">
+          <p className="mt-3 w-full text-right text-[11px] text-sidebar-muted">
             יתרה נוכחית: ₪{(balance ?? 0).toLocaleString("he-IL")}
           </p>
         </div>
       </aside>
 
       <div className="lg:ps-60">
-        <header className="sticky top-0 z-30 hidden border-b border-border bg-bg/95 px-8 py-6 backdrop-blur lg:block">
+        <header className="sticky top-0 z-30 hidden border-b border-border bg-bg px-8 py-8 lg:block">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 text-right">
               <h1 className="truncate text-2xl font-bold text-text-strong">{desktopHeading(pathname, displayName)}</h1>
@@ -285,7 +288,7 @@ export function BusinessShell({
                 />
               </form>
               <NotificationsBell businessId={me?.id} />
-              <div className="h-6 w-px bg-border-strong" />
+              <div className="h-6 w-px bg-border" />
               <Link to="/business/account" className="flex items-center gap-3">
                 <div className="text-right leading-tight">
                   <div className="text-sm font-bold text-text-strong">{me?.name || displayName}</div>

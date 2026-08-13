@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { nestCreateJob, nestUpdateJob } from "@/lib/nest-jobs";
+import { nestComputePrice, nestGetPricing } from "@/lib/nest-domain";
 import { AddressAutocomplete, type SelectedPlace } from "@/components/customer/AddressAutocomplete";
 import { OrderMap } from "@/components/customer/OrderMap";
 import { PaypalCheckoutDialog } from "@/components/PaypalCheckoutDialog";
@@ -20,6 +21,7 @@ import {
 
 
 import { getTileVisual, TONE_STYLES } from "@/config/deliveryTypeVisuals";
+import { DesktopNewOrder } from "@/components/business/DesktopNewOrder";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -92,6 +94,7 @@ export const Route = createFileRoute("/business/new-delivery")({
   validateSearch: (s: Record<string, unknown>) => ({
     timing: typeof s.timing === "string" ? (s.timing as string) : undefined,
     to: typeof s.to === "string" ? s.to : undefined,
+    vehicle: typeof s.vehicle === "string" ? s.vehicle : undefined,
   }),
   component: NewDeliveryPage,
 });
@@ -136,6 +139,8 @@ function NewDeliveryPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [packageWeight, setPackageWeight] = useState("");
+  const [packageContents, setPackageContents] = useState("");
 
   // Pickup contact + instructions — prefilled from business profile
   const [pickupContactName, setPickupContactName] = useState("");
@@ -192,7 +197,7 @@ function NewDeliveryPage() {
   // Vehicle required by the courier
   const defaultVehicle = category.serviceType === "moving" ? "רכב" : "אופנוע";
   const [vehicle, setVehicle] = useState<string>(defaultVehicle);
-  useEffect(() => { setVehicle(category.serviceType === "moving" ? "רכב" : "אופנוע"); }, [category.serviceType]);
+  useEffect(() => { setVehicle(search.vehicle || (category.serviceType === "moving" ? "רכב" : "אופנוע")); }, [category.serviceType, search.vehicle]);
 
   // Address details
   const [dropoffGround, setDropoffGround] = useState(false);
@@ -205,12 +210,13 @@ function NewDeliveryPage() {
 
   const [pricingModel, setPricingModel] = useState<"fixed_price" | "distance_based" | "quote_request">("fixed_price");
   const [offeredPrice, setOfferedPrice] = useState<string>("");
-  const [basePrice, setBasePrice] = useState<string>("25");
-  const [pricePerKm, setPricePerKm] = useState<string>("4");
+  const [basePrice, setBasePrice] = useState<string>("");
+  const [pricePerKm, setPricePerKm] = useState<string>("");
 
   const [payDialog, setPayDialog] = useState<{ jobId: string; amount: number } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const sheetBodyRef = useRef<HTMLDivElement>(null);
+  const asDraftRef = useRef(false);
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
@@ -291,6 +297,7 @@ function NewDeliveryPage() {
   };
 
   const attemptSubmit = () => {
+    asDraftRef.current = false;
     if (!me) {
       toast.error("חסר פרופיל עסק — השלימו את הפרופיל וחזרו לכאן");
       return;
@@ -311,6 +318,15 @@ function NewDeliveryPage() {
     submit.mutate();
   };
 
+  const attemptDraft = () => {
+    if (!pickup || !dropoff) {
+      toast.error("בחרו כתובת איסוף ומסירה כדי לשמור טיוטה");
+      return;
+    }
+    asDraftRef.current = true;
+    submit.mutate();
+  };
+
   const distanceKm = useMemo(() => {
     if (!pickup || !dropoff) return null;
     const R = 6371;
@@ -324,16 +340,42 @@ function NewDeliveryPage() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }, [pickup, dropoff]);
 
-  const suggestedPrice = useMemo(() => {
-    const km = distanceKm ?? 3;
-    return Math.max(25, Math.round(20 + km * 4));
-  }, [distanceKm]);
+  const extraStopCount = validExtraStops.length;
+  const isHeavy = attributes.has("heavy");
+  const { data: priceQuote } = useQuery({
+    queryKey: ["compute-price", distanceKm, extraStopCount, isHeavy],
+    enabled: distanceKm != null,
+    queryFn: () =>
+      nestComputePrice({
+        distanceKm: distanceKm!,
+        extraStops: extraStopCount,
+        isHeavy,
+      }),
+  });
+  const suggestedPrice =
+    priceQuote?.business_total != null ? Math.round(Number(priceQuote.business_total)) : null;
+
+  const { data: activePricing } = useQuery({
+    queryKey: ["pricing-active"],
+    queryFn: nestGetPricing,
+  });
+  useEffect(() => {
+    if (!activePricing) return;
+    if (!basePrice) {
+      const base = Number(activePricing.base_price);
+      if (Number.isFinite(base)) setBasePrice(String(base));
+    }
+    if (!pricePerKm) {
+      const perKm = Number(activePricing.price_per_km);
+      if (Number.isFinite(perKm)) setPricePerKm(String(perKm));
+    }
+  }, [activePricing, basePrice, pricePerKm]);
 
   const distancePrice = useMemo(() => {
-    const km = distanceKm ?? 3;
+    if (distanceKm == null) return null;
     const b = Number(basePrice) || 0;
     const perKm = Number(pricePerKm) || 0;
-    return Math.max(0, Math.round((b + perKm * km) * 100) / 100);
+    return Math.max(0, Math.round((b + perKm * distanceKm) * 100) / 100);
   }, [distanceKm, basePrice, pricePerKm]);
 
   const canContinue = !!pickup && !!dropoff;
@@ -403,13 +445,13 @@ function NewDeliveryPage() {
       }
       if (dropoffEntry) addressBits.push(`כניסה/קוד: ${dropoffEntry}`);
       const addressNote = addressBits.length ? `יעד: ${addressBits.join(" · ")}` : "";
-      const fullNotes = [attrNote, stopsNote, addressNote, notes].filter(Boolean).join(" · ");
+      const fullNotes = [attrNote, stopsNote, addressNote, packageContents && `תכולה: ${packageContents}`, packageWeight && `משקל: ${packageWeight}`, notes].filter(Boolean).join(" · ");
 
       const price =
         pricingModel === "fixed_price"
           ? Number(offeredPrice) || 0
           : pricingModel === "distance_based"
-            ? distancePrice
+            ? distancePrice ?? 0
             : 0;
 
       const pickupReadyAtIso = (() => {
@@ -456,15 +498,22 @@ function NewDeliveryPage() {
         estimated_distance_km: distanceKm ? Number(distanceKm.toFixed(1)) : null,
         description: [`קטגוריה: ${category.label}`, deliveryType, validExtraStops.length ? `${validExtraStops.length + 1} יעדים` : null].filter(Boolean).join(" · "),
         invoice_required: (me as { invoice_required?: boolean }).invoice_required ?? false,
-        status: "נשלחה לשליחים",
+        status: asDraftRef.current ? "טיוטה" : "נשלחה לשליחים",
       };
 
 
 
       const data = await nestCreateJob(payload);
+      const isDraft = asDraftRef.current;
+      asDraftRef.current = false;
 
       // Geocode fire-and-forget
       geocode({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
+
+      if (isDraft) {
+        toast.success("הטיוטה נשמרה");
+        return data;
+      }
 
       const hasPayment = !!(me as { payment_method_on_file?: boolean } | null)?.payment_method_on_file;
 
@@ -522,7 +571,62 @@ function NewDeliveryPage() {
         />
       )}
 
-      <div className="fixed inset-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-col bg-bg lg:static lg:inset-auto lg:bottom-auto lg:z-0 lg:min-h-[calc(100vh-8.5rem)]">
+      <DesktopNewOrder
+        pickupText={pickupText}
+        pickup={pickup}
+        onPickupText={(v) => { setPickupText(v); if (!v) setPickup(null); clearFieldError("pickup"); }}
+        onPickupSelect={(p) => { setPickup(p); setPickupText(p.address); clearFieldError("pickup"); }}
+        pickupError={fieldErrors.pickup}
+        pickupContactName={pickupContactName}
+        onPickupContactName={(v) => { setPickupContactName(v); clearFieldError("pickupContactName"); }}
+        pickupContactNameError={fieldErrors.pickupContactName}
+        pickupContactPhone={pickupContactPhone}
+        onPickupContactPhone={(v) => { setPickupContactPhone(v); clearFieldError("pickupContactPhone"); }}
+        pickupContactPhoneError={fieldErrors.pickupContactPhone}
+        pickupInstructions={pickupInstructions}
+        onPickupInstructions={setPickupInstructions}
+        timing={timing}
+        timings={timings}
+        onTiming={setTiming}
+        deliveryTypes={deliveryTypes}
+        deliveryType={deliveryType}
+        onDeliveryType={setDeliveryType}
+        contents={packageContents}
+        onContents={setPackageContents}
+        packageWeight={packageWeight}
+        onPackageWeight={setPackageWeight}
+        fragile={attributes.has("fragile")}
+        onFragile={(v) => { if (v !== attributes.has("fragile")) toggleAttr("fragile"); }}
+        signature={attributes.has("signature")}
+        onSignature={(v) => { if (v !== attributes.has("signature")) toggleAttr("signature"); }}
+        dropoffText={dropoffText}
+        dropoff={dropoff}
+        onDropoffText={(v) => { setDropoffText(v); if (!v) setDropoff(null); clearFieldError("dropoff"); }}
+        onDropoffSelect={(p) => { setDropoff(p); setDropoffText(p.address); clearFieldError("dropoff"); }}
+        dropoffError={fieldErrors.dropoff}
+        recipientName={recipientName}
+        onRecipientName={setRecipientName}
+        recipientPhone={recipientPhone}
+        onRecipientPhone={setRecipientPhone}
+        dropoffFloor={dropoffFloor}
+        onDropoffFloor={setDropoffFloor}
+        dropoffApt={dropoffApt}
+        onDropoffApt={setDropoffApt}
+        dropoffEntry={dropoffEntry}
+        onDropoffEntry={setDropoffEntry}
+        dropoffNotes={notes}
+        onDropoffNotes={setNotes}
+        distanceKm={distanceKm}
+        suggestedPrice={suggestedPrice}
+        offeredPrice={offeredPrice}
+        onOfferedPrice={(v) => { setOfferedPrice(v); clearFieldError("offeredPrice"); }}
+        priceError={fieldErrors.offeredPrice}
+        pending={submit.isPending}
+        onSubmit={attemptSubmit}
+        onDraft={attemptDraft}
+      />
+
+      <div className="fixed inset-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-col bg-bg lg:hidden">
         {/* Map on top */}
         <div className={`flex-1 relative ${expanded ? "min-h-[96px]" : "min-h-[240px]"}`}>
           <OrderMap pickup={pickup} dropoff={dropoff} className="absolute inset-0" />
@@ -1185,10 +1289,11 @@ function NewDeliveryPage() {
                           setOfferedPrice(e.target.value);
                           clearFieldError("offeredPrice");
                         }}
-                        placeholder={String(suggestedPrice)}
+                        placeholder={suggestedPrice == null ? "" : String(suggestedPrice)}
                         aria-invalid={!!fieldErrors.offeredPrice}
                         className="flex-1 bg-transparent border-0 outline-none text-lg font-black text-text-strong"
                       />
+                      {suggestedPrice != null && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1199,6 +1304,7 @@ function NewDeliveryPage() {
                       >
                         מוצע: ₪{suggestedPrice}
                       </button>
+                      )}
                     </div>
                     <FieldError message={fieldErrors.offeredPrice} />
                   </div>
@@ -1263,7 +1369,7 @@ function NewDeliveryPage() {
                       <span>
                         {distanceKm ? `${distanceKm.toFixed(1)} ק״מ` : "מרחק יחושב לפי הכתובות"}
                       </span>
-                      <span className="text-primary">≈ ₪{distancePrice}</span>
+                      <span className="text-primary">≈ ₪{distancePrice == null ? "—" : distancePrice}</span>
                     </div>
                   </div>
                 )}
