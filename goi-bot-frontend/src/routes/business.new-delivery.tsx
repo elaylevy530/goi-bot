@@ -91,6 +91,7 @@ export const Route = createFileRoute("/business/new-delivery")({
   ssr: false,
   validateSearch: (s: Record<string, unknown>) => ({
     timing: typeof s.timing === "string" ? (s.timing as string) : undefined,
+    to: typeof s.to === "string" ? s.to : undefined,
   }),
   component: NewDeliveryPage,
 });
@@ -114,7 +115,7 @@ function NewDeliveryPage() {
   const [pickup, setPickup] = useState<SelectedPlace | null>(null);
   const [dropoff, setDropoff] = useState<SelectedPlace | null>(null);
   const [pickupText, setPickupText] = useState("");
-  const [dropoffText, setDropoffText] = useState("");
+  const [dropoffText, setDropoffText] = useState(search.to ?? "");
   const [extraStops, setExtraStops] = useState<ExtraStop[]>([]);
   const validExtraStops = useMemo(() => extraStops.filter((s) => s.place && s.text.trim()), [extraStops]);
 
@@ -521,7 +522,7 @@ function NewDeliveryPage() {
         />
       )}
 
-      <div className="fixed inset-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex flex-col bg-bg z-20">
+      <div className="fixed inset-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-col bg-bg lg:static lg:inset-auto lg:bottom-auto lg:z-0 lg:min-h-[calc(100vh-8.5rem)]">
         {/* Map on top */}
         <div className={`flex-1 relative ${expanded ? "min-h-[96px]" : "min-h-[240px]"}`}>
           <OrderMap pickup={pickup} dropoff={dropoff} className="absolute inset-0" />
@@ -530,7 +531,7 @@ function NewDeliveryPage() {
             type="button"
             onClick={() => navigate({ to: "/business/account" })}
             aria-label="תפריט"
-            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 size-10 rounded-pill bg-surface shadow-card ring-1 ring-black/10 grid place-items-center hover:bg-muted active:scale-95 transition"
+            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 size-10 rounded-pill bg-surface shadow-card ring-1 ring-black/10 grid place-items-center hover:bg-muted active:scale-95 transition lg:hidden"
           >
             <Menu className="size-5 text-text-strong" strokeWidth={2.4} />
           </button>

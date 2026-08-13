@@ -1,21 +1,33 @@
-import { Link, useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FormEvent, useEffect, useState, type ReactNode } from "react";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Home, Package, Plus, MessageSquare, UserCircle2, Bell, ArrowRight,
+  ArrowRight,
+  Bell,
+  CreditCard,
+  Home,
+  MapPin,
+  MessageSquare,
+  Package,
+  Plus,
+  PlusCircle,
+  Search,
+  Settings,
+  Truck,
+  UserCircle2,
 } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PaymentBanner } from "@/components/PaymentGate";
 import { BusinessLogo } from "@/components/BusinessLogo";
 import { cn } from "@/lib/utils";
+import { formatHebrewDate, walletBalance } from "@/lib/business-panel";
+import { nestListWalletTransactions } from "@/lib/nest-domain";
 import {
   nestListMyNotifications,
   nestMarkAllNotificationsRead,
   nestUnreadNotificationCount,
   type NestBusinessNotification,
 } from "@/lib/nest-accounts";
-
-// -------- Data hooks (kept API-compatible with the previous shell) --------
 
 export function useMyBusiness() {
   return useQuery({
@@ -26,6 +38,15 @@ export function useMyBusiness() {
       return nestMyCustomer();
     },
     staleTime: 10_000,
+  });
+}
+
+export function useWalletBalance(businessId?: string) {
+  return useQuery({
+    queryKey: ["wallet-tx", businessId],
+    enabled: !!businessId,
+    queryFn: nestListWalletTransactions,
+    select: (txs) => walletBalance(txs as Array<{ amount?: unknown }>),
   });
 }
 
@@ -63,22 +84,22 @@ function NotificationsBell({ businessId }: { businessId?: string }) {
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="relative size-10 grid place-items-center rounded-pill bg-muted text-text-strong hover:bg-surface border border-border transition"
+          className="relative grid size-10 place-items-center rounded-pill border border-border bg-surface text-text-strong transition hover:bg-muted"
           aria-label="התראות"
         >
-          <Bell className="size-[18px]" strokeWidth={2} />
+          <Bell className="size-5" strokeWidth={2} />
           {unread > 0 && (
-            <span className="absolute -top-0.5 -left-0.5 min-w-4 h-4 px-1 grid place-items-center rounded-pill bg-primary text-primary-foreground text-[10px] font-black">
+            <span className="absolute -top-0.5 -start-0.5 grid h-4 min-w-4 place-items-center rounded-pill bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
               {unread > 9 ? "9+" : unread}
             </span>
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent dir="rtl" align="end" className="w-80 p-0 rounded-card overflow-hidden shadow-card">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div className="font-bold text-sm text-text-strong">התראות</div>
+      <PopoverContent dir="rtl" align="end" className="w-80 overflow-hidden rounded-card p-0 shadow-card">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div className="text-sm font-bold text-text-strong">התראות</div>
           {unread > 0 && (
-            <button onClick={() => markAll.mutate()} className="text-xs text-text-strong font-bold underline">
+            <button onClick={() => markAll.mutate()} className="text-xs font-bold text-text-strong underline">
               סמן הכל
             </button>
           )}
@@ -86,19 +107,24 @@ function NotificationsBell({ businessId }: { businessId?: string }) {
         <div className="max-h-96 overflow-y-auto">
           {items.length === 0 ? (
             <div className="p-8 text-center text-xs text-text-muted">אין התראות חדשות</div>
-          ) : (items as NestBusinessNotification[]).map((n) => (
-            <Link
-              key={n.id}
-              to={(n.link as never) || "/business/dashboard"}
-              className={`block px-4 py-3 border-b border-border/60 hover:bg-muted ${!n.read_at ? "bg-success-bg" : ""}`}
-            >
-              <div className="text-xs font-bold text-text-strong">{n.title}</div>
-              {n.body && <div className="text-xs text-text-muted line-clamp-2 mt-0.5">{n.body}</div>}
-              <div className="text-[10px] text-text-muted mt-1">{new Date(n.created_at).toLocaleString("he-IL")}</div>
-            </Link>
-          ))}
+          ) : (
+            (items as NestBusinessNotification[]).map((n) => (
+              <Link
+                key={n.id}
+                to={(n.link as never) || "/business/dashboard"}
+                className={cn("block border-b border-border/60 px-4 py-3 hover:bg-muted", !n.read_at && "bg-success-bg")}
+              >
+                <div className="text-xs font-bold text-text-strong">{n.title}</div>
+                {n.body && <div className="mt-0.5 line-clamp-2 text-xs text-text-muted">{n.body}</div>}
+                <div className="mt-1 text-[10px] text-text-muted">{new Date(n.created_at).toLocaleString("he-IL")}</div>
+              </Link>
+            ))
+          )}
         </div>
-        <Link to="/business/notifications" className="block text-center text-xs font-bold text-text-strong py-3 border-t border-border hover:bg-muted">
+        <Link
+          to="/business/notifications"
+          className="block border-t border-border py-3 text-center text-xs font-bold text-text-strong hover:bg-muted"
+        >
           כל ההתראות
         </Link>
       </PopoverContent>
@@ -106,9 +132,7 @@ function NotificationsBell({ businessId }: { businessId?: string }) {
   );
 }
 
-// -------- Layout Shell --------
-
-const NAV = [
+const MOBILE_NAV = [
   { to: "/business/dashboard", label: "בית", icon: Home, exact: true },
   { to: "/business/orders", label: "הזמנות", icon: Package },
   { to: "/business/new-delivery", label: "הזמן", icon: Plus, highlight: true },
@@ -116,14 +140,47 @@ const NAV = [
   { to: "/business/account", label: "אזור אישי", icon: UserCircle2 },
 ] as const;
 
-const HIDE_HEADER_ROUTES = [
+const DESKTOP_NAV = [
+  { to: "/business/dashboard", label: "דשבורד", icon: Home, match: (p: string) => p === "/business/dashboard" || p === "/business" || p === "/business/" },
+  { to: "/business/new-delivery", label: "הזמנה חדשה", icon: PlusCircle, match: (p: string) => p.startsWith("/business/new-") },
+  { to: "/business/orders", label: "הזמנות", icon: Package, match: (p: string) => p.startsWith("/business/orders") || p.startsWith("/business/order/") },
+  { to: "/business/active", label: "מעקב חי", icon: MapPin, match: (p: string) => p.startsWith("/business/active") || p.startsWith("/business/track/") },
+  { to: "/business/billing", label: "חיוב ותשלומים", icon: CreditCard, match: (p: string) => p.startsWith("/business/billing") || p.startsWith("/business/wallet") },
+  { to: "/business/settings", label: "הגדרות", icon: Settings, match: (p: string) => p.startsWith("/business/settings") || p.startsWith("/business/profile") },
+] as const;
+
+const HIDE_MOBILE_HEADER = [
   "/business/new-delivery",
   "/business/new-multi-delivery",
   "/business/new-route",
   "/business/new-shift",
 ];
 
-export function BusinessShell({ children, title, subtitle, headerExtra }: {
+const TOP_LEVEL = [
+  "/business/dashboard",
+  "/business/orders",
+  "/business/new-delivery",
+  "/business/messages",
+  "/business/account",
+  "/business",
+  "/business/",
+];
+
+function desktopHeading(pathname: string, displayName: string) {
+  if (pathname.startsWith("/business/orders")) return "ניהול הזמנות";
+  if (pathname.startsWith("/business/active") || pathname.startsWith("/business/track/")) return "מעקב חי";
+  if (pathname.startsWith("/business/billing") || pathname.startsWith("/business/wallet")) return "חיוב ותשלומים";
+  if (pathname.startsWith("/business/settings") || pathname.startsWith("/business/profile")) return "הגדרות";
+  if (pathname.startsWith("/business/new-")) return "הזמנה חדשה";
+  return `שלום, ${displayName}`;
+}
+
+export function BusinessShell({
+  children,
+  title,
+  subtitle,
+  headerExtra,
+}: {
   children: ReactNode;
   title?: string;
   subtitle?: string;
@@ -134,16 +191,15 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
   const router = useRouter();
   const qc = useQueryClient();
   const { data: me } = useMyBusiness();
+  const { data: balance } = useWalletBalance(me?.id);
+  const [query, setQuery] = useState("");
 
-  // Show a back button on any secondary page (not the 5 bottom-nav destinations)
-  const TOP_LEVEL = ["/business/dashboard", "/business/orders", "/business/new-delivery", "/business/messages", "/business/account", "/business", "/business/"];
   const showBack = !TOP_LEVEL.includes(pathname);
   const goBack = () => {
     if (window.history.length > 1) router.history.back();
     else navigate({ to: "/business/account" });
   };
 
-  // Poll notifications from Nest.
   useEffect(() => {
     if (!me?.id) return;
     const timer = window.setInterval(() => {
@@ -153,92 +209,165 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
     return () => window.clearInterval(timer);
   }, [me?.id, qc]);
 
-  const displayName = (me as { business_name?: string; name?: string } | null)?.business_name || (me as { name?: string } | null)?.name || "העסק שלי";
+  const displayName =
+    (me as { business_name?: string; name?: string } | null)?.business_name ||
+    (me as { name?: string } | null)?.name ||
+    "העסק שלי";
   const logoPath = (me as { logo_url?: string } | null)?.logo_url;
-  const hideHeader = HIDE_HEADER_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  const hideMobileHeader = HIDE_MOBILE_HEADER.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+
+  const onSearch = (e: FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    navigate({ to: "/business/orders", search: { q } });
+  };
 
   return (
-    <div dir="rtl" className="rtl-panel min-h-screen bg-bg text-text-strong pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-      {!hideHeader && (
-        <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-border pt-[env(safe-area-inset-top)]">
-          <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-            <Link to="/business/dashboard" className="flex items-center gap-2.5 shrink-0 min-w-0" aria-label="בית">
-              <BusinessLogo path={logoPath} name={displayName} size={34} />
-              <div className="min-w-0">
-                <div className="text-[10px] text-text-muted font-semibold leading-none tracking-wide">Goi · עסקים</div>
-                <div className="text-[13px] font-black truncate leading-tight mt-0.5 max-w-[180px] text-text-strong">
-                  {displayName}
-                </div>
-              </div>
-            </Link>
-            <div className="flex items-center gap-2">
+    <div dir="rtl" className="rtl-panel min-h-screen bg-bg text-text-strong lg:pb-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+      <aside className="fixed inset-y-0 start-0 z-40 hidden w-60 flex-col bg-sidebar text-sidebar-foreground lg:flex">
+        <div className="flex items-center gap-2.5 px-4 pt-8">
+          <div className="grid size-8 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+            <Truck className="size-[18px]" strokeWidth={2.2} />
+          </div>
+          <span className="font-wordmark text-lg font-bold tracking-tight">Goi</span>
+        </div>
+
+        <nav className="mt-8 flex flex-1 flex-col gap-1 px-4" aria-label="ניווט עסקי">
+          {DESKTOP_NAV.map((item) => {
+            const active = item.match(pathname);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition",
+                  active
+                    ? "bg-sidebar-accent font-bold text-sidebar-accent-foreground"
+                    : "font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                )}
+              >
+                <Icon className="size-5 shrink-0" strokeWidth={active ? 2.2 : 1.8} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="mx-4 mb-8 rounded-lg bg-sidebar-accent p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm font-semibold">{displayName}</span>
+            <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">עסק</span>
+          </div>
+          <p className="mt-2 text-xs text-sidebar-foreground/60">
+            יתרה נוכחית: ₪{(balance ?? 0).toLocaleString("he-IL")}
+          </p>
+        </div>
+      </aside>
+
+      <div className="lg:ps-60">
+        <header className="sticky top-0 z-30 hidden border-b border-border bg-bg/95 px-8 py-6 backdrop-blur lg:block">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 text-right">
+              <h1 className="truncate text-2xl font-bold text-text-strong">{desktopHeading(pathname, displayName)}</h1>
+              <p className="mt-1 text-sm text-text-subtle">{formatHebrewDate()}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <form onSubmit={onSearch} className="flex w-[16.25rem] items-center gap-2 rounded-pill border border-border bg-surface px-4 py-2.5">
+                <Search className="size-4 shrink-0 text-text-muted" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="חיפוש משלוח, כתובת או שליח..."
+                  className="min-w-0 flex-1 bg-transparent text-sm text-text-strong outline-none placeholder:text-text-muted"
+                  aria-label="חיפוש הזמנות"
+                />
+              </form>
               <NotificationsBell businessId={me?.id} />
-              {showBack && (
-                <button
-                  type="button"
-                  onClick={goBack}
-                  aria-label="חזרה"
-                  className="size-10 grid place-items-center rounded-pill bg-muted text-text-strong hover:bg-surface border border-border transition"
-                >
-                  <ArrowRight className="size-5" />
-                </button>
-              )}
+              <div className="h-6 w-px bg-border-strong" />
+              <Link to="/business/account" className="flex items-center gap-3">
+                <div className="text-right leading-tight">
+                  <div className="text-sm font-bold text-text-strong">{me?.name || displayName}</div>
+                  <div className="text-[11px] text-text-muted">חשבון עסקי</div>
+                </div>
+                <BusinessLogo path={logoPath} name={displayName} size={40} />
+              </Link>
             </div>
           </div>
-          {(title || subtitle) && (
-            <div className="max-w-3xl mx-auto px-4 pb-3 pt-1 text-right">
-              {title && <h1 className="text-xl font-black text-text-strong truncate">{title}</h1>}
-              {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
-            </div>
-          )}
-          {headerExtra && <div className="max-w-3xl mx-auto px-4 pb-3">{headerExtra}</div>}
         </header>
-      )}
 
-      <PaymentBanner />
+        {!hideMobileHeader && (
+          <header className="sticky top-0 z-30 border-b border-border bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur lg:hidden">
+            <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3 px-4">
+              <Link to="/business/dashboard" className="flex min-w-0 shrink-0 items-center gap-2.5" aria-label="בית">
+                <BusinessLogo path={logoPath} name={displayName} size={34} />
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold leading-none tracking-wide text-text-muted">Goi · עסקים</div>
+                  <div className="mt-0.5 max-w-[180px] truncate text-[13px] font-black leading-tight text-text-strong">
+                    {displayName}
+                  </div>
+                </div>
+              </Link>
+              <div className="flex items-center gap-2">
+                <NotificationsBell businessId={me?.id} />
+                {showBack && (
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    aria-label="חזרה"
+                    className="grid size-10 place-items-center rounded-pill border border-border bg-muted text-text-strong transition hover:bg-surface"
+                  >
+                    <ArrowRight className="size-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            {(title || subtitle) && (
+              <div className="mx-auto max-w-3xl px-4 pb-3 pt-1 text-right">
+                {title && <h1 className="truncate text-xl font-black text-text-strong">{title}</h1>}
+                {subtitle && <p className="mt-0.5 truncate text-xs text-text-muted">{subtitle}</p>}
+              </div>
+            )}
+            {headerExtra && <div className="mx-auto max-w-3xl px-4 pb-3">{headerExtra}</div>}
+          </header>
+        )}
 
-      <main className="relative">{children}</main>
+        <PaymentBanner />
+        <main className="relative">{children}</main>
+      </div>
 
-      {/* Bottom bar — 5 tabs; center FAB is primary create action */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-30 bg-surface/95 backdrop-blur border-t border-border shadow-bottom-bar pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-bottom-bar backdrop-blur lg:hidden"
         aria-label="ניווט עסקי"
       >
-        <div className="grid grid-cols-5 h-[72px] max-w-md mx-auto px-1">
-          {NAV.map((item) => {
+        <div className="mx-auto grid h-[72px] max-w-md grid-cols-5 px-1">
+          {MOBILE_NAV.map((item) => {
             const { to, label, icon: Icon } = item;
             const highlight = "highlight" in item && item.highlight;
             const active =
               pathname === to ||
               (to === "/business/dashboard" && (pathname === "/business" || pathname === "/business/")) ||
-              (to !== "/business/dashboard" && pathname.startsWith(to + "/")) ||
-              pathname === to;
+              (to !== "/business/dashboard" && pathname.startsWith(`${to}/`));
             if (highlight) {
               return (
                 <button
                   key={to}
                   type="button"
                   onClick={() => navigate({ to })}
-                  className="flex flex-col items-center justify-end pb-1.5 relative"
+                  className="relative flex flex-col items-center justify-end pb-1.5"
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
                 >
                   <div
                     className={cn(
-                      "absolute -top-5 size-[52px] rounded-pill grid place-items-center shadow-fab ring-[5px] ring-bg transition active:scale-95",
-                      active
-                        ? "bg-primary text-primary-foreground scale-105"
-                        : "bg-primary text-primary-foreground",
+                      "absolute -top-5 grid size-[52px] place-items-center rounded-pill bg-primary text-primary-foreground shadow-fab ring-[5px] ring-bg transition active:scale-95",
+                      active && "scale-105",
                     )}
                   >
                     <Icon className="size-5" strokeWidth={2.6} />
                   </div>
-                  <span
-                    className={cn(
-                      "text-[11px] mt-11 transition",
-                      active ? "font-black text-primary" : "font-bold text-text-muted",
-                    )}
-                  >
+                  <span className={cn("mt-11 text-[11px] transition", active ? "font-black text-primary" : "font-bold text-text-muted")}>
                     {label}
                   </span>
                 </button>
@@ -249,20 +378,13 @@ export function BusinessShell({ children, title, subtitle, headerExtra }: {
                 key={to}
                 to={to}
                 aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1 transition",
-                  active ? "text-primary" : "text-text-muted",
-                )}
+                className={cn("flex flex-col items-center justify-center gap-1 transition", active ? "text-primary" : "text-text-muted")}
               >
                 <div className={cn("relative transition-transform", active && "scale-110")}>
                   <Icon className="size-[22px]" strokeWidth={active ? 2.3 : 1.8} />
-                  {active && (
-                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-1 rounded-pill bg-primary" />
-                  )}
+                  {active && <div className="absolute -bottom-1.5 start-1/2 size-1 -translate-x-1/2 rounded-pill bg-primary rtl:translate-x-1/2" />}
                 </div>
-                <span className={cn("text-[11px]", active ? "font-black" : "font-semibold")}>
-                  {label}
-                </span>
+                <span className={cn("text-[11px]", active ? "font-black" : "font-semibold")}>{label}</span>
               </Link>
             );
           })}

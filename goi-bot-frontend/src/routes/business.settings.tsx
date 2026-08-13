@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { nestUpdatePassword } from "@/lib/nest-auth";
 import { nestUpdateMyCustomer } from "@/lib/nest-accounts";
-import { Loader2, LogOut, Users, Heart, Trash2 } from "lucide-react";
+import { ChevronLeft, Code2, Heart, Loader2, LogOut, Shield, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/settings")({
@@ -106,8 +106,50 @@ function SettingsPage() {
 
   return (
     <BusinessShell title="הגדרות" subtitle="חשבון, התראות וצוות">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-4xl mx-auto">
-        <Card className="rounded-2xl border-slate-200 shadow-sm lg:col-span-2">
+      <div className="flex flex-col gap-6 p-4 lg:flex-row lg:p-8">
+        <aside className="w-full shrink-0 space-y-4 lg:w-[22.5rem]">
+          <nav className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+            {[
+              { href: "/business/profile", label: "פרטי עסק", to: "/business/profile" },
+              { href: "/business/team", label: "משתמשים והרשאות", to: "/business/team" },
+              { href: "#biz-notify", label: "התראות וסמס" },
+              { href: "/business/integrations", label: "מפתחים ו-API", to: "/business/integrations" },
+              { href: "#biz-security", label: "אבטחת חשבון" },
+            ].map((item) =>
+              item.to ? (
+                <Link
+                  key={item.label}
+                  to={item.to as never}
+                  className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-semibold text-text-strong last:border-0 hover:bg-muted"
+                >
+                  {item.label}
+                  <ChevronLeft className="size-4 text-text-muted" />
+                </Link>
+              ) : (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-semibold text-text-strong last:border-0 hover:bg-muted"
+                >
+                  {item.label}
+                  <ChevronLeft className="size-4 text-text-muted" />
+                </a>
+              ),
+            )}
+          </nav>
+          <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+            <div className="mb-3 flex items-center justify-between">
+              <Code2 className="size-4 text-primary" />
+              <p className="text-sm font-bold text-text-strong">חיבור ה-API שלך</p>
+            </div>
+            <p className="text-xs text-text-muted">מפתחות, webhooks והזמנות אוטומטיות מנוהלים במסך האינטגרציות.</p>
+            <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+              <Link to="/business/integrations">למסך האינטגרציות</Link>
+            </Button>
+          </div>
+        </aside>
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card id="biz-account" className="scroll-mt-24 rounded-2xl border-border shadow-card lg:col-span-2">
           <CardHeader><CardTitle>סוג חשבון</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
@@ -120,11 +162,11 @@ function SettingsPage() {
                 <div className="text-xs text-slate-500 mt-1">לעסק — סניפים, משמרות, קווי חלוקה, חיוב חודשי וחשבוניות.</div>
               </button>
             </div>
-            <p className="text-xs text-slate-500 mt-3">הבחירה משנה את התפריט והאפשרויות בפאנל.</p>
+            <p className="text-xs text-slate-500 mt-3">הבחירה משנה את התפריט והאפשרויות בפאנל. <Link to="/business/profile" className="font-bold text-primary underline">עריכת פרטי העסק</Link></p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card id="biz-notify" className="scroll-mt-24 rounded-2xl border-border shadow-card">
           <CardHeader><CardTitle>התראות</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <label className="flex items-center justify-between"><span>קבל עדכונים בוואטסאפ</span><Switch checked={notifyWa} onCheckedChange={toggleWa} /></label>
@@ -250,8 +292,8 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardHeader><CardTitle>שינוי סיסמה</CardTitle></CardHeader>
+        <Card id="biz-security" className="scroll-mt-24 rounded-2xl border-border shadow-card">
+          <CardHeader className="flex flex-row items-center gap-2"><Shield className="size-4" /><CardTitle>שינוי סיסמה</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div><Label>סיסמה חדשה</Label><Input type="password" minLength={6} value={newPwd} onChange={(e) => setNewPwd(e.target.value)} /></div>
             <Button onClick={() => pwd.mutate()} disabled={!newPwd || pwd.isPending} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
@@ -275,6 +317,7 @@ function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+        </div>
       </div>
     </BusinessShell>
   );
