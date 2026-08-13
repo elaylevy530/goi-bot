@@ -14,6 +14,11 @@
   NPM_CONFIG_OPTIONAL = "true"
   VITE_API_URL = "https://goi-bot.fly.dev"
   API_URL = "https://goi-bot.fly.dev"
+  # Browser Maps key is public-by-design (HTTP-referrer restricted) and Vite inlines
+  # VITE_* into the Nitro SSR bundle. Pro smart-scan flags the AIza… pattern otherwise.
+  # Marked-secret env vars are still scanned.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY,GOOGLE_MAPS_API_KEY,GOOGLE_MAPS_BROWSER_KEY"
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [[headers]]
   for = "/version.json"
