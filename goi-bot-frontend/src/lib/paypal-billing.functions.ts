@@ -8,8 +8,8 @@ import { nestServerFetch } from "@/lib/nest-server";
 
 export const getPaypalConfigFn = createServerFn({ method: "GET" }).handler(async () => {
   return {
-    clientId: process.env.PAYPAL_CLIENT_ID ?? "",
-    mode: (process.env.PAYPAL_MODE ?? "live") as "live" | "sandbox",
+    clientId: String(process.env["PAYPAL_CLIENT_ID"] ?? "").trim(),
+    mode: (String(process.env["PAYPAL_MODE"] ?? "live").trim() || "live") as "live" | "sandbox",
     currency: "ILS",
   };
 });

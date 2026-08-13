@@ -2,18 +2,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2, Layers, Plus, Minus, Crosshair,
+  Layers, Plus, Minus, Crosshair,
   ChevronRight, ChevronLeft, Timer,
 } from "lucide-react";
 
 import { useMyCourier } from "@/components/CourierShell";
 import { BusinessLogo } from "@/components/BusinessLogo";
+import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
 import { termsFor } from "@/lib/courier-kind";
+import { fetchDrivingRoute, haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
 
 const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
 
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
+const MAP_FIT_PAD = { top: 200, right: 48, bottom: 320, left: 56 } as const;
+
+function tokenColor(el: HTMLElement | null, name: string, fallback: string) {
+  if (!el) return fallback;
+  return getComputedStyle(el).getPropertyValue(name).trim() || fallback;
+}
 
 declare global {
   interface Window {
@@ -81,38 +89,50 @@ function AcceptTimerBox({ expiresAt }: { expiresAt?: string | null }) {
   const expired = secLeft === 0;
   return (
     <div
-      className={`shrink-0 w-[4.5rem] min-h-11 grid place-items-center rounded-card border bg-surface ${
+      className={`inline-flex items-center gap-1 rounded-pill px-2 py-1 text-xs font-bold tabular-nums ${
         expired
-          ? "border-border text-text-muted"
+          ? "bg-muted text-text-muted"
           : urgent
-            ? "border-destructive/40 text-destructive animate-pulse"
-            : "border-border text-destructive"
+            ? "bg-danger-bg text-danger-text animate-pulse"
+            : "bg-danger-bg text-danger-text"
       }`}
       aria-label="זמן לאישור המשלוח"
     >
-      <span className="inline-flex items-center gap-1 text-sm font-bold tabular-nums">
-        <Timer className="size-3.5 opacity-80" />
-        {mm}:{ss}
-      </span>
+      <Timer className="size-3.5 opacity-80" />
+      {mm}:{ss}
     </div>
   );
 }
 
-function shortLine(value?: string | null) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "—";
-  return raw.split(",")[0]?.trim() || raw;
+function addressParts(address?: string | null, area?: string | null) {
+  const raw = String(address ?? "").trim();
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const COUNTRY = new Set(["ישראל", "Israel", "israel"]);
+  const street = parts[0] || String(area ?? "").trim() || "—";
+  let city = String(area ?? "").trim();
+  if (!city && parts.length >= 2) {
+    const last = parts[parts.length - 1] ?? "";
+    city = COUNTRY.has(last) && parts.length >= 2 ? (parts[parts.length - 2] ?? "") : last;
+  }
+  if (city === street) city = "";
+  return { street, city };
 }
 
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(x));
+function stopPinSvg(label: string, fill: string, onFill = "#fff") {
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+  <defs>
+    <filter id="sp" x="-30%" y="-20%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0006"/>
+    </filter>
+  </defs>
+  <g filter="url(#sp)">
+    <circle cx="18" cy="16" r="14" fill="${fill}" stroke="${onFill}" stroke-width="3"/>
+    <polygon points="12,28 24,28 18,40" fill="${fill}"/>
+    <text x="18" y="21" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial" font-size="13" font-weight="800" fill="${onFill}">${label}</text>
+  </g>
+</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 function pinSvg(price: string, accent = "#35AD29") {
@@ -129,25 +149,6 @@ function pinSvg(price: string, accent = "#35AD29") {
     <rect x="2" y="2" rx="9" ry="9" width="${w}" height="${h}" fill="#fff" stroke="${accent}" stroke-width="2"/>
     <polygon points="${(w + 4) / 2 - 6},${h + 1} ${(w + 4) / 2 + 6},${h + 1} ${(w + 4) / 2},${h + 10}" fill="${accent}"/>
     <text x="${(w + 4) / 2}" y="${h / 2 + 6}" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial" font-size="14" font-weight="800" fill="${accent}">${price}</text>
-  </g>
-</svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
-function pinSvgFilled(price: string, accent = "#35AD29") {
-  const w = Math.max(60, 28 + price.length * 11);
-  const h = 34;
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${w + 4}" height="${h + 14}" viewBox="0 0 ${w + 4} ${h + 14}">
-  <defs>
-    <filter id="s2" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0008"/>
-    </filter>
-  </defs>
-  <g filter="url(#s2)">
-    <rect x="2" y="2" rx="10" ry="10" width="${w}" height="${h}" fill="${accent}"/>
-    <polygon points="${(w + 4) / 2 - 7},${h + 1} ${(w + 4) / 2 + 7},${h + 1} ${(w + 4) / 2},${h + 12}" fill="${accent}"/>
-    <text x="${(w + 4) / 2}" y="${h / 2 + 7}" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial" font-size="16" font-weight="800" fill="#fff">${price}</text>
   </g>
 </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -171,11 +172,14 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const meMarkerRef = useRef<google.maps.Marker | null>(null);
   const polyRef = useRef<google.maps.Polyline | null>(null);
+  const casingRef = useRef<google.maps.Polyline | null>(null);
+  const pickupStopRef = useRef<google.maps.Marker | null>(null);
   const dropMarkerRef = useRef<google.maps.Marker | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeRoute, setActiveRoute] = useState<DrivingRoute | null>(null);
   const [filter, setFilter] = useState<"all" | "now" | "schedule" | "quote">("all");
 
   useEffect(() => {
@@ -213,6 +217,11 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       zoomControl: false,
       clickableIcons: false,
       gestureHandling: "greedy",
+      styles: [
+        { featureType: "poi", stylers: [{ visibility: "off" }] },
+        { featureType: "transit", stylers: [{ visibility: "off" }] },
+        { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+      ],
     });
 
     const invalidate = () => {
@@ -336,16 +345,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     mapRef.current.panTo(myPos);
   }, [myPos, activeId]);
 
-  // Keep the map focused on the selected offer's pickup.
-  useEffect(() => {
-    if (!mapRef.current || !active) return;
-    if (active.pickup_lat == null || active.pickup_lng == null) return;
-    mapRef.current.panTo({
-      lat: Number(active.pickup_lat),
-      lng: Number(active.pickup_lng),
-    });
-  }, [active?.id]);
-
   useEffect(() => {
     if (!mapRef.current || !window.google) return;
     if (meMarkerRef.current) { meMarkerRef.current.setMap(null); meMarkerRef.current = null; }
@@ -384,44 +383,53 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     const bounds = new window.google.maps.LatLngBounds();
     if (myPos) bounds.extend(myPos);
 
+    const accentDefault = tokenColor(mapDivRef.current, "--brand-green", "#35AD29");
+    const quoteAccent = tokenColor(mapDivRef.current, "--warning", "#e88026");
+
     for (const j of visibleJobs) {
       if (j.pickup_lat == null || j.pickup_lng == null) continue;
       const pos = { lat: Number(j.pickup_lat), lng: Number(j.pickup_lng) };
+      bounds.extend(pos);
+
+      let marker = existing.get(j.id);
+      if (j.id === activeId) {
+        if (marker) {
+          marker.setMap(null);
+          existing.delete(j.id);
+        }
+        continue;
+      }
+
       const priceLabel = j.__kind === "quote" ? "₪?" : `₪${Number(j.payment ?? 0).toFixed(0)}`;
-      const accent = j.__kind === "quote" ? "#f59e0b" : "#35AD29";
-      const isActive = j.id === activeId;
-      const url = isActive ? pinSvgFilled(priceLabel, accent) : pinSvg(priceLabel, accent);
+      const accent = j.__kind === "quote" ? quoteAccent : accentDefault;
+      const url = pinSvg(priceLabel, accent);
       const w = Math.max(60, 28 + priceLabel.length * 11) + 4;
       const icon = {
         url,
-        scaledSize: new window.google.maps.Size(w, isActive ? 48 : 42),
-        anchor: new window.google.maps.Point(w / 2, isActive ? 48 : 42),
+        scaledSize: new window.google.maps.Size(w, 42),
+        anchor: new window.google.maps.Point(w / 2, 42),
       };
 
-      let marker = existing.get(j.id);
       if (marker) {
-        // Update in place — no teardown, no flicker
         const cur = marker.getPosition();
         if (!cur || cur.lat() !== pos.lat || cur.lng() !== pos.lng) {
           marker.setPosition(pos);
         }
         marker.setIcon(icon);
-        marker.setZIndex(isActive ? 800 : 500);
+        marker.setZIndex(500);
       } else {
         marker = new window.google.maps.Marker({
           position: pos,
           map,
           icon,
-          zIndex: isActive ? 800 : 500,
+          zIndex: 500,
           title: j.customer_name ?? "עבודה",
         });
         marker.addListener("click", () => {
           setActiveId(j.id);
-          map.panTo(pos);
         });
         existing.set(j.id, marker);
       }
-      bounds.extend(pos);
     }
 
     if (!activeId) {
@@ -437,42 +445,150 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   }, [visibleJobs, myPos, activeId]);
 
 
-  // route preview to active pickup + dropoff marker
+  // Driving route for the selected offer: me → pickup → dropoff.
   useEffect(() => {
     const map = mapRef.current;
+    const el = mapDivRef.current;
     if (!map || !window.google) return;
-    if (polyRef.current) { polyRef.current.setMap(null); polyRef.current = null; }
-    if (dropMarkerRef.current) { dropMarkerRef.current.setMap(null); dropMarkerRef.current = null; }
-    if (!active) return;
-    const pickup = active.pickup_lat != null && active.pickup_lng != null
-      ? { lat: Number(active.pickup_lat), lng: Number(active.pickup_lng) } : null;
-    const drop = active.dropoff_lat != null && active.dropoff_lng != null
-      ? { lat: Number(active.dropoff_lat), lng: Number(active.dropoff_lng) } : null;
 
-    if (myPos && pickup) {
-      polyRef.current = new window.google.maps.Polyline({
-        path: [myPos, pickup],
-        strokeColor: "#2563eb",
-        strokeOpacity: 0,
-        icons: [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 }, offset: "0", repeat: "10px" }],
+    const clearRoute = () => {
+      polyRef.current?.setMap(null);
+      polyRef.current = null;
+      casingRef.current?.setMap(null);
+      casingRef.current = null;
+      pickupStopRef.current?.setMap(null);
+      pickupStopRef.current = null;
+      dropMarkerRef.current?.setMap(null);
+      dropMarkerRef.current = null;
+    };
+
+    clearRoute();
+    setActiveRoute(null);
+    if (!active) return;
+
+    const pickup: LatLng | null =
+      active.pickup_lat != null && active.pickup_lng != null
+        ? { lat: Number(active.pickup_lat), lng: Number(active.pickup_lng) }
+        : null;
+    const drop: LatLng | null =
+      active.dropoff_lat != null && active.dropoff_lng != null
+        ? { lat: Number(active.dropoff_lat), lng: Number(active.dropoff_lng) }
+        : null;
+
+    const green = tokenColor(el, "--brand-green", tokenColor(el, "--primary", "#35AD29"));
+    const navy = tokenColor(el, "--navy", "#101418");
+    const red = tokenColor(el, "--destructive", "#e8265d");
+    const onFill = tokenColor(el, "--primary-foreground", "#fff");
+
+    const stopIcon = (label: string, fill: string) => ({
+      url: stopPinSvg(label, fill, onFill),
+      scaledSize: new window.google.maps.Size(36, 44),
+      anchor: new window.google.maps.Point(18, 40),
+    });
+
+    if (pickup) {
+      pickupStopRef.current = new window.google.maps.Marker({
+        position: pickup,
         map,
+        icon: stopIcon("1", green),
+        title: "איסוף",
+        zIndex: 850,
       });
     }
     if (drop) {
       dropMarkerRef.current = new window.google.maps.Marker({
-        position: drop, map,
-        icon: {
-          path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          scale: 5,
-          fillColor: "#35AD29",
-          fillOpacity: 1,
-          strokeColor: "#fff",
-          strokeWeight: 2,
-        },
-        zIndex: 700,
+        position: drop,
+        map,
+        icon: stopIcon("2", red),
+        title: "מסירה",
+        zIndex: 850,
       });
     }
-  }, [active, myPos]);
+
+    const fit = (points: LatLng[]) => {
+      if (points.length === 0) return;
+      if (points.length === 1) {
+        map.panTo(points[0]);
+        map.setZoom(14);
+        return;
+      }
+      const bounds = new window.google.maps.LatLngBounds();
+      for (const p of points) bounds.extend(p);
+      map.fitBounds(bounds, MAP_FIT_PAD);
+    };
+
+    const drawRoute = (path: LatLng[], dashed: boolean) => {
+      casingRef.current?.setMap(null);
+      polyRef.current?.setMap(null);
+      casingRef.current = new window.google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: navy,
+        strokeOpacity: dashed ? 0 : 0.85,
+        strokeWeight: dashed ? 0 : 10,
+        map,
+        zIndex: 4,
+      });
+      polyRef.current = new window.google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: green,
+        strokeOpacity: dashed ? 0 : 1,
+        strokeWeight: dashed ? 0 : 6,
+        icons: dashed
+          ? [{
+              icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3, strokeColor: green },
+              offset: "0",
+              repeat: "12px",
+            }]
+          : undefined,
+        map,
+        zIndex: 5,
+      });
+    };
+
+    const origin = myPos ?? pickup;
+    if (!origin || !drop) {
+      if (pickup) fit(myPos ? [myPos, pickup] : [pickup]);
+      return;
+    }
+
+    const preview = myPos && pickup ? [myPos, pickup, drop] : [origin, drop];
+    drawRoute(preview, true);
+    fit(preview);
+
+    let cancelled = false;
+    const waypoints = myPos && pickup ? [pickup] : [];
+    void fetchDrivingRoute(origin, drop, waypoints).then((route) => {
+      if (cancelled) return;
+      if (!route?.path.length) {
+        const km = Math.round(haversineKm(origin, drop) * 10) / 10;
+        setActiveRoute({
+          path: preview,
+          distanceKm: km,
+          durationMin: Math.max(1, Math.round(km * 3)),
+        });
+        return;
+      }
+      drawRoute(route.path, false);
+      fit(route.path);
+      setActiveRoute(route);
+    });
+
+    return () => {
+      cancelled = true;
+      clearRoute();
+    };
+  }, [
+    ready,
+    active?.id,
+    active?.pickup_lat,
+    active?.pickup_lng,
+    active?.dropoff_lat,
+    active?.dropoff_lng,
+    myPos?.lat,
+    myPos?.lng,
+  ]);
 
   const zoomBy = (delta: number) => {
     const m = mapRef.current; if (!m) return;
@@ -532,12 +648,14 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
             const jIsQuote = j.__kind === "quote";
             const jIsMove = j.service_category === "small_move" || j.service_category === "big_move" || t.kind === "mover";
             const kindLabel = jIsMove ? "הובלה" : (j.job_type?.trim() || "משלוח מהיר");
-            const distLabel =
-              distToPickupKm != null && Number.isFinite(distToPickupKm)
+            const route = j.id === activeId ? activeRoute : null;
+            const routeLabel = route
+              ? `${route.durationMin} דק׳ · ${route.distanceKm} ק״מ`
+              : distToPickupKm != null && Number.isFinite(distToPickupKm)
                 ? `${distToPickupKm < 10 ? distToPickupKm.toFixed(1) : Math.round(distToPickupKm)} ק״מ`
                 : null;
-            const pickupLine = shortLine(j.pickup_address ?? j.pickup_area);
-            const dropoffLine = shortLine(j.dropoff_address ?? j.dropoff_area);
+            const pickupAddr = addressParts(j.pickup_address, j.pickup_area);
+            const dropoffAddr = addressParts(j.dropoff_address, j.dropoff_area);
             const offerExpiresAt =
               (j.__raw?.offer?.expires_at as string | undefined)
               ?? (j.__raw?.expires_at as string | undefined)
@@ -552,8 +670,8 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 dir="rtl"
                 className="snap-center shrink-0 w-full rounded-card border border-border bg-surface shadow-card-strong p-4 space-y-3"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="shrink-0 text-left min-w-[4.25rem]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="shrink-0 text-left space-y-1">
                     {jIsQuote ? (
                       <p className="text-xl font-extrabold text-warning tabular-nums leading-none">₪?</p>
                     ) : (
@@ -561,74 +679,85 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                         ₪{Number(j.payment ?? 0).toFixed(0)}
                       </p>
                     )}
+                    {!jIsQuote && <AcceptTimerBox expiresAt={offerExpiresAt} />}
                   </div>
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <div className="min-w-0 text-right">
-                      <h3 className="font-bold text-text-strong text-[15px] leading-tight truncate">{businessName}</h3>
-                      <p className="text-[11px] text-text-subtle mt-0.5 truncate">
-                        {[distLabel, kindLabel].filter(Boolean).join(" • ")}
+                      <h3 className="font-bold text-text-strong text-sm leading-tight truncate">{businessName}</h3>
+                      <p className="text-xs text-text-subtle mt-0.5 truncate">
+                        {[routeLabel, kindLabel].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <BusinessLogo path={j.customer_logo_path} name={businessName} size={36} />
                   </div>
                 </div>
 
-                <div className="border-t border-border" />
-
-                <div className="space-y-2 text-right">
-                  <div className="flex items-center gap-2 justify-end">
-                    <p className="flex-1 text-[13px] text-text-strong truncate">
-                      איסוף: {pickupLine}
-                    </p>
-                    <span className="size-2 rounded-full bg-primary shrink-0" aria-hidden />
+                <div className="flex gap-3">
+                  <div className="flex flex-col items-center pt-1" aria-hidden>
+                    <span className="size-2.5 rounded-full bg-primary ring-4 ring-primary-soft shrink-0" />
+                    <span className="w-0.5 flex-1 min-h-4 bg-border-strong my-1" />
+                    <span className="size-2.5 rounded-full bg-destructive ring-4 ring-danger-bg shrink-0" />
                   </div>
-                  <div className="flex items-center gap-2 justify-end">
-                    <p className="flex-1 text-[13px] text-text-subtle truncate">
-                      מסירה: {dropoffLine}
-                    </p>
-                    <span className="size-2 rounded-full bg-destructive shrink-0" aria-hidden />
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-text-muted">איסוף</p>
+                      <p className="text-sm font-bold text-text-strong truncate">{pickupAddr.street}</p>
+                      {pickupAddr.city ? (
+                        <p className="text-xs text-text-subtle truncate">{pickupAddr.city}</p>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-text-muted">מסירה</p>
+                      <p className="text-sm font-bold text-text-strong truncate">{dropoffAddr.street}</p>
+                      {dropoffAddr.city ? (
+                        <p className="text-xs text-text-subtle truncate">{dropoffAddr.city}</p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  {!jIsQuote && <AcceptTimerBox expiresAt={offerExpiresAt} />}
-                  {jIsQuote ? (
-                    <Button
-                      className="flex-1 min-h-11 rounded-card bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm shadow-fab"
-                      onClick={() => onQuote(j)}
-                    >
-                      הגש הצעת מחיר
-                    </Button>
-                  ) : (
-                    <Button
-                      className="flex-1 min-h-11 rounded-card bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm shadow-fab"
+                {jIsQuote ? (
+                  <Button
+                    className="w-full min-h-11 rounded-card font-bold"
+                    onClick={() => onQuote(j)}
+                  >
+                    הגש הצעת מחיר
+                  </Button>
+                ) : (
+                  <div
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  >
+                    <SwipeConfirm
+                      label="החלק לאישור"
                       disabled={claiming}
-                      onClick={() => onClaim(j)}
-                    >
-                      {claiming && <Loader2 className="size-4 animate-spin" />}
-                      {jIsMove ? "קבל הובלה" : "קבל משלוח"}
-                    </Button>
-                  )}
-                </div>
+                      onConfirm={() => onClaim(j)}
+                    />
+                  </div>
+                )}
 
-                <div className="flex items-center justify-center gap-4 pt-0.5">
-                  {onDetails && (
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-text-muted hover:text-text-strong py-1"
-                      onClick={() => onDetails(j)}
-                    >
-                      פרטים
-                    </button>
-                  )}
-                  <button
+                <div className="flex items-center gap-2">
+                  <Button
                     type="button"
-                    className="text-xs font-semibold text-destructive/80 hover:text-destructive py-1"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-danger-bg text-danger-text hover:bg-danger-bg"
                     onClick={() => onDecline(j)}
                     aria-label="דלג"
                   >
                     דלג
-                  </button>
+                  </Button>
+                  {onDetails && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => onDetails(j)}
+                    >
+                      פרטים
+                    </Button>
+                  )}
                 </div>
               </div>
             );
@@ -638,6 +767,13 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
           return (
             <div className="absolute inset-x-3 bottom-3 z-10 pointer-events-none">
+              {activeRoute && (
+                <div className="pointer-events-none flex justify-center mb-2">
+                  <div className="rounded-pill bg-navy text-primary-foreground shadow-fab px-3 py-1.5 text-xs font-bold tabular-nums">
+                    {activeRoute.durationMin} דק׳ · {activeRoute.distanceKm} ק״מ
+                  </div>
+                </div>
+              )}
               {hasMultiple && (
                 <div dir="rtl" className="pointer-events-auto flex items-center justify-between gap-2 mb-2">
                   <button

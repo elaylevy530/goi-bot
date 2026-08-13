@@ -5,20 +5,27 @@
  * Env required:
  *   PAYPAL_CLIENT_ID
  *   PAYPAL_CLIENT_SECRET
- *   PAYPAL_MODE         = "sandbox" | "live"   (default: "sandbox")
+ *   PAYPAL_MODE         = "sandbox" | "live"   (default: "live")
  *   PAYPAL_WEBHOOK_ID   (for webhook signature verification)
+ *
+ * Env is read dynamically (process.env[name]) so Vite/Nitro cannot replace
+ * missing build-time values with empty strings.
  */
 
 const BASE_LIVE = "https://api-m.paypal.com";
 const BASE_SANDBOX = "https://api-m.sandbox.paypal.com";
 
+function env(name: string): string {
+  return String(process.env[name] ?? "").trim();
+}
+
 function baseUrl(): string {
-  return (process.env.PAYPAL_MODE ?? "sandbox") === "live" ? BASE_LIVE : BASE_SANDBOX;
+  return env("PAYPAL_MODE") === "sandbox" ? BASE_SANDBOX : BASE_LIVE;
 }
 
 function creds(): { id: string; secret: string } {
-  const id = process.env.PAYPAL_CLIENT_ID;
-  const secret = process.env.PAYPAL_CLIENT_SECRET;
+  const id = env("PAYPAL_CLIENT_ID");
+  const secret = env("PAYPAL_CLIENT_SECRET");
   if (!id || !secret) throw new Error("PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET not configured");
   return { id, secret };
 }
@@ -235,7 +242,7 @@ export async function verifyWebhookSignature(input: {
   headers: Headers;
   rawBody: string;
 }): Promise<boolean> {
-  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  const webhookId = env("PAYPAL_WEBHOOK_ID");
   if (!webhookId) return false;
   const h = input.headers;
   const payload = {
