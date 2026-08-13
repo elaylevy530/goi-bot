@@ -122,8 +122,10 @@ export function BusinessNewOrder(props: Props) {
           ? "בקש הצעות משליחים"
           : "שלח לשליחים";
 
+  const routeReady = Boolean(props.pickup && props.dropoff);
+
   return (
-    <div className="flex min-h-[calc(100dvh-8.5rem)] flex-col lg:h-[calc(100vh-8.5rem)] lg:flex-row">
+    <div className="flex min-h-[calc(100dvh-9rem)] flex-col lg:h-full lg:min-h-0 lg:flex-row">
       <section className="relative h-52 shrink-0 overflow-hidden border-b border-border bg-map-canvas lg:h-auto lg:w-[min(42%,32rem)] lg:border-b-0 lg:border-e">
         <OrderMap
           pickup={props.pickup}
@@ -132,20 +134,20 @@ export function BusinessNewOrder(props: Props) {
           onRoute={props.onRoute}
           className="absolute inset-0 h-full w-full"
         />
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap justify-end gap-2">
-          {durationLabel && (
-            <span className="rounded-pill bg-surface/95 px-3 py-1.5 text-xs font-semibold text-text-subtle shadow-card">
-              {durationLabel}
-            </span>
-          )}
-          <span className="rounded-pill bg-navy px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-card">
-            {distanceLabel}
-          </span>
-        </div>
+        {routeReady && (
+          <div className="pointer-events-none absolute end-3 top-3 z-20">
+            <div className="rounded-xl border border-border bg-surface px-3 py-2.5 shadow-card-strong">
+              <p className="text-sm font-bold text-text-strong">{distanceLabel}</p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                {durationLabel ?? "מחשב זמן נסיעה…"}
+              </p>
+            </div>
+          </div>
+        )}
       </section>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-end gap-3 border-b border-border px-4 py-3 lg:px-8">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-b border-border px-4 py-3 lg:px-8">
           <ol className="flex items-center gap-2" aria-label="שלבי הזמנה">
             {STEPS.map((label, i) => (
               <li key={label} className="flex items-center gap-2">
@@ -182,7 +184,7 @@ export function BusinessNewOrder(props: Props) {
           {step === 2 && <SummaryStep {...props} distanceLabel={distanceLabel} durationLabel={durationLabel} priceLabel={priceLabel} />}
         </div>
 
-        <div className="border-t border-border bg-surface px-4 py-3 lg:px-8">
+        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 shrink-0 border-t border-border bg-surface px-4 py-3 lg:static lg:bottom-auto lg:px-8">
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
               {step > 0 && (
@@ -225,6 +227,12 @@ function RouteStep(props: Props) {
       <div>
         <h2 className="text-lg font-bold text-text-strong">נקודות המסלול</h2>
         <p className="mt-1 text-sm text-text-muted">כתובת איסוף ומסירה. המפה מציגה את נתיב הנסיעה.</p>
+        {props.route && (
+          <p className="mt-2 text-sm font-semibold text-text-strong">
+            {props.route.distanceKm.toFixed(1)} ק״מ
+            <span className="font-medium text-text-muted"> · ~{props.route.durationMin} דק׳ נסיעה</span>
+          </p>
+        )}
       </div>
       {props.useBusinessAddress && props.businessPickupAddress ? (
         <div data-field="pickup">

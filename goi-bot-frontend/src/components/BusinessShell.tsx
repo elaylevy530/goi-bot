@@ -298,8 +298,8 @@ export function BusinessShell({
         </div>
       </aside>
 
-      <div className="lg:ps-60">
-        <header className="sticky top-0 z-30 hidden border-b border-border bg-bg px-8 py-8 lg:block">
+      <div className="lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden lg:ps-60">
+        <header className="sticky top-0 z-30 hidden shrink-0 border-b border-border bg-bg px-8 py-8 lg:block">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 text-right">
               <h1 className="truncate text-2xl font-bold text-text-strong">{desktopHeading(pathname, displayName)}</h1>
@@ -376,8 +376,10 @@ export function BusinessShell({
           </header>
         )}
 
-        <PaymentBanner />
-        <main className="relative">{children}</main>
+        <div className="shrink-0">
+          <PaymentBanner />
+        </div>
+        <main className="relative lg:min-h-0 lg:flex-1 lg:overflow-y-auto">{children}</main>
       </div>
 
       <nav
