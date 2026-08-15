@@ -1,14 +1,12 @@
 /// <reference types="google.maps" />
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   Layers, Plus, Minus, Crosshair,
-  ChevronRight, ChevronLeft, Timer,
+  ChevronRight, ChevronLeft,
 } from "lucide-react";
 
 import { useMyCourier } from "@/components/CourierShell";
-import { BusinessLogo } from "@/components/BusinessLogo";
-import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
+import { CourierOfferCard } from "@/components/courier/CourierOfferCard";
 import { termsFor } from "@/lib/courier-kind";
 import { fetchDrivingRoute, haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
 
@@ -64,59 +62,12 @@ export type MapJob = {
   service_category?: string | null;
   dropoff_floor?: string | number | null;
   item_value?: string | number | null;
+  matching_couriers_count?: number | null;
+  pricing_snapshot?: Record<string, unknown> | null;
   __kind: "offer" | "open" | "quote";
   __raw: any;
 };
 
-
-/** Compact live countdown for accepting an offer.
- *  Uses `expiresAt` when set, otherwise a synthetic 10-minute window. */
-const SYNTHETIC_ACCEPT_WINDOW_SEC = 10 * 60;
-function AcceptTimerBox({ expiresAt }: { expiresAt?: string | null }) {
-  const [now, setNow] = useState(() => Date.now());
-  const mountAtRef = useRef<number>(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const effectiveDeadline = expiresAt
-    ? new Date(expiresAt).getTime()
-    : mountAtRef.current + SYNTHETIC_ACCEPT_WINDOW_SEC * 1000;
-  const secLeft = Math.max(0, Math.floor((effectiveDeadline - now) / 1000));
-  const mm = String(Math.floor(secLeft / 60));
-  const ss = String(secLeft % 60).padStart(2, "0");
-  const urgent = secLeft <= 60;
-  const expired = secLeft === 0;
-  return (
-    <div
-      className={`inline-flex items-center gap-1 rounded-pill px-2 py-1 text-xs font-bold tabular-nums ${
-        expired
-          ? "bg-muted text-text-muted"
-          : urgent
-            ? "bg-danger-bg text-danger-text animate-pulse"
-            : "bg-danger-bg text-danger-text"
-      }`}
-      aria-label="זמן לאישור המשלוח"
-    >
-      <Timer className="size-3.5 opacity-80" />
-      {mm}:{ss}
-    </div>
-  );
-}
-
-function addressParts(address?: string | null, area?: string | null) {
-  const raw = String(address ?? "").trim();
-  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  const COUNTRY = new Set(["ישראל", "Israel", "israel"]);
-  const street = parts[0] || String(area ?? "").trim() || "—";
-  let city = String(area ?? "").trim();
-  if (!city && parts.length >= 2) {
-    const last = parts[parts.length - 1] ?? "";
-    city = COUNTRY.has(last) && parts.length >= 2 ? (parts[parts.length - 2] ?? "") : last;
-  }
-  if (city === street) city = "";
-  return { street, city };
-}
 
 function stopPinSvg(label: string, fill: string, onFill = "#fff") {
   const svg = `
@@ -645,125 +596,20 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
         {/* Compact offer carousel — map stays dominant */}
         {scoredJobs.length > 0 && active && (() => {
-          const renderCard = (j: MapJob, distToPickupKm: number | null) => {
-            const businessName = j.customer_name?.trim() || "לקוח פרטי";
-            const jIsQuote = j.__kind === "quote";
-            const jIsMove = j.service_category === "small_move" || j.service_category === "big_move" || t.kind === "mover";
-            const kindLabel = jIsMove ? "הובלה" : (j.job_type?.trim() || "משלוח מהיר");
-            const route = j.id === activeId ? activeRoute : null;
-            const routeLabel = route
-              ? `${route.durationMin} דק׳ · ${route.distanceKm} ק״מ`
-              : distToPickupKm != null && Number.isFinite(distToPickupKm)
-                ? `${distToPickupKm < 10 ? distToPickupKm.toFixed(1) : Math.round(distToPickupKm)} ק״מ`
-                : null;
-            const pickupAddr = addressParts(j.pickup_address, j.pickup_area);
-            const dropoffAddr = addressParts(j.dropoff_address, j.dropoff_area);
-            const offerExpiresAt =
-              (j.__raw?.offer?.expires_at as string | undefined)
-              ?? (j.__raw?.expires_at as string | undefined)
-              ?? (j.__raw?.job?.quote_deadline_at as string | undefined)
-              ?? (j.__raw?.quote_deadline_at as string | undefined)
-              ?? null;
-
-            return (
-              <div
-                key={j.id}
-                data-job-id={j.id}
-                dir="rtl"
-                className="snap-center shrink-0 w-full rounded-card border border-border bg-surface shadow-card-strong p-4 space-y-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="shrink-0 text-left space-y-1">
-                    {jIsQuote ? (
-                      <p className="text-xl font-extrabold text-warning tabular-nums leading-none">₪?</p>
-                    ) : (
-                      <p className="text-xl font-extrabold text-primary tabular-nums leading-none">
-                        ₪{Number(j.payment ?? 0).toFixed(0)}
-                      </p>
-                    )}
-                    {!jIsQuote && <AcceptTimerBox expiresAt={offerExpiresAt} />}
-                  </div>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="min-w-0 text-right">
-                      <h3 className="font-bold text-text-strong text-sm leading-tight truncate">{businessName}</h3>
-                      <p className="text-xs text-text-subtle mt-0.5 truncate">
-                        {[routeLabel, kindLabel].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                    <BusinessLogo path={j.customer_logo_path} name={businessName} size={36} />
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="flex flex-col items-center pt-1" aria-hidden>
-                    <span className="size-2.5 rounded-full bg-primary ring-4 ring-primary-soft shrink-0" />
-                    <span className="w-0.5 flex-1 min-h-4 bg-border-strong my-1" />
-                    <span className="size-2.5 rounded-full bg-destructive ring-4 ring-danger-bg shrink-0" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-text-muted">איסוף</p>
-                      <p className="text-sm font-bold text-text-strong truncate">{pickupAddr.street}</p>
-                      {pickupAddr.city ? (
-                        <p className="text-xs text-text-subtle truncate">{pickupAddr.city}</p>
-                      ) : null}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-text-muted">מסירה</p>
-                      <p className="text-sm font-bold text-text-strong truncate">{dropoffAddr.street}</p>
-                      {dropoffAddr.city ? (
-                        <p className="text-xs text-text-subtle truncate">{dropoffAddr.city}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                {jIsQuote ? (
-                  <Button
-                    className="w-full min-h-11 rounded-card font-bold"
-                    onClick={() => onQuote(j)}
-                  >
-                    הגש הצעת מחיר
-                  </Button>
-                ) : (
-                  <div
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                  >
-                    <SwipeConfirm
-                      label="החלק לאישור"
-                      disabled={claiming}
-                      onConfirm={() => onClaim(j)}
-                    />
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 border-danger-bg text-danger-text hover:bg-danger-bg"
-                    onClick={() => onDecline(j)}
-                    aria-label="דלג"
-                  >
-                    דלג
-                  </Button>
-                  {onDetails && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => onDetails(j)}
-                    >
-                      פרטים
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          };
+          const renderCard = (j: MapJob, distToPickupKm: number | null) => (
+            <CourierOfferCard
+              key={j.id}
+              job={j}
+              distToPickupKm={distToPickupKm}
+              route={j.id === activeId ? activeRoute : null}
+              claiming={claiming}
+              terms={t}
+              onClaim={onClaim}
+              onDecline={onDecline}
+              onQuote={onQuote}
+              onDetails={onDetails}
+            />
+          );
 
           const hasMultiple = scoredJobs.length >= 2;
 

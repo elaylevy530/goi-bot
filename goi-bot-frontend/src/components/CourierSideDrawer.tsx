@@ -173,7 +173,7 @@ function CourierSideDrawer() {
     },
     {
       key: "messages",
-      label: "הודעות",
+      label: "צאט",
       to: "/courier/messages",
       icon: MessageSquare,
       badge: 0,
