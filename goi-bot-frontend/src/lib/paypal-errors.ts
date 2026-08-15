@@ -37,14 +37,14 @@ function issueFromMessage(message: string): string {
   return "";
 }
 
-export function paypalErrorHe(err: unknown): string {
+export function paypalErrorHe(err: unknown, fallback = DEFAULT_HE): string {
   const root = asRecord(err);
   const cause = asRecord(root?.cause);
   const nested = asRecord(root?.error);
   const rawMessage = String(root?.message ?? cause?.message ?? (typeof err === "string" ? err : ""));
 
   const alreadyHe =
-    [...Object.values(ISSUE_HE), DEFAULT_HE].some((he) => rawMessage.startsWith(he)) ||
+    [...Object.values(ISSUE_HE), DEFAULT_HE, fallback].some((he) => rawMessage.startsWith(he)) ||
     /[\u0590-\u05FF]/.test(rawMessage);
   if (alreadyHe && rawMessage.length > 8) return rawMessage;
 
@@ -58,7 +58,7 @@ export function paypalErrorHe(err: unknown): string {
   const debugId = [root?.debug_id, root?.debugId, cause?.debug_id, nested?.debug_id]
     .find((v) => typeof v === "string" && v.length > 0) as string | undefined;
 
-  const he = ISSUE_HE[issue] ?? DEFAULT_HE;
+  const he = ISSUE_HE[issue] ?? fallback;
   return debugId ? `${he} (קוד: ${debugId})` : he;
 }
 

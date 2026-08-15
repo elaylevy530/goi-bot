@@ -37,7 +37,16 @@ export const confirmVaultFn = createServerFn({ method: "POST" })
   .middleware([requireNestAuth])
   .inputValidator((d: unknown) => z.object({ setup_token_id: z.string().min(8) }).parse(d))
   .handler(async ({ data, context }) => {
-    const { createPaymentToken } = await import("@/lib/paypal/client.server");
+    const { createPaymentToken, deletePaymentToken } = await import("@/lib/paypal/client.server");
+    const existing = await nestServerFetch<{ paypal_vault_id?: string | null }>(
+      "/api/accounts/customers/me",
+      { accessToken: context.accessToken },
+    );
+    if (existing?.paypal_vault_id) {
+      try {
+        await deletePaymentToken(existing.paypal_vault_id);
+      } catch { /* previous token may already be gone */ }
+    }
     const pm = await createPaymentToken(data.setup_token_id);
     const isPaypal = !!pm.payment_source.paypal;
     const brand = isPaypal ? "PayPal" : (pm.payment_source.card?.brand ?? "Card");

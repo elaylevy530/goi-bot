@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness, useWalletBalance } from "@/components/BusinessShell";
@@ -9,6 +9,7 @@ import { CreditCard, Download, Loader2, Lock, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "./business.dashboard";
 import { createSetupTokenFn, confirmVaultFn, removeVaultFn } from "@/lib/paypal-billing.functions";
+import { SaveCardDialog } from "@/components/SaveCardDialog";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/business/billing")({
@@ -30,6 +31,7 @@ function PaymentMethodCard() {
   const setupFn = useServerFn(createSetupTokenFn);
   const confirmFn = useServerFn(confirmVaultFn);
   const removeFn = useServerFn(removeVaultFn);
+  const [cardOpen, setCardOpen] = useState(false);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -46,12 +48,12 @@ function PaymentMethodCard() {
       .catch((e: Error) => toast.error("שגיאה באישור PayPal: " + e.message));
   }, [confirmFn, qc]);
 
-  const startSetup = useMutation({
-    mutationFn: async (source: "paypal" | "card") => {
+  const startPaypal = useMutation({
+    mutationFn: async () => {
       const origin = window.location.origin;
       const r = await setupFn({
         data: {
-          source,
+          source: "paypal",
           return_url: `${origin}/business/billing`,
           cancel_url: `${origin}/business/billing?paypal=cancel`,
         },
@@ -71,53 +73,75 @@ function PaymentMethodCard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const cardDialog = (
+    <SaveCardDialog
+      open={cardOpen}
+      onClose={() => setCardOpen(false)}
+      onSaved={() => {
+        setCardOpen(false);
+        qc.invalidateQueries({ queryKey: ["business-me"] });
+      }}
+    />
+  );
+
   if (m?.payment_method_on_file) {
     return (
-      <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
-        <div className="flex items-center justify-between gap-3">
-          <div className="grid size-9 place-items-center rounded-md bg-kpi-volume-bg text-primary">
-            <CreditCard className="size-5" />
+      <>
+        <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <div className="grid size-9 place-items-center rounded-md bg-kpi-volume-bg text-primary">
+              <CreditCard className="size-5" />
+            </div>
+            <p className="text-sm font-medium text-text-subtle">אמצעי תשלום</p>
           </div>
-          <p className="text-sm font-medium text-text-subtle">אמצעי תשלום</p>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={() => remove.mutate()} disabled={remove.isPending} className="text-sm font-semibold text-primary hover:underline">
-            {remove.isPending ? "מסיר…" : "שנה כרטיס"}
-          </button>
-          <div className="text-right">
-            <p className="text-lg font-bold text-text-strong">
-              {m.payment_method_brand}
-              {m.payment_method_last4 ? ` ending in ${m.payment_method_last4}` : ""}
-            </p>
-            <p className="text-xs text-text-muted">{m.paypal_email || "PayPal"}</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setCardOpen(true)} className="text-sm font-semibold text-primary hover:underline">
+                שנה כרטיס
+              </button>
+              <button type="button" onClick={() => remove.mutate()} disabled={remove.isPending} className="text-sm font-semibold text-text-muted hover:underline">
+                {remove.isPending ? "מסיר…" : "הסר"}
+              </button>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-bold text-text-strong">
+                {m.payment_method_brand}
+                {m.payment_method_last4 ? ` ••${m.payment_method_last4}` : ""}
+              </p>
+              <p className="text-xs text-text-muted">{m.paypal_email || "PayPal"}</p>
+            </div>
           </div>
-        </div>
-        <p className="text-xs text-text-muted">
-          חיוב {m.billing_cycle === "monthly" ? "חודשי" : m.billing_cycle === "weekly" ? "שבועי" : m.billing_cycle === "daily" ? "יומי" : "פר־משלוח"}
-        </p>
-      </article>
+          <p className="text-xs text-text-muted">
+            חיוב {m.billing_cycle === "monthly" ? "חודשי" : m.billing_cycle === "weekly" ? "שבועי" : m.billing_cycle === "daily" ? "יומי" : "פר־משלוח"}
+          </p>
+        </article>
+        {cardDialog}
+      </>
     );
   }
 
-  const busy = startSetup.isPending;
+  const busy = startPaypal.isPending;
   return (
-    <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-warning/40 bg-warning-bg p-6 shadow-card">
-      <div className="flex items-center gap-3">
-        <div className="grid size-9 place-items-center rounded-md bg-warning/20 text-warning-text">
-          <Lock className="size-5" />
+    <>
+      <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-warning/40 bg-warning-bg p-6 shadow-card">
+        <div className="flex items-center gap-3">
+          <div className="grid size-9 place-items-center rounded-md bg-warning/20 text-warning-text">
+            <Lock className="size-5" />
+          </div>
+          <p className="text-sm font-bold text-text-strong">אין אמצעי תשלום</p>
         </div>
-        <p className="text-sm font-bold text-text-strong">אין אמצעי תשלום</p>
-      </div>
-      <p className="text-sm text-text-subtle">חבר PayPal או כרטיס כדי לשדר משלוחים.</p>
-      <div className="mt-auto flex flex-wrap gap-2">
-        <Button onClick={() => startSetup.mutate("paypal")} disabled={busy} className="bg-navy text-white hover:bg-navy/90">
-          {busy && <Loader2 className="size-4 animate-spin" />} חבר PayPal
-        </Button>
-        <Button onClick={() => startSetup.mutate("card")} disabled={busy} variant="outline">
-          <CreditCard className="size-4" /> כרטיס
-        </Button>
-      </div>
-    </article>
+        <p className="text-sm text-text-subtle">חבר PayPal או כרטיס כדי לשדר משלוחים.</p>
+        <div className="mt-auto flex flex-wrap gap-2">
+          <Button onClick={() => startPaypal.mutate()} disabled={busy} className="bg-navy text-white hover:bg-navy/90">
+            {busy && <Loader2 className="size-4 animate-spin" />} חבר PayPal
+          </Button>
+          <Button onClick={() => setCardOpen(true)} disabled={busy} variant="outline">
+            <CreditCard className="size-4" /> כרטיס
+          </Button>
+        </div>
+      </article>
+      {cardDialog}
+    </>
   );
 }
 

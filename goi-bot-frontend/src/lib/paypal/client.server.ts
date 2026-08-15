@@ -100,13 +100,26 @@ export async function createSetupToken(input: {
             },
           },
         }
-      : { card: { experience_context: { return_url: input.return_url, cancel_url: input.cancel_url } } };
+      : {
+          card: {
+            experience_context: {
+              brand_name: "Goi",
+              locale: "he-IL",
+              return_url: input.return_url,
+              cancel_url: input.cancel_url,
+            },
+          },
+        };
 
   return call("/v3/vault/setup-tokens", {
     method: "POST",
     idempotencyKey: `setup-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     body: JSON.stringify({
-      ...(input.customer_id ? { customer: { id: input.customer_id } } : {}),
+      ...(input.customer_id
+        ? input.source === "card"
+          ? { customer: { merchant_customer_id: input.customer_id } }
+          : { customer: { id: input.customer_id } }
+        : {}),
       payment_source,
     }),
   });
