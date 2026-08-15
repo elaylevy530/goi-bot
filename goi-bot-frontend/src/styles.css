@@ -264,7 +264,11 @@
   html {
     direction: rtl;
     font-size: 106.25%;
-    height: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background-color: var(--color-bg);
   }
   body {
@@ -272,6 +276,8 @@
     min-height: 100%;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
+    overflow-x: hidden;
+    touch-action: pan-y;
     background-color: var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-sans);

@@ -343,14 +343,10 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   return (
     <div
       dir="rtl"
-      className={`rtl-panel flex w-full bg-bg ${
-        fullBleed ? "h-dvh overflow-hidden" : "min-h-dvh"
-      }`}
+      className={`rtl-panel flex h-dvh w-full overflow-hidden bg-bg`}
     >
       <main
-        className={`flex-1 min-w-0 flex flex-col w-full ${
-          fullBleed ? "h-full min-h-0 overflow-hidden" : "min-h-dvh"
-        }`}
+        className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
       >
         {/* Sticky app bar — greeting/avatar header is personal-area only.
             fullBleed screens (map) own their chrome. Other pages get a compact bar. */}
@@ -407,10 +403,10 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         )}
 
         {/* Content — full-bleed removes padding so map/canvas fills the viewport. */}
-        <div className={`flex-1 min-h-0 flex flex-col overscroll-y-contain scroll-smooth ${
+        <div className={`flex min-h-0 flex-1 flex-col scroll-smooth ${
           fullBleed
-            ? "p-0 overflow-hidden"
-            : "px-3 py-3 sm:px-5 sm:py-4 lg:p-6 overflow-y-auto [-webkit-overflow-scrolling:touch] [&>*]:shrink-0"
+            ? "overflow-hidden p-0"
+            : "overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-3 sm:px-5 sm:py-4 lg:p-6 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] [&>*]:shrink-0"
         }`}>{children}</div>
 
         {/* Bottom tab bar sits in-flow so it stays flush with the screen bottom.

@@ -228,7 +228,7 @@ export function BusinessShell({
   };
 
   return (
-    <div dir="rtl" className="biz-panel rtl-panel min-h-screen bg-bg text-text-strong lg:pb-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+    <div dir="rtl" className="biz-panel rtl-panel min-h-dvh bg-bg text-text-strong lg:pb-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       {navOpen && (
         <button
           type="button"
@@ -298,7 +298,7 @@ export function BusinessShell({
         </div>
       </aside>
 
-      <div className="lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden lg:ps-60">
+      <div className="min-h-0 lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden lg:ps-60">
         <header className="sticky top-0 z-30 hidden shrink-0 border-b border-border bg-bg px-8 py-8 lg:block">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 text-right">
@@ -379,7 +379,7 @@ export function BusinessShell({
         <div className="shrink-0">
           <PaymentBanner />
         </div>
-        <main className="relative lg:min-h-0 lg:flex-1 lg:overflow-y-auto">{children}</main>
+        <main className="relative min-h-0 overflow-x-hidden overflow-y-auto [-webkit-overflow-scrolling:touch] [touch-action:pan-y] lg:flex-1">{children}</main>
       </div>
 
       <nav
