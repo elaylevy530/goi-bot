@@ -206,7 +206,7 @@ export function CourierOfferCard({
           <div className="flex flex-wrap gap-1.5 justify-end">
             {!isQuote && <AcceptTimerChip expiresAt={offerExpiresAt} />}
             {distanceKm != null && <Chip icon={Route} label={formatKm(distanceKm)} />}
-            <Chip icon={Clock} label={isImmediate ? "מיידי" : scheduledClock!} />}
+            <Chip icon={Clock} label={isImmediate ? "מיידי" : scheduledClock!} />
             {deadlineClock && (
               <Chip icon={Clock} label={`מסירה עד ${deadlineClock}`} tone="urgent" />
             )}
