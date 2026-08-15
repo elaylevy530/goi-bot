@@ -52,6 +52,10 @@ export class Conversation {
   @Column({ type: "int", default: 0 })
   unread_guest!: number;
 
+  /** When true, courier/business inboxes hide this thread. Admin still sees it. */
+  @Column({ type: "boolean", default: false })
+  hidden_from_participants!: boolean;
+
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;
 

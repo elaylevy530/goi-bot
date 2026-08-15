@@ -30,6 +30,7 @@ import type { RegisterBusinessDto } from "./dto/register-business.dto";
 import type { RegisterCourierDto } from "./dto/register-courier.dto";
 import type { RegisterCustomerDto } from "./dto/register-customer.dto";
 import { AdminPreviewSession } from "./entities/admin-preview-session.entity";
+import { FilesService } from "../files/files.service";
 import {
   businessPhoneToEmail,
   courierPhoneToEmail,
@@ -66,6 +67,7 @@ export class AuthService {
     @InjectRepository(AdminPreviewSession)
     private readonly previewSessions: Repository<AdminPreviewSession>,
     private readonly jwtService: JwtService,
+    private readonly files: FilesService,
   ) {}
 
   async register(email: string, password: string): Promise<NestAuthSession> {
@@ -594,6 +596,27 @@ export class AuthService {
         ? ["אחר"]
         : [];
 
+    let idPhotoUrl: string | null = null;
+    let idPhotoBackUrl: string | null = null;
+    if (dto.id_photo_base64) {
+      const uploaded = await this.files.uploadBase64(
+        "courier-ids",
+        dto.id_photo_base64,
+        dto.id_photo_mime,
+        "id-front",
+      );
+      idPhotoUrl = uploaded.path;
+    }
+    if (dto.id_photo_back_base64) {
+      const uploaded = await this.files.uploadBase64(
+        "courier-ids",
+        dto.id_photo_back_base64,
+        dto.id_photo_back_mime,
+        "id-back",
+      );
+      idPhotoBackUrl = uploaded.path;
+    }
+
     const courier = await this.couriers.save(
       this.couriers.create({
         full_name: dto.full_name.trim(),
@@ -607,6 +630,8 @@ export class AuthService {
         courier_status: "ממתין לאישור",
         lead_source: "טופס /join",
         id_number: dto.id_number || null,
+        id_photo_url: idPhotoUrl,
+        id_photo_back_url: idPhotoBackUrl,
         vehicle_type: firstVehicle,
         vehicle_label: vehicleTypes.join(", ") || null,
         vehicle_types: vehicleTypes,

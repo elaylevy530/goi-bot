@@ -1,13 +1,18 @@
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { AppHttpExceptionFilter } from "./common/filters/http-exception.filter";
 
 async function bootstrap() {
   // rawBody is needed by the WhatsApp Cloud webhook (X-Hub-Signature-256 HMAC)
   // and is harmless elsewhere — Express still parses `request.body` as JSON.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
+  app.useBodyParser("json", { limit: "12mb" });
+  app.useBodyParser("urlencoded", { limit: "12mb", extended: true });
   const config = app.get(ConfigService);
 
   const corsOrigins = config.get<string[]>("cors.origins") ?? [

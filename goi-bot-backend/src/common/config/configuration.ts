@@ -28,6 +28,13 @@ export default () => {
     },
     files: {
       uploadDir: process.env.UPLOAD_DIR || "./uploads",
+      s3: {
+        bucket: process.env.BUCKET_NAME || undefined,
+        endpoint: process.env.AWS_ENDPOINT_URL_S3 || undefined,
+        region: process.env.AWS_REGION || "auto",
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || undefined,
+      },
     },
     // Optional until Phase 2 worker cutover; CronSecretGuard fails closed if unset.
     cron: {

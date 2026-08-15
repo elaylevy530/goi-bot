@@ -113,13 +113,13 @@ export class DomainService {
     const ids = await this.identities(userId);
     if (roles.includes("courier") && ids.courierId) {
       return this.conversations.find({
-        where: { courier_id: ids.courierId },
+        where: { courier_id: ids.courierId, hidden_from_participants: false },
         order: { last_message_at: "DESC" },
       });
     }
     if ((roles.includes("business") || roles.includes("customer")) && ids.businessId) {
       return this.conversations.find({
-        where: { business_id: ids.businessId },
+        where: { business_id: ids.businessId, hidden_from_participants: false },
         order: { last_message_at: "DESC" },
       });
     }
@@ -132,20 +132,37 @@ export class DomainService {
     const businessId = (body.business_id as string | undefined) ?? ids.businessId ?? null;
     const kind = String(body.kind ?? (courierId && businessId ? "courier_business" : courierId ? "courier_support" : "business_support"));
     const jobId = (body.job_id as string | undefined) ?? null;
-    const query = this.conversations
-      .createQueryBuilder("conversation")
-      .where("conversation.kind = :kind", { kind });
-    courierId
-      ? query.andWhere("conversation.courier_id = :courierId", { courierId })
-      : query.andWhere("conversation.courier_id IS NULL");
-    businessId
-      ? query.andWhere("conversation.business_id = :businessId", { businessId })
-      : query.andWhere("conversation.business_id IS NULL");
-    jobId
-      ? query.andWhere("conversation.job_id = :jobId", { jobId })
-      : query.andWhere("conversation.job_id IS NULL");
-    let conversation = await query.getOne();
+    const isStaff = roles.includes("admin") || roles.includes("manager");
+    let conversation: Conversation | null = null;
+    if (kind === "courier_business" && jobId) {
+      conversation = await this.conversations.findOne({
+        where: { kind: "courier_business", job_id: jobId },
+      });
+    } else {
+      const query = this.conversations
+        .createQueryBuilder("conversation")
+        .where("conversation.kind = :kind", { kind });
+      courierId
+        ? query.andWhere("conversation.courier_id = :courierId", { courierId })
+        : query.andWhere("conversation.courier_id IS NULL");
+      businessId
+        ? query.andWhere("conversation.business_id = :businessId", { businessId })
+        : query.andWhere("conversation.business_id IS NULL");
+      jobId
+        ? query.andWhere("conversation.job_id = :jobId", { jobId })
+        : query.andWhere("conversation.job_id IS NULL");
+      conversation = await query.getOne();
+    }
     if (!conversation) {
+      if (kind === "courier_business" && jobId && !isStaff) {
+        const job = await this.jobs.findOne({
+          where: { id: jobId },
+          select: ["id", "status"],
+        });
+        if (!job || ["הושלמה", "בוטלה"].includes(job.status)) {
+          throw new ForbiddenException("השיחה הסתיימה עם מסירת המשלוח");
+        }
+      }
       conversation = await this.conversations.save(
         this.conversations.create({
           kind: kind as Conversation["kind"],
@@ -159,6 +176,7 @@ export class DomainService {
           unread_business: 0,
           unread_courier: 0,
           unread_guest: 0,
+          hidden_from_participants: false,
         }),
       );
     }
@@ -197,6 +215,13 @@ export class DomainService {
     const senderRole = roles.includes("admin") || roles.includes("manager")
       ? "admin"
       : roles.includes("courier") ? "courier" : "business";
+    if (
+      conversation.hidden_from_participants &&
+      conversation.kind === "courier_business" &&
+      senderRole !== "admin"
+    ) {
+      throw new ForbiddenException("השיחה הסתיימה עם מסירת המשלוח");
+    }
     const message = await this.messages.save(this.messages.create({
       conversation_id: id,
       sender_user_id: userId,

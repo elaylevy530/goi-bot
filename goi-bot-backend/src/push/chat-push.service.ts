@@ -45,6 +45,7 @@ export class ChatPushService {
 
     // Only per-job chat gets push. Support chats are handled elsewhere.
     if (conv.kind !== "courier_business") return { ok: true };
+    if (conv.hidden_from_participants) return { ok: true };
 
     const bodyPreview = (payload.body_preview ?? "").trim() || "הודעה חדשה";
 

@@ -19,6 +19,11 @@ const envSchema = z
     JWT_SECRET: z.string().min(16),
     JWT_EXPIRES_IN: z.string().optional(),
     UPLOAD_DIR: z.string().optional(),
+    BUCKET_NAME: z.string().optional(),
+    AWS_ENDPOINT_URL_S3: z.string().optional(),
+    AWS_REGION: z.string().optional(),
+    AWS_ACCESS_KEY_ID: z.string().optional(),
+    AWS_SECRET_ACCESS_KEY: z.string().optional(),
 
     // Phase 2 worker cutover — CronSecretGuard fails closed when unset.
     CRON_SECRET: z.string().optional(),

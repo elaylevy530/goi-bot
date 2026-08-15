@@ -16,6 +16,7 @@ import { AdminPreviewSession } from "./entities/admin-preview-session.entity";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { AuthRequestInterceptor } from "./interceptors/auth-request.interceptor";
+import { FilesModule } from "../files/files.module";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 
 @Global()
@@ -40,6 +41,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       CourierPasswordReset,
       AdminPreviewSession,
     ]),
+    FilesModule,
   ],
   controllers: [AuthController],
   providers: [

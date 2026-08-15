@@ -108,4 +108,24 @@ export class RegisterCourierDto {
   @IsOptional()
   @IsIn(["courier", "mover"])
   courier_kind?: "courier" | "mover";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10_000_000)
+  id_photo_base64?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  id_photo_mime?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10_000_000)
+  id_photo_back_base64?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  id_photo_back_mime?: string | null;
 }

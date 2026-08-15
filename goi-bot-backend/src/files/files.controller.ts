@@ -30,7 +30,7 @@ export class FilesController {
 
   @Post(":bucket")
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 8 * 1024 * 1024 } }))
   upload(
     @Param("bucket") bucket: string,
     @UploadedFile() file?: UploadedMemoryFile,
@@ -54,8 +54,9 @@ export class FilesController {
       token,
     );
     const file = await this.files.open(bucket, path);
-    response.type(file.absolute);
+    response.type(file.contentType);
     response.setHeader("Content-Length", String(file.size));
+    response.setHeader("Cache-Control", "private, max-age=300");
     file.stream.pipe(response);
   }
 

@@ -14,6 +14,7 @@ import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Customer } from "../accounts/entities/customer.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import type { AppRole } from "../auth/auth.types";
+import { Conversation } from "../push/entities/conversation.entity";
 import { OfferPushService } from "../push/offer-push.service";
 import { WhatsappDispatchService } from "../whatsapp/whatsapp-dispatch.service";
 import { CourierJobDecline } from "./entities/courier-job-decline.entity";
@@ -57,6 +58,8 @@ export class JobsService {
     @InjectRepository(CourierStats) private readonly courierStats: Repository<CourierStats>,
     @InjectRepository(BusinessNotification)
     private readonly businessNotifications: Repository<BusinessNotification>,
+    @InjectRepository(Conversation)
+    private readonly conversations: Repository<Conversation>,
     private readonly whatsappDispatch: WhatsappDispatchService,
     private readonly offerPush: OfferPushService,
   ) {}
@@ -117,7 +120,8 @@ export class JobsService {
       ]
         .filter(Boolean)
         .map(String);
-      if (pickup && areas.some((a) => a.includes(pickup) || pickup.includes(a))) {
+      const nationwide = areas.some((a) => a.includes("כל הארץ"));
+      if (nationwide || (pickup && areas.some((a) => a.includes(pickup) || pickup.includes(a)))) {
         score += 15;
         reasons.push({ label: "אזור איסוף", points: 15 });
       }
@@ -376,7 +380,8 @@ export class JobsService {
   async getForUserWithCourier(id: string, userId: string, roles: AppRole[]) {
     const job = await this.getForUser(id, userId, roles);
     const [withCourier] = await this.attachCouriers([job]);
-    return withCourier;
+    const [withChat] = await this.attachJobChatMeta([withCourier]);
+    return withChat;
   }
 
   async create(userId: string, roles: AppRole[], dto: CreateJobDto) {
@@ -686,6 +691,28 @@ export class JobsService {
     return this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
   }
 
+  private async attachJobChatMeta<T extends { id: string; customer_id?: string | null }>(jobs: T[]) {
+    if (jobs.length === 0) return jobs;
+    const jobIds = jobs.map((j) => j.id);
+    const customerIds = [...new Set(jobs.map((j) => j.customer_id).filter(Boolean))] as string[];
+    const [convs, customers] = await Promise.all([
+      this.conversations.find({
+        where: { kind: "courier_business", job_id: In(jobIds) },
+        select: ["id", "job_id"],
+      }),
+      customerIds.length
+        ? this.customers.find({ where: { id: In(customerIds) }, select: ["id", "phone"] })
+        : Promise.resolve([]),
+    ]);
+    const convByJob = new Map(convs.map((c) => [c.job_id, c.id]));
+    const phoneByCustomer = new Map(customers.map((c) => [c.id, c.phone]));
+    return jobs.map((j) => ({
+      ...j,
+      conversation_id: convByJob.get(j.id) ?? null,
+      customer_phone: j.customer_id ? phoneByCustomer.get(j.customer_id) ?? null : null,
+    }));
+  }
+
   private async attachCouriers(jobs: Job[]) {
     const ids = [...new Set(jobs.map((j) => j.selected_courier_id).filter(Boolean))] as string[];
     if (ids.length === 0) {
@@ -855,6 +882,62 @@ export class JobsService {
           }`,
         ),
       );
+
+    await this.ensureCourierBusinessConversation(job, courier.id);
+  }
+
+  /** Idempotent: one courier_business thread per job. Skip (don't fail claim) if no business. */
+  private async ensureCourierBusinessConversation(job: Job, courierId: string) {
+    if (!job.customer_id) return;
+    try {
+      const existing = await this.conversations.findOne({
+        where: { kind: "courier_business", job_id: job.id },
+      });
+      if (existing) {
+        existing.courier_id = courierId;
+        existing.business_id = job.customer_id;
+        existing.hidden_from_participants = false;
+        await this.conversations.save(existing);
+        return;
+      }
+      await this.conversations.save(
+        this.conversations.create({
+          kind: "courier_business",
+          courier_id: courierId,
+          business_id: job.customer_id,
+          job_id: job.id,
+          subject: job.job_number ? `#${job.job_number}` : null,
+          last_message_at: new Date(),
+          last_message_preview: null,
+          unread_admin: 0,
+          unread_business: 0,
+          unread_courier: 0,
+          unread_guest: 0,
+          hidden_from_participants: false,
+        }),
+      );
+    } catch (e) {
+      this.logger.warn(
+        `ensureCourierBusinessConversation failed for ${job.id}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+  }
+
+  private async hideCourierBusinessConversation(jobId: string) {
+    try {
+      await this.conversations.update(
+        { kind: "courier_business", job_id: jobId },
+        { hidden_from_participants: true },
+      );
+    } catch (e) {
+      this.logger.warn(
+        `hideCourierBusinessConversation failed for ${jobId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
   }
 
   async claimJob(userId: string, jobId: string, _source = "app") {
@@ -1067,10 +1150,12 @@ export class JobsService {
       ? await this.outcomes.find({ where: { job_id: In(jobIds) } })
       : [];
     const outcomeByJob = new Map(outcomes.map((o) => [o.job_id, o]));
-    return rows.map((j) => ({
-      ...j,
-      job_outcomes: outcomeByJob.get(j.id) ? [outcomeByJob.get(j.id)] : [],
-    }));
+    return this.attachJobChatMeta(
+      rows.map((j) => ({
+        ...j,
+        job_outcomes: outcomeByJob.get(j.id) ? [outcomeByJob.get(j.id)] : [],
+      })),
+    );
   }
 
   async courierUpdateProgress(userId: string, jobId: string, step: string) {
@@ -1104,6 +1189,7 @@ export class JobsService {
       outcome.delivered_at = now;
       outcome.courier_id = courier.id;
       await this.outcomes.save(outcome);
+      await this.hideCourierBusinessConversation(jobId);
     }
     await this.jobs.save(job);
     await this.statusLogs.save(
