@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -31,6 +32,7 @@ const PRIVATE_BUCKETS = new Set<FileBucket>(FILE_BUCKETS);
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
   "image/heic",
@@ -40,6 +42,7 @@ const ALLOWED_MIME = new Set([
 ]);
 const MIME_EXTENSION: Record<string, string> = {
   "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
   "image/heic": ".heic",
@@ -47,6 +50,36 @@ const MIME_EXTENSION: Record<string, string> = {
   "image/gif": ".gif",
   "application/pdf": ".pdf",
 };
+const EXT_MIME: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".gif": "image/gif",
+  ".pdf": "application/pdf",
+};
+
+function normalizeMime(mimetype: string, originalname: string, buffer: Buffer): string {
+  const raw = (mimetype || "").toLowerCase() === "image/jpg" ? "image/jpeg" : (mimetype || "").toLowerCase();
+  if (ALLOWED_MIME.has(raw)) return raw === "image/jpg" ? "image/jpeg" : raw;
+  const fromExt = EXT_MIME[extname(originalname).toLowerCase()];
+  if (fromExt) return fromExt;
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return "image/png";
+  }
+  if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "%PDF") {
+    return "application/pdf";
+  }
+  return raw;
+}
 
 type UploadFile = {
   buffer: Buffer;
@@ -57,6 +90,7 @@ type UploadFile = {
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
   private readonly root: string;
   private readonly s3?: S3Client;
   private readonly s3Bucket?: string;
@@ -76,7 +110,13 @@ export class FilesService {
         region: config.get<string>("files.s3.region") || "auto",
         endpoint,
         credentials: { accessKeyId, secretAccessKey },
+        // AWS SDK v3.729+ checksums are rejected by Tigris unless disabled.
+        requestChecksumCalculation: "WHEN_REQUIRED",
+        responseChecksumValidation: "WHEN_REQUIRED",
       });
+      this.logger.log(`File storage: Tigris/S3 bucket=${bucket}`);
+    } else {
+      this.logger.warn("File storage: local ./uploads (ephemeral on Fly — set Tigris secrets)");
     }
   }
 
@@ -105,12 +145,17 @@ export class FilesService {
   }
 
   private assertUpload(file: UploadFile) {
+    if (!file.buffer?.length) {
+      throw new BadRequestException("לא התקבל קובץ. נסה שוב.");
+    }
     if (file.size > MAX_UPLOAD_BYTES || file.buffer.length > MAX_UPLOAD_BYTES) {
-      throw new BadRequestException("File too large");
+      throw new BadRequestException("הקובץ גדול מדי (עד 8MB)");
     }
-    if (!ALLOWED_MIME.has(file.mimetype)) {
-      throw new BadRequestException("Unsupported file type");
+    const mime = normalizeMime(file.mimetype, file.originalname, file.buffer);
+    if (!ALLOWED_MIME.has(mime)) {
+      throw new BadRequestException("סוג קובץ לא נתמך. העלה תמונה או PDF.");
     }
+    file.mimetype = mime === "image/jpg" ? "image/jpeg" : mime;
   }
 
   async uploadBase64(
@@ -135,21 +180,32 @@ export class FilesService {
 
   async upload(bucketValue: string, file?: UploadFile) {
     const bucket = this.assertBucket(bucketValue);
-    if (!file) throw new BadRequestException("file is required");
+    if (!file) throw new BadRequestException("לא התקבל קובץ. נסה שוב.");
     this.assertUpload(file);
-    const extension = extname(file.originalname).replace(/[^.\w-]/g, "").slice(0, 16);
+    const extension =
+      extname(file.originalname).replace(/[^.\w-]/g, "").slice(0, 16) ||
+      MIME_EXTENSION[file.mimetype] ||
+      "";
     const path = `${Date.now()}-${randomUUID()}${extension}`;
     const { absolute } = this.safePath(bucket, path);
     if (this.s3 && this.s3Bucket) {
-      await this.s3.send(
-        new PutObjectCommand({
-          Bucket: this.s3Bucket,
-          Key: this.objectKey(bucket, path),
-          Body: file.buffer,
-          ContentType: file.mimetype,
-          ContentLength: file.buffer.length,
-        }),
-      );
+      try {
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: this.s3Bucket,
+            Key: this.objectKey(bucket, path),
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            ContentLength: file.buffer.length,
+          }),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Tigris upload failed bucket=${bucket} key=${this.objectKey(bucket, path)}`,
+          error instanceof Error ? error.stack : error,
+        );
+        throw new BadRequestException("העלאת הקובץ נכשלה. נסה שוב.");
+      }
     } else {
       await mkdir(resolve(this.root, bucket), { recursive: true });
       await writeFile(absolute, file.buffer);
@@ -212,6 +268,10 @@ export class FilesService {
         };
       } catch (error) {
         if (error instanceof NotFoundException) throw error;
+        this.logger.error(
+          `Tigris read failed bucket=${bucket} key=${this.objectKey(bucket, path)}`,
+          error instanceof Error ? error.stack : error,
+        );
         throw new NotFoundException("File not found");
       }
     }
