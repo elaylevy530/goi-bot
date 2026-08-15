@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,6 +9,7 @@ import {
   PayPalExpiryField,
   PayPalCVVField,
   usePayPalCardFields,
+  usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -37,12 +38,16 @@ function PaymentErrorBanner({ message }: { message: string }) {
   );
 }
 
+function FieldSlot({ children }: { children: ReactNode }) {
+  return <div className="min-h-12 overflow-hidden rounded-md border border-border bg-surface">{children}</div>;
+}
+
 function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
   const { cardFieldsForm } = usePayPalCardFields();
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      disabled={busy}
+      disabled={busy || !cardFieldsForm}
       onClick={async () => {
         if (!cardFieldsForm) return;
         setBusy(true);
@@ -68,11 +73,80 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
   );
 }
 
+function cardFieldsEligible(): boolean {
+  const paypal = (window as unknown as {
+    paypal?: { CardFields?: ((opts?: unknown) => { isEligible?: () => boolean }) & { isEligible?: () => boolean } };
+  }).paypal;
+  const CardFields = paypal?.CardFields;
+  if (!CardFields) return false;
+  try {
+    if (typeof CardFields.isEligible === "function") return CardFields.isEligible();
+    const instance = CardFields();
+    if (typeof instance?.isEligible === "function") return instance.isEligible();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function VaultCardForm({
+  createVaultSetupToken,
+  onApprove,
+  onError,
+  onFail,
+}: {
+  createVaultSetupToken: () => Promise<string>;
+  onApprove: (data: { vaultSetupToken?: string; vault_setup_token?: string }) => Promise<void>;
+  onError: (err: Record<string, unknown>) => void;
+  onFail: (message: string) => void;
+}) {
+  const [{ isPending, isRejected, isResolved }] = usePayPalScriptReducer();
+  const [eligible, setEligible] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isResolved) return;
+    setEligible(cardFieldsEligible());
+  }, [isResolved]);
+
+  if (isPending || (isResolved && eligible === null)) {
+    return (
+      <div className="py-8 text-center text-sm text-text-muted">
+        <Loader2 className="mx-auto mb-2 size-5 animate-spin" />
+        טוען טופס כרטיס…
+      </div>
+    );
+  }
+
+  if (isRejected || eligible === false) {
+    return (
+      <PaymentErrorBanner message="טופס הכרטיס לא זמין כרגע. נסה לרענן, או חבר PayPal במקום." />
+    );
+  }
+
+  return (
+    <PayPalCardFieldsProvider
+      createVaultSetupToken={createVaultSetupToken}
+      onApprove={onApprove}
+      onError={onError}
+    >
+      <div className="space-y-2">
+        <FieldSlot><PayPalNameField /></FieldSlot>
+        <FieldSlot><PayPalNumberField /></FieldSlot>
+        <div className="grid grid-cols-2 gap-2">
+          <FieldSlot><PayPalExpiryField /></FieldSlot>
+          <FieldSlot><PayPalCVVField /></FieldSlot>
+        </div>
+        <CardSubmit onFail={onFail} />
+      </div>
+    </PayPalCardFieldsProvider>
+  );
+}
+
 export function SaveCardDialog({ open, onClose, onSaved }: Props) {
   const setupFn = useServerFn(createSetupTokenFn);
   const confirmFn = useServerFn(confirmVaultFn);
   const getCfg = useServerFn(getPaypalConfigFn);
-  const { data: cfg } = useQuery({
+  const { data: cfg, isLoading: cfgLoading } = useQuery({
     queryKey: ["paypal-config"],
     queryFn: () => getCfg(),
     staleTime: 60 * 60_000,
@@ -117,6 +191,8 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
     }
   };
 
+  const showForm = open && !!cfg?.clientId;
+
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="max-w-md" dir="rtl">
@@ -129,38 +205,32 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
 
         {error && <PaymentErrorBanner message={error} />}
 
-        {!cfg?.clientId ? (
+        {cfgLoading || (open && !cfg) ? (
           <div className="py-8 text-center text-sm text-text-muted">
-            <Loader2 className="size-5 animate-spin mx-auto mb-2" />
+            <Loader2 className="mx-auto mb-2 size-5 animate-spin" />
             טוען טופס תשלום…
           </div>
-        ) : (
+        ) : !cfg?.clientId ? (
+          <PaymentErrorBanner message="PayPal לא מוגדר בשרת. אפשר לחבר PayPal או לפנות לתמיכה." />
+        ) : showForm ? (
           <PayPalScriptProvider
             options={{
               clientId: cfg.clientId,
               currency: cfg.currency,
-              components: "card-fields",
+              intent: "capture",
+              components: "buttons,card-fields",
               locale: "he_IL",
-              dataNamespace: "paypal_vault_card",
+              vault: true,
             }}
           >
-            <PayPalCardFieldsProvider
+            <VaultCardForm
               createVaultSetupToken={createVaultSetupToken}
               onApprove={handleApprove}
               onError={(err) => setError(paypalErrorHe(err, VAULT_FAIL))}
-            >
-              <div className="space-y-2">
-                <PayPalNameField />
-                <PayPalNumberField />
-                <div className="grid grid-cols-2 gap-2">
-                  <PayPalExpiryField />
-                  <PayPalCVVField />
-                </div>
-                <CardSubmit onFail={setError} />
-              </div>
-            </PayPalCardFieldsProvider>
+              onFail={setError}
+            />
           </PayPalScriptProvider>
-        )}
+        ) : null}
 
         <Button variant="ghost" onClick={onClose} className="mt-2">ביטול</Button>
       </DialogContent>
