@@ -67,8 +67,8 @@ async function call<T = unknown>(
   const text = await res.text();
   const body = text ? (JSON.parse(text) as unknown) : null;
   if (!res.ok) {
-    const err = body as { message?: string; details?: unknown } | null;
-    throw new Error(`PayPal ${path} ${res.status}: ${err?.message ?? text}`);
+    const { paypalApiErrorMessage } = await import("@/lib/paypal-errors");
+    throw new Error(paypalApiErrorMessage(body, `PayPal ${path} ${res.status}: ${text}`));
   }
   return body as T;
 }

@@ -210,7 +210,8 @@ export const capturePerJobOrderFn = createServerFn({ method: "POST" })
     const captured = await captureOrder(data.order_id);
     const cap = captured.purchase_units?.[0]?.payments?.captures?.[0];
     if (cap?.status !== "COMPLETED") {
-      throw new Error(`PayPal capture status: ${cap?.status ?? "unknown"}`);
+      const { paypalErrorHe } = await import("@/lib/paypal-errors");
+      throw new Error(paypalErrorHe({ details: [{ issue: cap?.status ?? "CAPTURE_FAILED" }] }));
     }
 
     await nestServerFetch("/api/payments/per-job/capture", {

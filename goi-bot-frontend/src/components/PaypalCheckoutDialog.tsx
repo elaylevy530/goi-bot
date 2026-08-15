@@ -4,9 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { PayPalScriptProvider, PayPalButtons, PayPalCardFieldsProvider, PayPalNameField, PayPalNumberField, PayPalExpiryField, PayPalCVVField, usePayPalCardFields } from "@paypal/react-paypal-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { createPerJobOrderFn, capturePerJobOrderFn, getPaypalConfigFn } from "@/lib/paypal-billing.functions";
+import { cardFieldsInvalidHe, paypalErrorHe } from "@/lib/paypal-errors";
 
 type Props = {
   open: boolean;
@@ -16,7 +17,19 @@ type Props = {
   onPaid: () => void;
 };
 
-function CardSubmit({ onCreate, onApprove }: { onCreate: () => Promise<string>; onApprove: (orderId: string) => Promise<void> }) {
+function PaymentErrorBanner({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-danger-bg px-3 py-2.5 text-sm text-danger-text"
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      <p className="min-w-0 font-medium leading-snug">{message}</p>
+    </div>
+  );
+}
+
+function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
   const { cardFieldsForm } = usePayPalCardFields();
   const [busy, setBusy] = useState(false);
   return (
@@ -27,16 +40,19 @@ function CardSubmit({ onCreate, onApprove }: { onCreate: () => Promise<string>; 
         setBusy(true);
         try {
           const state = await cardFieldsForm.getState();
-          if (!state.isFormValid) { toast.error("מלא את כל שדות הכרטיס"); setBusy(false); return; }
-          // submit() will trigger createOrder + onApprove on the provider
+          if (!state.isFormValid) {
+            onFail(cardFieldsInvalidHe(state));
+            setBusy(false);
+            return;
+          }
           await cardFieldsForm.submit();
-        } catch (e: any) {
-          toast.error("שגיאה: " + (e?.message ?? "לא ידוע"));
+        } catch (e: unknown) {
+          onFail(paypalErrorHe(e));
         } finally {
           setBusy(false);
         }
       }}
-      className="w-full bg-[#35AD29] hover:bg-[#2d9623] text-white"
+      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
     >
       {busy ? <Loader2 className="size-4 animate-spin ml-2" /> : <ShieldCheck className="size-4 ml-2" />}
       שלם בכרטיס אשראי
@@ -49,6 +65,11 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
   const captureOrder = useServerFn(capturePerJobOrderFn);
   const getCfg = useServerFn(getPaypalConfigFn);
   const { data: cfg } = useQuery({ queryKey: ["paypal-config"], queryFn: () => getCfg(), staleTime: 60 * 60_000, enabled: open });
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
 
   const handleCreate = async (): Promise<string> => {
     const origin = window.location.origin;
@@ -60,10 +81,11 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
   const handleApprove = async (orderId: string) => {
     try {
       await captureOrder({ data: { job_id: jobId, order_id: orderId } });
+      setError(null);
       toast.success("התשלום אושר ✅");
       onPaid();
-    } catch (e: any) {
-      toast.error("שגיאה באישור תשלום: " + (e?.message ?? "לא ידוע"));
+    } catch (e: unknown) {
+      setError(paypalErrorHe(e));
     }
   };
 
@@ -77,8 +99,10 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
           </DialogDescription>
         </DialogHeader>
 
+        {error && <PaymentErrorBanner message={error} />}
+
         {!cfg?.clientId ? (
-          <div className="py-8 text-center text-sm text-slate-500">
+          <div className="py-8 text-center text-sm text-text-muted">
             <Loader2 className="size-5 animate-spin mx-auto mb-2" />
             טוען PayPal…
           </div>
@@ -97,8 +121,11 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
                 style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
                 createOrder={handleCreate}
                 onApprove={async (data) => { await handleApprove(data.orderID); }}
-                onError={(err) => toast.error("PayPal: " + (((err as any)?.message as string) ?? "שגיאה"))}
-                onCancel={() => toast.message("התשלום בוטל")}
+                onError={(err) => setError(paypalErrorHe(err))}
+                onCancel={() => {
+                  setError(null);
+                  toast.message("התשלום בוטל");
+                }}
               />
 
               <div className="relative my-2">
@@ -111,7 +138,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
               <PayPalCardFieldsProvider
                 createOrder={handleCreate}
                 onApprove={async (data) => { await handleApprove(data.orderID); }}
-                onError={(err) => toast.error("PayPal: " + (((err as any)?.message as string) ?? "שגיאה"))}
+                onError={(err) => setError(paypalErrorHe(err))}
               >
                 <div className="space-y-2">
                   <PayPalNameField />
@@ -120,7 +147,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
                     <PayPalExpiryField />
                     <PayPalCVVField />
                   </div>
-                  <CardSubmit onCreate={handleCreate} onApprove={handleApprove} />
+                  <CardSubmit onFail={setError} />
                 </div>
               </PayPalCardFieldsProvider>
             </div>
