@@ -5,6 +5,7 @@ import {
   requireNestAuth,
 } from "@/integrations/nest/auth-middleware";
 import { matchTagIds, type ClassificationRule } from "./classification";
+import { nestApiBase, nestServerFetch } from "./nest-server";
 
 const phoneRegex = /^[0-9+\-\s()]{7,20}$/;
 
@@ -36,14 +37,6 @@ const intakeSchema = z.object({
 });
 
 export type CourierIntakeInput = z.infer<typeof intakeSchema>;
-
-function nestApiBase(): string {
-  return (
-    process.env.VITE_API_URL ||
-    process.env.API_URL ||
-    "http://localhost:3001"
-  ).replace(/\/$/, "");
-}
 
 /**
  * Legacy serverFn — JoinPage now calls Nest directly via nestRegisterCourier.
@@ -107,16 +100,34 @@ export const approveCourier = createServerFn({ method: "POST" })
     };
   });
 
+function normalizeIdPhotoPath(path: string) {
+  return path
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/api\/files\/courier-ids\//, "")
+    .replace(/^courier-ids\//, "")
+    .replace(/^\//, "");
+}
+
 export const getIdPhotoSignedUrl = createServerFn({ method: "POST" })
   .middleware([requireNestAuth])
   .inputValidator((data: unknown) =>
     z.object({ path: z.string().min(1).max(500) }).parse(data),
   )
-  .handler(async ({ context }) => {
+  .handler(async ({ data, context }) => {
     assertNestAdmin(context);
-    throw new Error(
-      "ID photo storage is not wired through Nest yet.",
+    const path = normalizeIdPhotoPath(data.path);
+    const signed = await nestServerFetch<{ url: string }>(
+      "/api/files/courier-ids/signed-url",
+      {
+        method: "POST",
+        accessToken: context.accessToken,
+        body: { path, expiresIn: "15m" },
+      },
     );
+    const url = signed.url.startsWith("http")
+      ? signed.url
+      : `${nestApiBase()}${signed.url.startsWith("/") ? signed.url : `/${signed.url}`}`;
+    return { url };
   });
 
 export const deleteCourier = createServerFn({ method: "POST" })

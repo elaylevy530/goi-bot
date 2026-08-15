@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { BankDetailsFields } from "@/components/courier/BankDetailsFields";
 
 export const Route = createFileRoute("/courier/wallet")({
   head: () => ({ meta: [{ title: "הארנק שלי — Goi" }] }),
@@ -100,7 +101,7 @@ function WalletPage() {
       setEditBank(false);
       setAmount(""); setNote("");
       qc.invalidateQueries({ queryKey: ["wallet-withdrawals"] });
-      qc.invalidateQueries({ queryKey: ["my-courier"] });
+      qc.invalidateQueries({ queryKey: ["my-courier-me"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -297,12 +298,19 @@ function WalletPage() {
                       </div>
                     </div>
                     {(editBank || !hasSavedBank) && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div className="col-span-2"><Label className="text-end block mb-1 text-[11px]">שם בעל החשבון</Label><Input value={accountOwner} onChange={(e) => setAccountOwner(e.target.value)} className="text-end" /></div>
-                        <div><Label className="text-end block mb-1 text-[11px]">בנק</Label><Input value={bankName} onChange={(e) => setBankName(e.target.value)} className="text-end" /></div>
-                        <div><Label className="text-end block mb-1 text-[11px]">סניף</Label><Input value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} className="text-end" /></div>
-                        <div className="col-span-2"><Label className="text-end block mb-1 text-[11px]">מספר חשבון</Label><Input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="text-end" /></div>
-                        <div className="col-span-2 text-[10px] text-muted-foreground">הפרטים יישמרו אוטומטית ויהיו מוכנים לכל בקשה הבאה.</div>
+                      <div className="mt-2 space-y-2">
+                        <BankDetailsFields
+                          compact
+                          accountOwner={accountOwner}
+                          bankName={bankName}
+                          bankBranch={bankBranch}
+                          bankAccount={bankAccount}
+                          onAccountOwner={setAccountOwner}
+                          onBankName={setBankName}
+                          onBankBranch={setBankBranch}
+                          onBankAccount={setBankAccount}
+                        />
+                        <div className="text-[10px] text-muted-foreground">הפרטים יישמרו אוטומטית ויהיו מוכנים לכל בקשה הבאה.</div>
                       </div>
                     )}
                   </div>

@@ -227,9 +227,11 @@ function OrderDetailPage() {
             <JobStatusBadge status={j.status as JobStatus} courierStep={j.courier_step} />
             <Button asChild variant="outline" size="sm"><Link to="/business/track/$id" params={{ id: j.id }}><Navigation className="size-4" /> מעקב חי</Link></Button>
             {trackUrl && <Button variant="outline" size="sm" onClick={shareTrack}><Share2 className="size-4" /> שתף עם הנמען</Button>}
-            {courier?.whatsapp_phone && (
+            {courierId && !["הושלמה", "בוטלה"].includes(j.status) && (
               <Button asChild variant="outline" size="sm">
-                <a href={`https://wa.me/${courier.whatsapp_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"><MessageSquare className="size-4" /> דבר עם השליח</a>
+                <Link to="/business/messages" search={{ courierId, jobId: j.id }}>
+                  <MessageSquare className="size-4" /> צ׳אט עם השליח
+                </Link>
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => duplicate.mutate()}><Copy className="size-4" /> שכפל</Button>
@@ -330,23 +332,25 @@ function OrderDetailPage() {
                     </div>
                   </div>
 
-                  {courier.whatsapp_phone && (
-                    <div className="space-y-2">
-                      <a
-                        href={`https://wa.me/${courier.whatsapp_phone.replace(/\D/g, "").replace(/^0/, "972")}?text=${encodeURIComponent(`שלום ${courier.full_name?.split(" ")[0] || ""}, לגבי משלוח ${j.job_number}`)}`}
-                        target="_blank" rel="noreferrer"
-                        className="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#1ebe57] text-white font-bold py-2.5 rounded-xl transition-colors"
+                  <div className="space-y-2">
+                    {!["הושלמה", "בוטלה"].includes(j.status) && (
+                      <Link
+                        to="/business/messages"
+                        search={{ courierId: courier.id, jobId: j.id }}
+                        className="flex items-center justify-center gap-2 w-full bg-[#35AD29] hover:bg-[#2d9222] text-white font-bold py-2.5 rounded-xl transition-colors"
                       >
-                        <MessageSquare className="size-4" /> שלח הודעת ווצאפ
-                      </a>
+                        <MessageSquare className="size-4" /> צ׳אט עם השליח
+                      </Link>
+                    )}
+                    {courier.whatsapp_phone && (
                       <a
                         href={`tel:${courier.whatsapp_phone}`}
                         className="flex items-center justify-center gap-2 w-full bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-bold py-2.5 rounded-xl transition-colors"
                       >
                         <Phone className="size-4 text-[#35AD29]" /> {courier.whatsapp_phone}
                       </a>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2">
                     <Button

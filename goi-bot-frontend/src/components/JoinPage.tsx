@@ -13,6 +13,8 @@ import {
   Camera, Upload, X, KeyRound,
 } from "lucide-react";
 import { BackNav } from "@/components/BackNav";
+import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
+import { WORK_AREA_REQUIRED_ERROR } from "@/lib/regions";
 import { toast } from "sonner";
 import { cacheCourierKind } from "@/lib/courier-kind";
 
@@ -179,6 +181,7 @@ export function JoinPage() {
   const [gender, setGender] = useState<string>("");
 
   const [baseCity, setBaseCity] = useState("");
+  const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
   const [invoice, setInvoice] = useState<string>("");
   const [password, setPassword] = useState("");
@@ -197,6 +200,7 @@ export function JoinPage() {
 
   const mut = useMutation({
     mutationFn: async () => {
+      if (workAreas.length === 0) throw new Error(WORK_AREA_REQUIRED_ERROR);
       const invoiceDb = INVOICE_OPTIONS.find((i) => i.value === invoice)?.db ?? "לא";
 
       let id_photo_base64: string | null = null;
@@ -214,18 +218,17 @@ export function JoinPage() {
         id_photo_back_mime = mime;
       }
 
-      // Identity and courier profile are handled by Nest.
-      void id_photo_base64;
-      void id_photo_mime;
-      void id_photo_back_base64;
-      void id_photo_back_mime;
       return nestRegisterCourier({
         full_name: fullName,
         whatsapp_phone: phone,
         id_number: idNumber || null,
+        id_photo_base64,
+        id_photo_mime,
+        id_photo_back_base64,
+        id_photo_back_mime,
         gender: gender || null,
         base_city: baseCity,
-        wanted_work_areas: [],
+        wanted_work_areas: workAreas,
         custom_work_area: null,
         pickup_areas: [],
         custom_pickup_area: null,
@@ -279,6 +282,7 @@ export function JoinPage() {
     idNumber.trim().length >= 9 &&
     gender &&
     baseCity.trim().length >= 2 &&
+    workAreas.length > 0 &&
     vehicleTypes.length > 0 &&
     password.length >= 6 &&
     consent;
@@ -459,9 +463,9 @@ export function JoinPage() {
           {/* 2. Base city */}
           <Section
             n={2}
-            title="איפה אתה גר או בסיס יציאה לעבודה שלך בדרך כלל?"
+            title="איפה אתה גר / בסיס יציאה"
             icon={MapPin}
-            sub="זה עוזר לנו לשלוח לך עבודות שמתאימות למיקום שלך"
+            sub="עיר מגורים או נקודת היציאה שלך — לא אזורי העבודה"
           >
             <Input
               value={baseCity}
@@ -470,8 +474,21 @@ export function JoinPage() {
             />
           </Section>
 
-          {/* 3. Vehicle */}
-          <Section n={3} title="עם מה אתה עובד?" icon={Bike} sub="אפשר לבחור יותר מכלי אחד">
+          <Section
+            n={3}
+            title="אזורי עבודה"
+            icon={MapPin}
+            sub="איפה אתה מוכן לקחת משלוחים?"
+          >
+            <WorkAreaPicker
+              selected={workAreas}
+              onChange={setWorkAreas}
+              error={workAreas.length === 0 && (fullName.trim() || baseCity.trim()) ? WORK_AREA_REQUIRED_ERROR : null}
+            />
+          </Section>
+
+          {/* 4. Vehicle */}
+          <Section n={4} title="עם מה אתה עובד?" icon={Bike} sub="אפשר לבחור יותר מכלי אחד">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {VEHICLES.map((v) => {
                 const on = vehicleTypes.includes(v.value);
@@ -509,8 +526,8 @@ export function JoinPage() {
             </Section>
           )}
 
-          {/* 4. Invoice */}
-          <Section n={4} title="יש לך חשבונית / קבלה?" icon={Briefcase}>
+          {/* 5. Invoice */}
+          <Section n={5} title="יש לך חשבונית / קבלה?" icon={Briefcase}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {INVOICE_OPTIONS.filter((i) => (kind === "mover" ? i.value !== "לא" : true)).map((i) => (
                 <ChoiceCard key={i.value} active={invoice === i.value} onClick={() => setInvoice(i.value)} className={`justify-center flex-col ${i.sub ? "py-3" : ""}`}>
@@ -521,8 +538,8 @@ export function JoinPage() {
             </div>
           </Section>
 
-          {/* 5. Password — for personal area */}
-          <Section n={5} title="בחר סיסמה לאזור האישי שלך" icon={KeyRound} sub="עם המספר שלך + הסיסמה תוכל להיכנס לאזור האישי שלך באתר">
+          {/* 6. Password — for personal area */}
+          <Section n={6} title="בחר סיסמה לאזור האישי שלך" icon={KeyRound} sub="עם המספר שלך + הסיסמה תוכל להיכנס לאזור האישי שלך באתר">
             <Input
               type="password"
               value={password}

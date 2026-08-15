@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   nestListCourierActiveJobs, nestCourierUpdateProgress, nestListJobStatusLogs,
 } from "@/lib/nest-jobs";
+import { jobBusinessPhone, resolveCourierBusinessConversation } from "@/lib/nest-chat";
 import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import {
   CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Clock, History as HistoryIcon,
@@ -19,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { BusinessLogo } from "@/components/BusinessLogo";
+import { openWaze } from "@/lib/waze";
 
 
 export const Route = createFileRoute("/courier/history")({
@@ -55,18 +57,28 @@ function stageOf(j: any, currentStep?: string): Stage {
 
 function stageIndex(s: Stage) { return STAGES.findIndex(x => x.key === s); }
 
-// ============ ActiveJobs (Kanban-style filter + compact expandable cards) ============
+type ActiveTab = "today" | "scheduled";
+
+function todayYmd() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function isScheduledActiveJob(job: { job_date?: string | null }) {
+  const date = job.job_date ? String(job.job_date).slice(0, 10) : "";
+  return !!date && date > todayYmd();
+}
+
+// ============ ActiveJobs (Today / Scheduled + compact expandable cards) ============
 export function ActiveJobs() {
   const { data: me } = useMyCourier();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [contactJob, setContactJob] = useState<any>(null);
-  const [filter, setFilter] = useState<Stage | "all">("all");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [nowTick, setNowTick] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNowTick(Date.now()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+  const [tab, setTab] = useState<ActiveTab>("today");
 
 
   const { data: jobs = [] } = useQuery({
@@ -115,52 +127,88 @@ export function ActiveJobs() {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_d, v) => {
       toast.success("הסטטוס עודכן");
       qc.invalidateQueries({ queryKey: ["active-jobs"] });
       qc.invalidateQueries({ queryKey: ["active-job-steps"] });
+      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
+      if (v.step === "נמסר") {
+        qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+        qc.invalidateQueries({ queryKey: ["chat-start-active-jobs"] });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
 
-  const openNav = (addr?: string | null) => {
-    if (!addr) return toast.error("אין כתובת");
-    window.open(`https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`, "_blank");
+  const openNav = (addr?: string | null) => openWaze(addr);
+
+  const todayJobs = useMemo(() => jobs.filter((j) => !isScheduledActiveJob(j)), [jobs]);
+  const scheduledJobs = useMemo(() => jobs.filter((j) => isScheduledActiveJob(j)), [jobs]);
+  const visible = tab === "today" ? todayJobs : scheduledJobs;
+
+  const openBusinessChat = async (j: any) => {
+    try {
+      const id = await resolveCourierBusinessConversation({
+        id: j.id,
+        conversation_id: j.conversation_id,
+        customer_id: j.customer_id,
+        selected_courier_id: j.selected_courier_id ?? me?.id,
+      });
+      navigate({ to: "/courier/messages", search: { c: id } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "פתיחת צ׳אט נכשלה");
+    }
   };
 
-  // group by stage for counters
-  const grouped = useMemo(() => {
-    const g: Record<Stage, any[]> = { assigned: [], to_pickup: [], picked_up: [], delivered: [] };
-    for (const j of jobs) {
-      const step = (lastSteps as Record<string, string>)[j.id];
-      g[stageOf(j, step)].push(j);
-    }
-    return g;
-  }, [jobs, lastSteps]);
+  const callBusiness = (j: any) => {
+    const p = jobBusinessPhone(j);
+    if (p) window.location.href = `tel:${p}`;
+    else toast.error("אין מספר עסק");
+  };
 
-  const visible = filter === "all" ? jobs : grouped[filter];
-
-  if (jobs.length === 0) {
-    return (
-      <Card className="rounded-2xl">
-        <CardContent className="py-14 text-center text-slate-500">
-          <ClipboardCheck className="size-10 mx-auto mb-3 opacity-50" />
-          אין עבודות פעילות כרגע
-        </CardContent>
-      </Card>
-    );
-  }
+  const tabs: { key: ActiveTab; label: string; count: number }[] = [
+    { key: "today", label: "להיום", count: todayJobs.length },
+    { key: "scheduled", label: "מתוזמנות", count: scheduledJobs.length },
+  ];
 
   return (
     <div className="space-y-3">
-      {/* Header count strip */}
-      <div className="flex items-end justify-between px-1">
-        <div className="text-sm text-slate-500">{jobs.length} משלוחים בביצוע</div>
-        <div className="rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold">משמרת פעילה</div>
+      <div className="flex w-full rounded-[14px] bg-border-strong/60 p-1">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              "flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-[13px] text-center transition-all",
+              tab === t.key
+                ? "bg-surface font-bold text-primary shadow-card"
+                : "font-semibold text-text-subtle",
+            )}
+          >
+            {t.label} ({t.count})
+          </button>
+        ))}
       </div>
 
-      {jobs.map((j) => {
+      {jobs.length > 0 && (
+        <div className="flex items-end justify-between px-1">
+          <div className="text-sm text-slate-500">{jobs.length} משלוחים בביצוע</div>
+          <div className="rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold">משמרת פעילה</div>
+        </div>
+      )}
+
+      {visible.length === 0 && (
+        <Card className="rounded-2xl">
+          <CardContent className="py-14 text-center text-slate-500">
+            <ClipboardCheck className="size-10 mx-auto mb-3 opacity-50" />
+            {tab === "today" ? "אין משלוחים להיום" : "אין משלוחים מתוזמנים"}
+          </CardContent>
+        </Card>
+      )}
+
+      {visible.map((j) => {
         const step = (lastSteps as Record<string, string>)[j.id];
         const stage = stageOf(j, step);
         const sIdx = stageIndex(stage);
@@ -248,20 +296,22 @@ export function ActiveJobs() {
               </div>
 
               {/* Contact row */}
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5">
                 <SoftBtn
                   icon={MessageCircle}
                   label="צ׳אט עסק"
                   tint="green"
-                  onClick={() => {
-                    const p = j.pickup_contact_phone;
-                    if (!p) return toast.error("אין מספר עסק");
-                    window.open(`https://wa.me/${String(p).replace(/\D/g, "")}`, "_blank");
-                  }}
+                  onClick={() => { void openBusinessChat(j); }}
                 />
                 <SoftBtn
                   icon={Phone}
-                  label="חיוג ללקוח"
+                  label="התקשר לעסק"
+                  tint="blue"
+                  onClick={() => callBusiness(j)}
+                />
+                <SoftBtn
+                  icon={Phone}
+                  label="התקשר ללקוח"
                   tint="blue"
                   onClick={() => {
                     const p = j.recipient_phone;
@@ -272,10 +322,30 @@ export function ActiveJobs() {
                 <SoftBtn icon={Info} label="פרטים" tint="slate" onClick={() => setContactJob(j)} />
               </div>
 
-              {/* Navigation row */}
+              {!pickedUp && (
+                <button
+                  type="button"
+                  onClick={() => openNav(j.pickup_address ?? j.pickup_area)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl min-h-12 font-bold text-[15px] text-primary-foreground bg-primary shadow-fab active:scale-[0.99]"
+                >
+                  <Navigation className="size-4" strokeWidth={2.25} />
+                  נווט לאיסוף בוויז
+                </button>
+              )}
+              {pickedUp && !delivered && (
+                <button
+                  type="button"
+                  onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl min-h-12 font-bold text-[15px] text-primary-foreground bg-primary shadow-fab active:scale-[0.99]"
+                >
+                  <Navigation className="size-4" strokeWidth={2.25} />
+                  נווט למסירה בוויז
+                </button>
+              )}
+
               <div className="grid grid-cols-2 gap-1.5">
-                <SoftNavBtn label="לאיסוף" sublabel={j.pickup_area ?? ""} tint="indigo" onClick={() => openNav(j.pickup_address ?? j.pickup_area)} />
-                <SoftNavBtn label="למסירה" sublabel={j.dropoff_area ?? ""} tint="rose" onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)} />
+                <SoftNavBtn label="נווט לאיסוף" sublabel={j.pickup_area ?? ""} tint="indigo" onClick={() => openNav(j.pickup_address ?? j.pickup_area)} />
+                <SoftNavBtn label="נווט למסירה" sublabel={j.dropoff_area ?? ""} tint="rose" onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)} />
               </div>
 
               <Link
@@ -323,16 +393,6 @@ export function ActiveJobs() {
           </Card>
         );
       })}
-
-      {jobs.length === 0 && (
-        <Card className="rounded-2xl">
-          <CardContent className="py-14 text-center text-slate-500">
-            <ClipboardCheck className="size-10 mx-auto mb-3 opacity-50" />
-            אין עבודות פעילות כרגע
-          </CardContent>
-        </Card>
-      )}
-
 
       <Dialog open={!!contactJob} onOpenChange={(o) => !o && setContactJob(null)}>
         <DialogContent dir="rtl" className="max-w-md max-h-[92vh] overflow-hidden p-0 gap-0 border border-black/15 rounded-2xl">
@@ -482,13 +542,13 @@ function SoftNavBtn({ label, sublabel, tint, onClick }: { label: string; sublabe
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       className={cn(
-        "flex items-center justify-center gap-1.5 h-9 rounded-lg border font-medium text-[12px] transition-colors",
+        "flex items-center justify-center gap-1.5 min-h-11 rounded-lg border font-medium text-[12px] transition-colors",
         tints[tint],
       )}
     >
       <Navigation className="size-3.5" strokeWidth={1.75} />
       <span className="flex items-baseline gap-1">
-        <span>נווט {label}</span>
+        <span>{label}</span>
         {sublabel && <span className="text-[10px] opacity-60 truncate max-w-[70px]">· {sublabel}</span>}
       </span>
     </button>
@@ -706,11 +766,11 @@ function BonBlock({ badge, accent, icon: Icon, address, area, extras, name, phon
         {/* Header row */}
         <div className="flex items-center justify-between gap-2">
           <button
-            onClick={() => address && window.open(`https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`, "_blank")}
+            onClick={() => openWaze(address)}
             disabled={!address}
             className="h-7 text-[11px] rounded-full bg-slate-100 text-slate-700 px-2.5 font-semibold inline-flex items-center gap-1 disabled:opacity-40 active:bg-slate-200"
           >
-            <Navigation className="size-3" /> נווט
+            <Navigation className="size-3" /> נווט בוויז
           </button>
           <span className={cn("h-6 text-[11px] rounded-full px-2.5 font-bold inline-flex items-center gap-1", a.chip)}>
             <Icon className={cn("size-3", a.icon)} /> {badge}

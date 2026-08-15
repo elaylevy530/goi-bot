@@ -125,6 +125,7 @@ import { Route as CourierMissionJobIdRouteImport } from './routes/courier.missio
 import { Route as CourierMultiStopIdRouteImport } from './routes/courier.multi-stop.$id'
 import { Route as CourierProfileIndexRouteImport } from './routes/courier.profile.index'
 import { Route as CourierProfileEditRouteImport } from './routes/courier.profile.edit'
+import { Route as CourierProfileBankRouteImport } from './routes/courier.profile.bank'
 import { Route as CustomerChatJobIdRouteImport } from './routes/customer.chat.$jobId'
 import { Route as CustomerOrderIdRouteImport } from './routes/customer.order.$id'
 import { Route as ExpressThanksTokenRouteImport } from './routes/express.thanks.$token'
@@ -727,6 +728,11 @@ const CourierProfileEditRoute = CourierProfileEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => CourierProfileRoute,
 } as any)
+const CourierProfileBankRoute = CourierProfileBankRouteImport.update({
+  id: '/bank',
+  path: '/bank',
+  getParentRoute: () => CourierProfileRoute,
+} as any)
 const CustomerChatJobIdRoute = CustomerChatJobIdRouteImport.update({
   id: '/$jobId',
   path: '/$jobId',
@@ -867,6 +873,7 @@ export interface FileRoutesByFullPath {
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
+  '/courier/profile/bank': typeof CourierProfileBankRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
   '/customer/order/$id': typeof CustomerOrderIdRoute
   '/express/thanks/$token': typeof ExpressThanksTokenRoute
@@ -987,6 +994,7 @@ export interface FileRoutesByTo {
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
+  '/courier/profile/bank': typeof CourierProfileBankRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
   '/customer/order/$id': typeof CustomerOrderIdRoute
   '/express/thanks/$token': typeof ExpressThanksTokenRoute
@@ -1111,6 +1119,7 @@ export interface FileRoutesById {
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
+  '/courier/profile/bank': typeof CourierProfileBankRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
   '/customer/order/$id': typeof CustomerOrderIdRoute
   '/express/thanks/$token': typeof ExpressThanksTokenRoute
@@ -1235,6 +1244,7 @@ export interface FileRouteTypes {
     | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
     | '/courier/profile/edit'
+    | '/courier/profile/bank'
     | '/customer/chat/$jobId'
     | '/customer/order/$id'
     | '/express/thanks/$token'
@@ -1355,6 +1365,7 @@ export interface FileRouteTypes {
     | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
     | '/courier/profile/edit'
+    | '/courier/profile/bank'
     | '/customer/chat/$jobId'
     | '/customer/order/$id'
     | '/express/thanks/$token'
@@ -1478,6 +1489,7 @@ export interface FileRouteTypes {
     | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
     | '/courier/profile/edit'
+    | '/courier/profile/bank'
     | '/customer/chat/$jobId'
     | '/customer/order/$id'
     | '/express/thanks/$token'
@@ -2341,6 +2353,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CourierProfileEditRouteImport
       parentRoute: typeof CourierProfileRoute
     }
+    '/courier/profile/bank': {
+      id: '/courier/profile/bank'
+      path: '/bank'
+      fullPath: '/courier/profile/bank'
+      preLoaderRoute: typeof CourierProfileBankRouteImport
+      parentRoute: typeof CourierProfileRoute
+    }
     '/customer/chat/$jobId': {
       id: '/customer/chat/$jobId'
       path: '/$jobId'
@@ -2527,11 +2546,13 @@ const BusinessRouteWithChildren = BusinessRoute._addFileChildren(
 
 interface CourierProfileRouteChildren {
   CourierProfileEditRoute: typeof CourierProfileEditRoute
+  CourierProfileBankRoute: typeof CourierProfileBankRoute
   CourierProfileIndexRoute: typeof CourierProfileIndexRoute
 }
 
 const CourierProfileRouteChildren: CourierProfileRouteChildren = {
   CourierProfileEditRoute: CourierProfileEditRoute,
+  CourierProfileBankRoute: CourierProfileBankRoute,
   CourierProfileIndexRoute: CourierProfileIndexRoute,
 }
 

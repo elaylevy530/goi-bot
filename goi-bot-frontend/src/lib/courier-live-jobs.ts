@@ -1,3 +1,5 @@
+import { isWorkAreaLabel, locationMatchesWorkAreas, NATIONWIDE_WORK_AREA } from "@/lib/regions";
+
 const OPEN_JOB_STATUSES = new Set(["נשלחה לשליחים", "ממתינה לתגובות", "יש שליחים שאישרו"]);
 
 function todayIsoDate() {
@@ -148,15 +150,18 @@ export function matchesCourier(job: any, courier?: any | null) {
 
   if (!pickup) return true;
 
-  const areas = textList(
-    courier.working_areas,
-    courier.pickup_areas,
-    courier.base_city,
-    courier.custom_work_area,
-    courier.custom_pickup_area,
-  );
-  if (areas.includes("כל הארץ")) return true;
-  return areas.some((area) => area === pickup || pickup.includes(area) || area.includes(pickup));
+  const workAreas = textList(courier.working_areas);
+  const usesFixedAreas = workAreas.some((a) => isWorkAreaLabel(a) || a.includes(NATIONWIDE_WORK_AREA));
+  const areas = usesFixedAreas
+    ? workAreas
+    : textList(
+        courier.working_areas,
+        courier.pickup_areas,
+        courier.base_city,
+        courier.custom_work_area,
+        courier.custom_pickup_area,
+      );
+  return locationMatchesWorkAreas(pickup, areas);
 }
 
 

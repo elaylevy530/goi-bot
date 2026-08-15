@@ -15,6 +15,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { wazeNavigateLlUrl, wazeNavigateUrl } from "@/lib/waze";
 
 export const Route = createFileRoute("/courier/multi-stop/$id")({
   head: () => ({ meta: [{ title: "משלוח מרובה נקודות — Goi" }] }),
@@ -92,9 +93,9 @@ function MultiStopActivePage() {
           const isArrived = s.status === "arrived";
           const isPickup = s.stop_type === "pickup";
           const nav = s.lat && s.lng
-            ? `https://waze.com/ul?ll=${s.lat},${s.lng}&navigate=yes`
+            ? wazeNavigateLlUrl(Number(s.lat), Number(s.lng))
             : s.address
-            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address)}`
+            ? wazeNavigateUrl(String(s.address))
             : null;
 
           return (
@@ -175,7 +176,7 @@ function MultiStopActivePage() {
                       >
                         <a href={nav} target="_blank" rel="noopener noreferrer">
                           <Navigation className="size-4" />
-                          ניווט
+                          נווט בוויז
                         </a>
                       </Button>
                     )}

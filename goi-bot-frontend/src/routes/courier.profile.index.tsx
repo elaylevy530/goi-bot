@@ -26,6 +26,7 @@ import {
   KeyRound,
   Loader2,
   Star,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCourierTerms, type CourierTerms } from "@/lib/courier-kind";
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/courier/profile/")({
 function buildMenu(t: CourierTerms) {
   return [
     { to: "/courier/profile/edit", label: "הפרופיל שלי", sub: "תמונה, פרטים אישיים ורכב", icon: User },
+    { to: "/courier/profile/bank", label: "פרטי חשבון בנק", sub: "בנק, סניף ומספר חשבון לתשלום", icon: Building2 },
     { to: "/courier/history", label: "העבודות שלי", sub: `היסטוריית ${t.jobPlural} שבוצעו`, icon: History },
     { to: "/courier/wallet", label: "רווחים", sub: "יתרה, תשלומים ומשיכות", icon: WalletIcon },
   ];

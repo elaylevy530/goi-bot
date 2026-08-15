@@ -20,6 +20,7 @@ export type NestConversation = {
   unread_business: number;
   unread_admin: number;
   unread_guest?: number;
+  hidden_from_participants?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -58,6 +59,31 @@ function token() {
 
 export function nestListConversations() {
   return apiFetch<NestConversation[]>("/api/chat/conversations", { accessToken: token() });
+}
+
+export function jobBusinessPhone(job: {
+  pickup_contact_phone?: string | null;
+  customer_phone?: string | null;
+}): string | null {
+  const raw = job.pickup_contact_phone || job.customer_phone;
+  const trimmed = raw?.trim();
+  return trimmed || null;
+}
+
+export async function resolveCourierBusinessConversation(job: {
+  id: string;
+  conversation_id?: string | null;
+  customer_id?: string | null;
+  selected_courier_id?: string | null;
+}): Promise<string> {
+  if (job.conversation_id) return job.conversation_id;
+  const conv = await nestOpenConversation({
+    kind: "courier_business",
+    courier_id: job.selected_courier_id ?? undefined,
+    business_id: job.customer_id ?? undefined,
+    job_id: job.id,
+  });
+  return conv.id;
 }
 
 export function nestOpenConversation(body: {

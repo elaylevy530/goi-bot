@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { CourierShell } from "@/components/CourierShell";
 import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
 import { nestCourierUpdateProgress, nestGetJob, nestListJobStatusLogs } from "@/lib/nest-jobs";
+import { jobBusinessPhone, resolveCourierBusinessConversation } from "@/lib/nest-chat";
 import {
   Camera, Check, CheckCircle2, MessageCircle, Navigation, Phone, PhoneCall, TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { openWaze } from "@/lib/waze";
 
 type MissionUiStage =
   | "accepted"
@@ -110,6 +112,11 @@ function MissionPage() {
       qc.invalidateQueries({ queryKey: ["mission-job-steps", jobId] });
       qc.invalidateQueries({ queryKey: ["active-jobs"] });
       qc.invalidateQueries({ queryKey: ["active-job-steps"] });
+      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
+      if (step === "נמסר") {
+        qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+        qc.invalidateQueries({ queryKey: ["chat-start-active-jobs"] });
+      }
       if (step === "בדרך לאיסוף") setUiStage("to_pickup");
       if (step === "אספתי") setUiStage("en_route");
       if (step === "נמסר") setUiStage("complete");
@@ -118,11 +125,6 @@ function MissionPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const openNav = (addr?: string | null) => {
-    if (!addr) return toast.error("אין כתובת");
-    window.open(`https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`, "_blank");
-  };
-
   if (isLoading || !job) {
     return (
       <CourierShell fullBleed>
@@ -130,6 +132,26 @@ function MissionPage() {
       </CourierShell>
     );
   }
+
+  const openBusinessChat = async () => {
+    try {
+      const id = await resolveCourierBusinessConversation({
+        id: job.id,
+        conversation_id: (job as { conversation_id?: string | null }).conversation_id,
+        customer_id: job.customer_id,
+        selected_courier_id: job.selected_courier_id,
+      });
+      navigate({ to: "/courier/messages", search: { c: id } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "פתיחת צ׳אט נכשלה");
+    }
+  };
+
+  const callBusiness = () => {
+    const p = jobBusinessPhone(job);
+    if (p) window.location.href = `tel:${p}`;
+    else toast.error("אין מספר עסק");
+  };
 
   const pickup = String(job.pickup_address ?? job.pickup_area ?? "—");
   const dropoff = String(job.dropoff_address ?? job.dropoff_area ?? "—");
@@ -158,8 +180,10 @@ function MissionPage() {
             pickup={pickup}
             dropoff={dropoff}
             payment={payment}
+            onChatBusiness={() => { void openBusinessChat(); }}
+            onCallBusiness={callBusiness}
             onStart={() => {
-              openNav(pickup);
+              openWaze(pickup);
               setStep.mutate("בדרך לאיסוף");
             }}
             pending={setStep.isPending}
@@ -176,6 +200,9 @@ function MissionPage() {
             swipeLabel="החלק לאישור הגעה"
             ctaLabel="הגעתי לנקודת האיסוף"
             onSwipeOrCta={() => setUiStage("at_pickup")}
+            onNavigate={() => openWaze(pickup)}
+            onChatBusiness={() => { void openBusinessChat(); }}
+            onCallBusiness={callBusiness}
             pending={setStep.isPending}
           />
         )}
@@ -184,11 +211,13 @@ function MissionPage() {
           <AtPickupStage
             storeName={storeName}
             address={pickup}
-            phone={(job as any).pickup_contact_phone}
+            phone={jobBusinessPhone(job)}
             items={itemLines}
             notes={description || null}
             checked={checkedItems}
             onToggle={(i) => setCheckedItems((prev) => ({ ...prev, [i]: !prev[i] }))}
+            onChatBusiness={() => { void openBusinessChat(); }}
+            onCallBusiness={callBusiness}
             onComplete={() => setStep.mutate("אספתי")}
             pending={setStep.isPending}
           />
@@ -198,8 +227,8 @@ function MissionPage() {
           <EnRouteStage
             recipient={recipient}
             address={dropoff}
-            phone={job.recipient_phone != null ? String(job.recipient_phone) : null}
             onArrived={() => setUiStage("confirm")}
+            onNavigate={() => openWaze(dropoff)}
             onCall={() => {
               if (job.recipient_phone) window.location.href = `tel:${job.recipient_phone}`;
               else toast.error("אין מספר לקוח");
@@ -209,6 +238,8 @@ function MissionPage() {
               if (!p) return toast.error("אין מספר לקוח");
               window.open(`https://wa.me/${p}`, "_blank");
             }}
+            onChatBusiness={() => { void openBusinessChat(); }}
+            onCallBusiness={callBusiness}
           />
         )}
 
@@ -267,11 +298,36 @@ function MapBackdrop({ className = "" }: { className?: string }) {
   );
 }
 
+function BusinessContactRow({
+  onChat, onCall,
+}: {
+  onChat: () => void; onCall: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        onClick={onChat}
+        className="min-h-11 rounded-xl border border-border flex items-center justify-center gap-2 text-sm font-semibold"
+      >
+        צ׳אט עסק <MessageCircle className="size-4 text-primary" />
+      </button>
+      <button
+        type="button"
+        onClick={onCall}
+        className="min-h-11 rounded-xl border border-border flex items-center justify-center gap-2 text-sm font-semibold"
+      >
+        התקשר לעסק <PhoneCall className="size-4 text-primary" />
+      </button>
+    </div>
+  );
+}
+
 function AcceptedStage({
-  jobNumber, storeName, pickup, dropoff, payment, onStart, pending,
+  jobNumber, storeName, pickup, dropoff, payment, onStart, onChatBusiness, onCallBusiness, pending,
 }: {
   jobNumber?: string; storeName: string; pickup: string; dropoff: string;
-  payment: number; onStart: () => void; pending?: boolean;
+  payment: number; onStart: () => void; onChatBusiness: () => void; onCallBusiness: () => void; pending?: boolean;
 }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-y-auto pb-[calc(7rem+env(safe-area-inset-bottom))]">
@@ -310,6 +366,9 @@ function AcceptedStage({
             <p className="text-[11px] text-text-subtle mt-0.5">זמן הגעה משוער</p>
           </div>
         </div>
+        <div className="mt-3">
+          <BusinessContactRow onChat={onChatBusiness} onCall={onCallBusiness} />
+        </div>
       </div>
 
       <div className="mx-5 mt-4 h-40 rounded-2xl overflow-hidden border border-border">
@@ -323,7 +382,7 @@ function AcceptedStage({
           onClick={onStart}
           className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] disabled:opacity-60"
         >
-          התחל ניווט לאיסוף 🚀
+          נווט לאיסוף בוויז
         </button>
       </div>
     </div>
@@ -367,11 +426,11 @@ function Stepper({ active }: { active: 0 | 1 | 2 }) {
 }
 
 function ActiveNavStage({
-  stepLabel, name, subtitle, address, stepperActive, swipeLabel, ctaLabel, onSwipeOrCta, pending,
+  stepLabel, name, subtitle, address, stepperActive, swipeLabel, ctaLabel, onSwipeOrCta, onNavigate, onChatBusiness, onCallBusiness, pending,
 }: {
   stepLabel: string; name: string; subtitle: string; address: string;
   stepperActive: 0 | 1 | 2; swipeLabel: string; ctaLabel: string;
-  onSwipeOrCta: () => void; pending?: boolean;
+  onSwipeOrCta: () => void; onNavigate: () => void; onChatBusiness: () => void; onCallBusiness: () => void; pending?: boolean;
 }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -394,6 +453,14 @@ function ActiveNavStage({
 
       <div className="rounded-t-3xl bg-surface border-t border-border px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-4 shadow-card-strong">
         <Stepper active={stepperActive} />
+        <button
+          type="button"
+          onClick={onNavigate}
+          className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] flex items-center justify-center gap-2"
+        >
+          <Navigation className="size-4" /> נווט לאיסוף בוויז
+        </button>
+        <BusinessContactRow onChat={onChatBusiness} onCall={onCallBusiness} />
         <SwipeConfirm label={swipeLabel} onConfirm={onSwipeOrCta} disabled={pending} />
         <button
           type="button"
@@ -409,11 +476,12 @@ function ActiveNavStage({
 }
 
 function AtPickupStage({
-  storeName, address, phone, items, notes, checked, onToggle, onComplete, pending,
+  storeName, address, phone, items, notes, checked, onToggle, onChatBusiness, onCallBusiness, onComplete, pending,
 }: {
   storeName: string; address: string; phone?: string | null;
   items: string[]; notes?: string | null;
   checked: Record<number, boolean>; onToggle: (i: number) => void;
+  onChatBusiness: () => void; onCallBusiness: () => void;
   onComplete: () => void; pending?: boolean;
 }) {
   return (
@@ -421,11 +489,8 @@ function AtPickupStage({
       <div className="px-5 pt-[max(1rem,env(safe-area-inset-top))] flex items-start justify-between gap-3">
         <button
           type="button"
-          aria-label="התקשר"
-          onClick={() => {
-            if (phone) window.location.href = `tel:${phone}`;
-            else toast.error("אין מספר ליצירת קשר");
-          }}
+          aria-label="התקשר לעסק"
+          onClick={onCallBusiness}
           className="size-10 rounded-full bg-surface border border-border grid place-items-center text-primary"
         >
           <PhoneCall className="size-[18px]" />
@@ -436,20 +501,22 @@ function AtPickupStage({
         </div>
       </div>
 
-      <div className="mx-5 mt-4 rounded-2xl border border-border bg-surface p-3.5 flex items-center gap-3">
-        <button
-          type="button"
-          className="size-9 rounded-full bg-primary-soft text-primary grid place-items-center shrink-0"
-          onClick={() => {
-            if (phone) window.location.href = `tel:${phone}`;
-          }}
-        >
-          <Phone className="size-4" />
-        </button>
-        <div className="min-w-0 flex-1 text-right">
-          <p className="text-sm font-bold text-text-strong truncate">{storeName}</p>
-          <p className="text-xs text-text-subtle">טלפון ליצירת קשר: {phone || "—"}</p>
+      <div className="mx-5 mt-4 rounded-2xl border border-border bg-surface p-3.5 space-y-3">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="size-9 rounded-full bg-primary-soft text-primary grid place-items-center shrink-0"
+            onClick={onCallBusiness}
+            aria-label="התקשר לעסק"
+          >
+            <Phone className="size-4" />
+          </button>
+          <div className="min-w-0 flex-1 text-right">
+            <p className="text-sm font-bold text-text-strong truncate">{storeName}</p>
+            <p className="text-xs text-text-subtle">טלפון ליצירת קשר: {phone || "—"}</p>
+          </div>
         </div>
+        <BusinessContactRow onChat={onChatBusiness} onCall={onCallBusiness} />
       </div>
 
       <p className="px-5 mt-5 text-sm font-bold text-text-strong text-right">פריטים לאימות הזמנה</p>
@@ -508,10 +575,11 @@ function AtPickupStage({
 }
 
 function EnRouteStage({
-  recipient, address, phone, onArrived, onCall, onMessage,
+  recipient, address, onArrived, onNavigate, onCall, onMessage, onChatBusiness, onCallBusiness,
 }: {
-  recipient: string; address: string; phone?: string | null;
-  onArrived: () => void; onCall: () => void; onMessage: () => void;
+  recipient: string; address: string;
+  onArrived: () => void; onNavigate: () => void; onCall: () => void; onMessage: () => void;
+  onChatBusiness: () => void; onCallBusiness: () => void;
 }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -538,6 +606,14 @@ function EnRouteStage({
       </div>
 
       <div className="rounded-t-3xl bg-surface border-t border-border px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3">
+        <button
+          type="button"
+          onClick={onNavigate}
+          className="w-full min-h-[51px] rounded-xl border-2 border-primary text-primary font-bold text-[15px] flex items-center justify-center gap-2"
+        >
+          <Navigation className="size-4" /> נווט למסירה בוויז
+        </button>
+        <BusinessContactRow onChat={onChatBusiness} onCall={onCallBusiness} />
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={onMessage} className="min-h-11 rounded-xl border border-border flex items-center justify-center gap-2 text-sm font-semibold">
             שליחת הודעה <MessageCircle className="size-4 text-primary" />
@@ -556,7 +632,6 @@ function EnRouteStage({
         <button type="button" className="w-full text-center text-xs text-text-subtle py-1" onClick={() => toast.message("דיווח בעיה — פנו לתמיכה")}>
           דיווח על בעיה במשלוח
         </button>
-        {phone ? null : null}
       </div>
     </div>
   );

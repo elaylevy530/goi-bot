@@ -85,12 +85,14 @@ function unreadFor(c: ConversationRow, viewer: ViewerRole) {
 }
 
 type AdminFilter = "all" | "courier_support" | "business_support" | "courier_business" | "guest_support" | "unread";
+type CourierFilter = "all" | "support" | "customers";
 
 export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: ViewerRole; initialConversationId?: string }) {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(initialConversationId ?? null);
   const [mobileView, setMobileView] = useState<"list" | "thread">(initialConversationId ? "thread" : "list");
   const [adminFilter, setAdminFilter] = useState<AdminFilter>("all");
+  const [courierFilter, setCourierFilter] = useState<CourierFilter>("all");
   const [search, setSearch] = useState("");
 
   // Sync when caller passes a new initial conversation id (e.g. opened from a deep link)
@@ -152,6 +154,9 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
     if (viewerRole === "admin") {
       if (adminFilter === "unread") list = list.filter((c) => c.unread_admin > 0);
       else if (adminFilter !== "all") list = list.filter((c) => c.kind === adminFilter);
+    } else if (viewerRole === "courier") {
+      if (courierFilter === "support") list = list.filter((c) => c.kind === "courier_support");
+      else if (courierFilter === "customers") list = list.filter((c) => c.kind === "courier_business");
     }
     const q = search.trim().toLowerCase();
     if (q) {
@@ -162,7 +167,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       });
     }
     return list;
-  }, [conversations, adminFilter, search, viewerRole]);
+  }, [conversations, adminFilter, courierFilter, search, viewerRole]);
 
   const adminCounts = useMemo(() => {
     if (viewerRole !== "admin") return null;
@@ -173,6 +178,22 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       courier_business: conversations.filter((c) => c.kind === "courier_business").length,
       guest_support: conversations.filter((c) => c.kind === "guest_support").length,
       unread: conversations.filter((c) => c.unread_admin > 0).length,
+    };
+  }, [conversations, viewerRole]);
+
+  const courierCounts = useMemo(() => {
+    if (viewerRole !== "courier") return null;
+    const unreadOf = (list: ConversationRow[]) =>
+      list.reduce((n, c) => n + (unreadFor(c, viewerRole) > 0 ? unreadFor(c, viewerRole) : 0), 0);
+    const support = conversations.filter((c) => c.kind === "courier_support");
+    const customers = conversations.filter((c) => c.kind === "courier_business");
+    return {
+      all: conversations.length,
+      support: support.length,
+      customers: customers.length,
+      unreadAll: unreadOf(conversations),
+      unreadSupport: unreadOf(support),
+      unreadCustomers: unreadOf(customers),
     };
   }, [conversations, viewerRole]);
 
@@ -212,8 +233,42 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
           )}
         </div>
 
+        {viewerRole === "courier" && courierCounts && (
+          <div className="border-b p-2">
+            <div className="flex w-full rounded-[14px] bg-border-strong/60 p-1">
+              {([
+                ["all", "הכל", courierCounts.all, courierCounts.unreadAll],
+                ["support", "תמיכה", courierCounts.support, courierCounts.unreadSupport],
+                ["customers", "לקוחות", courierCounts.customers, courierCounts.unreadCustomers],
+              ] as const).map(([key, label, count, unread]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCourierFilter(key)}
+                  className={`flex-1 min-h-11 rounded-[10px] px-1.5 py-2 text-[13px] text-center transition-all ${
+                    courierFilter === key
+                      ? "bg-surface font-bold text-primary shadow-card"
+                      : "font-semibold text-text-subtle"
+                  }`}
+                >
+                  {label} ({count})
+                  {unread > 0 && (
+                    <span className="mr-1 inline-flex min-w-4 justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                      {unread}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {viewerRole !== "admin" && (
-          <StartChatPanel viewerRole={viewerRole} onStart={openConversation} />
+          <StartChatPanel
+            viewerRole={viewerRole}
+            panelFilter={viewerRole === "courier" ? courierFilter : "all"}
+            onStart={openConversation}
+          />
         )}
 
         {viewerRole === "admin" && adminCounts && (
@@ -255,7 +310,9 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
             <div className="p-6 grid place-items-center text-muted-foreground"><Loader2 className="size-5 animate-spin" /></div>
           ) : filteredConversations.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
-              {conversations.length === 0 ? "אין שיחות עדיין" : "אין שיחות תואמות"}
+              {viewerRole === "courier" && courierFilter === "customers"
+                ? "אין שיחה עם בית עסק — תופיע כשתקבל משלוח"
+                : conversations.length === 0 ? "אין שיחות עדיין" : "אין שיחות תואמות"}
             </div>
           ) : (
             <ul className="divide-y">
@@ -279,7 +336,12 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                         {unread > 0 && <Badge className="bg-primary text-primary-foreground">{unread}</Badge>}
                       </div>
                       {viewerRole === "admin" && (
-                        <div className="text-[10px] text-muted-foreground mb-1">{kindLabel}</div>
+                        <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                          <span>{kindLabel}</span>
+                          {c.kind === "courier_business" && c.hidden_from_participants && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">הושלם</Badge>
+                          )}
+                        </div>
                       )}
                       {viewerRole === "admin" && c.kind === "guest_support" && c.job?.guest_phone ? (
                         <div className="text-[10px] text-muted-foreground mb-1 truncate">{c.job.guest_phone}</div>
@@ -473,6 +535,8 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
     setPendingFile(f);
   };
 
+  const participantLocked = !!conv.hidden_from_participants && viewerRole !== "admin";
+
   return (
     <>
       <div className="px-4 py-3 border-b flex items-center gap-2">
@@ -557,7 +621,13 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
         })}
       </div>
 
-      {pendingFile && (
+      {participantLocked && (
+        <div className="border-t px-4 py-3 text-center text-sm text-muted-foreground">
+          השיחה הסתיימה עם מסירת המשלוח
+        </div>
+      )}
+
+      {!participantLocked && pendingFile && (
         <div className="border-t bg-muted/40 p-2 flex items-center gap-2">
           {pendingFile.type.startsWith("image/") && pendingPreview ? (
             <img src={pendingPreview} alt="" className="size-12 rounded object-cover" />
@@ -578,7 +648,7 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="border-t p-3 flex items-center gap-2">
+      {!participantLocked && <form onSubmit={handleSubmit} className="border-t p-3 flex items-center gap-2">
         <input
           ref={fileRef}
           type="file"
@@ -624,7 +694,7 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
             )}
           </>
         )}
-      </form>
+      </form>}
     </>
   );
 }
@@ -643,9 +713,11 @@ type ActiveJob = {
 
 function StartChatPanel({
   viewerRole,
+  panelFilter = "all",
   onStart,
 }: {
   viewerRole: "courier" | "business";
+  panelFilter?: "all" | "support" | "customers";
   onStart: (args: {
     kind: "courier_support" | "business_support" | "courier_business";
     courier_id?: string | null;
@@ -653,6 +725,8 @@ function StartChatPanel({
     job_id?: string | null;
   }) => void | Promise<void>;
 }) {
+  const showSupport = panelFilter !== "customers";
+  const showJobs = panelFilter !== "support";
   const { data: jobs = [] } = useQuery({
     queryKey: ["chat-start-active-jobs", viewerRole],
     queryFn: async () => {
@@ -665,26 +739,30 @@ function StartChatPanel({
 
   return (
     <div className="border-b bg-muted/20 p-3 space-y-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-full justify-start gap-2 h-auto py-2.5"
-        onClick={() => onStart({ kind: viewerRole === "courier" ? "courier_support" : "business_support" })}
-      >
-        <LifeBuoy className="size-4 text-primary" />
-        <span className="flex-1 text-right font-semibold">פנייה לתמיכה</span>
-        <Plus className="size-4 opacity-60" />
-      </Button>
+      {showSupport && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full justify-start gap-2 h-auto py-2.5"
+          onClick={() => onStart({ kind: viewerRole === "courier" ? "courier_support" : "business_support" })}
+        >
+          <LifeBuoy className="size-4 text-primary" />
+          <span className="flex-1 text-right font-semibold">פנייה לתמיכה</span>
+          <Plus className="size-4 opacity-60" />
+        </Button>
+      )}
 
+      {showJobs && (
       <div className="text-[11px] font-bold text-muted-foreground px-1 pt-1">
         {viewerRole === "courier" ? "משלוחים פעילים — צ'אט עם בית העסק" : "משלוחים פעילים — צ'אט עם השליח"}
       </div>
-      {jobs.length === 0 ? (
+      )}
+      {showJobs && jobs.length === 0 ? (
         <div className="text-[11px] text-muted-foreground px-1 py-2 bg-card/50 border border-dashed rounded-lg text-center">
           אין משלוחים פעילים כרגע
         </div>
-      ) : (
+      ) : showJobs ? (
         <div className="space-y-1.5">
           {jobs.map((j) => {
             const partyName =

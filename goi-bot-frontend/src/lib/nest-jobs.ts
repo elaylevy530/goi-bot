@@ -22,6 +22,10 @@ export type NestJob = Record<string, unknown> & {
   dropoff_area?: string | null;
   payment?: string;
   created_at?: string;
+  conversation_id?: string | null;
+  customer_phone?: string | null;
+  pickup_contact_phone?: string | null;
+  job_date?: string | null;
 };
 
 export type NestOfferEvent = Record<string, unknown> & {

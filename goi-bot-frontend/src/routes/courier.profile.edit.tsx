@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { nestSignedFileUrlResolved, nestUploadFile } from "@/lib/nest-files";
+import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
+import { splitWorkingAreas, WORK_AREA_REQUIRED_ERROR } from "@/lib/regions";
 import { Loader2, Save, Camera, User, Bike, FileText, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,7 +54,9 @@ function EditProfilePage() {
   const [email, setEmail] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [baseCity, setBaseCity] = useState("");
-  const [workingAreas, setWorkingAreas] = useState("");
+  const [workingAreas, setWorkingAreas] = useState<string[]>([]);
+  const [legacyAreas, setLegacyAreas] = useState<string[]>([]);
+  const [areasError, setAreasError] = useState<string | null>(null);
   const [vehicle, setVehicle] = useState("");
   const [jobTypes, setJobTypes] = useState("");
   const [experience, setExperience] = useState("");
@@ -83,7 +87,10 @@ function EditProfilePage() {
     setEmail(row.email ?? "");
     setIdNumber(row.id_number ?? "");
     setBaseCity(row.base_city ?? "");
-    setWorkingAreas((row.working_areas ?? []).join(", "));
+    const areas = splitWorkingAreas(row.working_areas);
+    setWorkingAreas(areas.selected);
+    setLegacyAreas(areas.legacy);
+    setAreasError(null);
     setVehicle(row.vehicle_type ?? "");
     setJobTypes((row.job_types ?? []).join(", "));
     setExperience(row.courier_experience_duration ?? "");
@@ -110,24 +117,28 @@ function EditProfilePage() {
         newAvatarPath = uploaded.path;
       }
 
+      if (workingAreas.length === 0 && legacyAreas.length === 0) {
+        setAreasError(WORK_AREA_REQUIRED_ERROR);
+        throw new Error(WORK_AREA_REQUIRED_ERROR);
+      }
       const payload: Record<string, unknown> = {
         full_name: fullName,
         email: email || null,
         id_number: idNumber || null,
         base_city: baseCity || null,
-        working_areas: workingAreas.split(",").map((s) => s.trim()).filter(Boolean),
+        working_areas: workingAreas.length > 0 ? workingAreas : legacyAreas,
         vehicle_type: vehicle || null,
         job_types: jobTypes.split(",").map((s) => s.trim()).filter(Boolean),
         courier_experience_duration: experience.trim().slice(0, 60) || null,
         notes: notes || null,
       };
       if (newAvatarPath) payload.avatar_url = newAvatarPath;
+      if (idFile) {
+        const uploaded = await nestUploadFile("courier-ids", idFile);
+        payload.id_photo_url = uploaded.path;
+      }
 
       await nestUpdateMyCourier(payload);
-
-      if (idFile) {
-        await nestUploadFile("courier-ids", idFile);
-      }
     },
     onSuccess: () => {
       toast.success("הפרופיל עודכן ✓");
@@ -225,7 +236,24 @@ function EditProfilePage() {
           <CardContent className="p-5 space-y-3">
             <SectionTitle icon={Bike} title="רכב ועבודה" />
             <div><Label className="text-end block mb-1">עיר בסיס</Label><Input value={baseCity} onChange={(e) => setBaseCity(e.target.value)} className="text-end" /></div>
-            <div><Label className="text-end block mb-1">אזורי עבודה</Label><Input value={workingAreas} onChange={(e) => setWorkingAreas(e.target.value)} className="text-end" placeholder="תל אביב, רמת גן" /></div>
+            <div>
+              <Label className="text-end block mb-1">אזורי עבודה</Label>
+              <p className="text-xs text-text-subtle text-end mb-2">איפה אתה מוכן לקחת משלוחים?</p>
+              <WorkAreaPicker
+                selected={workingAreas}
+                onChange={(next) => {
+                  setWorkingAreas(next);
+                  if (next.length > 0) setLegacyAreas([]);
+                  setAreasError(next.length === 0 && legacyAreas.length === 0 ? WORK_AREA_REQUIRED_ERROR : null);
+                }}
+                error={areasError}
+              />
+              {legacyAreas.length > 0 && workingAreas.length === 0 && (
+                <p className="text-xs text-text-subtle text-end mt-2">
+                  נשמרו ערים ישנות: {legacyAreas.join(", ")} — בחר אזור מהרשימה כדי לעדכן
+                </p>
+              )}
+            </div>
             <div><Label className="text-end block mb-1">כלי עבודה</Label><Input value={vehicle} onChange={(e) => setVehicle(e.target.value)} className="text-end" placeholder="קטנוע / רכב / אופניים חשמליים" /></div>
             <div><Label className="text-end block mb-1">סוגי עבודות</Label><Input value={jobTypes} onChange={(e) => setJobTypes(e.target.value)} className="text-end" placeholder="אוכל, חבילות, מסמכים" /></div>
             <div><Label className="text-end block mb-1">ניסיון</Label><Input value={experience} onChange={(e) => setExperience(e.target.value)} className="text-end" placeholder="לדוגמה: שנתיים" maxLength={60} /></div>

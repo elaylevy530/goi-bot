@@ -175,6 +175,99 @@ export function regionOf(city: string | null | undefined): Region {
   return CITY_TO_REGION[key] ?? CITY_TO_REGION[city.trim()] ?? "אחר";
 }
 
+/** Signup / profile work areas — exact Hebrew labels stored on the courier. */
+export const WORK_AREA_OPTIONS = [
+  "אזור צפון",
+  "אזור שרון",
+  "אזור מרכז",
+  "אזור דרום",
+  "אזור שפלה וירושלים",
+  "כל הארץ",
+] as const;
+
+export type WorkAreaLabel = (typeof WORK_AREA_OPTIONS)[number];
+
+export const NATIONWIDE_WORK_AREA: WorkAreaLabel = "כל הארץ";
+export const WORK_AREA_REQUIRED_ERROR = "יש לבחור לפחות אזור עבודה אחד";
+
+const ADMIN_REGION_TO_WORK_AREA: Record<Region, WorkAreaLabel | null> = {
+  צפון: "אזור צפון",
+  השרון: "אזור שרון",
+  מרכז: "אזור מרכז",
+  דרום: "אזור דרום",
+  שפלה: "אזור שפלה וירושלים",
+  "ירושלים והסביבה": "אזור שפלה וירושלים",
+  אחר: null,
+};
+
+const WORK_AREA_TO_ADMIN_REGIONS: Record<string, Region[]> = {
+  "אזור צפון": ["צפון"],
+  "אזור שרון": ["השרון"],
+  "אזור מרכז": ["מרכז"],
+  "אזור דרום": ["דרום"],
+  "אזור שפלה וירושלים": ["שפלה", "ירושלים והסביבה"],
+  [NATIONWIDE_WORK_AREA]: REGIONS.filter((r) => r !== "אחר"),
+};
+
+export function isWorkAreaLabel(value: string): value is WorkAreaLabel {
+  return (WORK_AREA_OPTIONS as readonly string[]).includes(value);
+}
+
+export function workAreaOf(city: string | null | undefined): WorkAreaLabel | null {
+  if (!city) return null;
+  const trimmed = city.trim();
+  if (isWorkAreaLabel(trimmed)) return trimmed;
+  if (trimmed.includes(NATIONWIDE_WORK_AREA)) return NATIONWIDE_WORK_AREA;
+  const direct = ADMIN_REGION_TO_WORK_AREA[regionOf(trimmed)];
+  if (direct) return direct;
+  for (const [name, region] of Object.entries(CITY_TO_REGION)) {
+    if (name.length >= 3 && trimmed.includes(name)) {
+      const mapped = ADMIN_REGION_TO_WORK_AREA[region];
+      if (mapped) return mapped;
+    }
+  }
+  return null;
+}
+
+export function toggleWorkArea(selected: string[], option: string): string[] {
+  if (option === NATIONWIDE_WORK_AREA) {
+    return selected.includes(NATIONWIDE_WORK_AREA) ? [] : [NATIONWIDE_WORK_AREA];
+  }
+  const withoutNationwide = selected.filter((a) => a !== NATIONWIDE_WORK_AREA);
+  return withoutNationwide.includes(option)
+    ? withoutNationwide.filter((a) => a !== option)
+    : [...withoutNationwide, option];
+}
+
+export function splitWorkingAreas(values: string[] | null | undefined): {
+  selected: string[];
+  legacy: string[];
+} {
+  const selected: string[] = [];
+  const legacy: string[] = [];
+  for (const raw of values ?? []) {
+    const v = raw.trim();
+    if (!v) continue;
+    if (isWorkAreaLabel(v)) selected.push(v);
+    else legacy.push(v);
+  }
+  return { selected, legacy };
+}
+
+/** City / address overlap plus city → signup-region mapping. */
+export function locationMatchesWorkAreas(location: string | null | undefined, areas: string[]): boolean {
+  if (areas.some((a) => a === NATIONWIDE_WORK_AREA || a.includes(NATIONWIDE_WORK_AREA))) return true;
+  const loc = String(location ?? "").trim();
+  if (!loc) return true;
+  const locWorkArea = workAreaOf(loc);
+  return areas.some((area) => {
+    if (area === loc || loc.includes(area) || area.includes(loc)) return true;
+    if (locWorkArea && area === locWorkArea) return true;
+    const areaWork = workAreaOf(area);
+    return !!(locWorkArea && areaWork && locWorkArea === areaWork);
+  });
+}
+
 // Aggregate regions of base city + all working/pickup/dropoff areas.
 export function regionsOfCourier(c: {
   base_city?: string | null;
@@ -183,9 +276,17 @@ export function regionsOfCourier(c: {
   dropoff_areas?: string[] | null;
 }): Region[] {
   const set = new Set<Region>();
-  if (c.base_city) set.add(regionOf(c.base_city));
+  const addPlace = (place: string) => {
+    const mapped = WORK_AREA_TO_ADMIN_REGIONS[place.trim()];
+    if (mapped) {
+      mapped.forEach((r) => set.add(r));
+      return;
+    }
+    set.add(regionOf(place));
+  };
+  if (c.base_city) addPlace(c.base_city);
   for (const arr of [c.working_areas, c.pickup_areas, c.dropoff_areas]) {
-    (arr ?? []).forEach((city) => set.add(regionOf(city)));
+    (arr ?? []).forEach(addPlace);
   }
   return Array.from(set);
 }

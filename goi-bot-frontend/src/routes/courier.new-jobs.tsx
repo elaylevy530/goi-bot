@@ -160,8 +160,10 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-active-count"] });
+      qc.invalidateQueries({ queryKey: ["active-jobs"] });
+      qc.invalidateQueries({ queryKey: ["chat-conversations"] });
       if (v.response === "accepted" && v.jobId) {
-        navigate({ to: "/courier/mission/$jobId", params: { jobId: v.jobId }, search: { stage: "accepted" } });
+        navigate({ to: "/courier/active" });
       }
     },
     onError: (e: Error) => {
@@ -203,7 +205,9 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-active-count"] });
-      navigate({ to: "/courier/mission/$jobId", params: { jobId }, search: { stage: "accepted" } });
+      qc.invalidateQueries({ queryKey: ["active-jobs"] });
+      qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      navigate({ to: "/courier/active" });
     },
     onError: (e: Error) => {
       if (e.message === "taken") {
