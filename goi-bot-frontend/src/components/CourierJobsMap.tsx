@@ -161,9 +161,11 @@ type Props = {
   onQuote: (job: MapJob) => void;
   onDetails?: (job: MapJob) => void;
   claiming?: boolean;
+  /** Extra classes for the floating zoom/layers cluster (e.g. to clear an overlay). */
+  controlsClassName?: string;
 };
 
-export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming }: Props) {
+export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName }: Props) {
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -617,8 +619,8 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
           />
         )}
 
-        {/* Floating map controls — below header overlay */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+        {/* Floating map controls — sit below the page overlay when one is present */}
+        <div className={`absolute left-3 flex flex-col gap-2 z-10 ${controlsClassName ?? "top-3"}`}>
           <button onClick={cycleMapType} className="size-10 rounded-card bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95" aria-label="שכבות">
             <Layers className="size-4" />
           </button>

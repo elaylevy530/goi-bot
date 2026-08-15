@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
-import { CourierAvatar } from "@/components/CourierAvatar";
 import { termsFor } from "@/lib/courier-kind";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -324,7 +323,6 @@ function NewJobsPage() {
     });
   };
 
-  const displayName = me?.full_name?.trim() || "שליח";
   const availableCount = mapJobs.length;
 
   const refreshJobs = useCallback(async () => {
@@ -346,32 +344,22 @@ function NewJobsPage() {
         className="flex-1 min-h-0 h-full overflow-hidden bg-bg"
       >
       <div dir="rtl" className="relative h-full min-h-0 flex flex-col overflow-hidden">
-        {/* Compact top chrome — keeps the map dominant */}
+        {/* Floating chrome only — map fills the viewport underneath */}
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
-          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/95 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3 space-y-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <CourierMenuButton className="size-11 shadow-card border-0" />
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="min-w-0 text-right">
-                  <p className="text-[12px] text-text-subtle leading-tight">שלום,</p>
-                  <p className="text-base font-bold text-text-strong truncate leading-tight">{displayName}</p>
-                </div>
-                <CourierAvatar
-                  path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
-                  name={displayName}
-                  size={40}
-                />
-                <Link
-                  to="/courier/messages"
-                  aria-label="הודעות"
-                  className="size-10 grid place-items-center rounded-full bg-surface shadow-card text-text-strong active:bg-muted transition-colors shrink-0"
-                >
-                  <Bell className="size-5" strokeWidth={2} />
-                </Link>
+          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/80 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <CourierMenuButton className="size-11 shadow-card border-0 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <AcceptJobsToggle me={me} compact />
               </div>
+              <Link
+                to="/courier/messages"
+                aria-label="הודעות"
+                className="size-11 grid place-items-center rounded-full bg-surface shadow-card text-text-strong active:bg-muted transition-colors shrink-0"
+              >
+                <Bell className="size-5" strokeWidth={2} />
+              </Link>
             </div>
-
-            <AcceptJobsToggle me={me} compact />
 
             <div className="flex w-full rounded-[14px] bg-muted/90 backdrop-blur p-1 shadow-card">
               <button
@@ -403,7 +391,7 @@ function NewJobsPage() {
         {tab === "active" ? (
           <div
             data-ptr-scroll
-            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[11.5rem] px-4 pb-4"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[8.25rem] px-4 pb-4"
           >
             <ActiveJobs />
           </div>
@@ -412,7 +400,7 @@ function NewJobsPage() {
             <Loader2 className="size-6 animate-spin" />
           </div>
         ) : (
-          <div className="flex-1 min-h-0 pt-[10.5rem]">
+          <div className="flex-1 min-h-0">
             <CourierJobsMap
               jobs={mapJobs}
               onClaim={handleClaim}
@@ -420,6 +408,7 @@ function NewJobsPage() {
               onQuote={handleQuote}
               onDetails={openDetails}
               claiming={claim.isPending || respond.isPending}
+              controlsClassName="top-[8.5rem]"
             />
           </div>
         )}

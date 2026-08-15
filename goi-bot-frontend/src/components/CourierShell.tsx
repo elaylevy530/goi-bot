@@ -216,7 +216,8 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   const incomingSeenRef = useRef(new Set<string>());
 
   // App-like back button: hidden on primary bottom-tab screens.
-  const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/wallet", "/courier/profile", "/courier/profile/edit", "/courier"];
+  const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/wallet", "/courier/profile", "/courier"];
+  const isPersonalArea = path === "/courier/profile";
   const showBack = !PRIMARY_PATHS.includes(path);
   const goBack = () => {
     const canGoBack = typeof window !== "undefined" && window.history.length > 1;
@@ -351,28 +352,45 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
           fullBleed ? "h-full min-h-0 overflow-hidden" : "min-h-dvh"
         }`}
       >
-        {/* Sticky app bar — hidden on fullBleed screens (they own their header + menu) */}
+        {/* Sticky app bar — greeting/avatar header is personal-area only.
+            fullBleed screens (map) own their chrome. Other pages get a compact bar. */}
         {!fullBleed && (
           <header className="sticky top-0 z-20 bg-surface/90 backdrop-blur-lg border-b border-border px-4 lg:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
-            <div className="flex items-center justify-between gap-3">
-              <CourierMenuButton className="size-11 shadow-card border-0" />
+            {isPersonalArea ? (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <CourierMenuButton className="size-11 shadow-card border-0" />
 
-              <div className="flex items-center gap-3 min-w-0">
-                {me && <StatusBadge status={me?.courier_status} kind={kind} />}
-                <div className="min-w-0 text-right">
-                  {showBack ? (
-                    <>
-                      <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">חזרה</div>
-                      <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{title ?? "המסך הקודם"}</div>
-                    </>
-                  ) : (
-                    <>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {me && <StatusBadge status={me?.courier_status} kind={kind} />}
+                    <div className="min-w-0 text-right">
                       <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">{greetingHe()}</div>
                       <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{me?.full_name ?? "שליח"}</div>
-                    </>
-                  )}
+                    </div>
+                    <div className="relative shrink-0">
+                      <div className="size-11 rounded-pill bg-primary text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
+                        {initialsOf(me?.full_name)}
+                      </div>
+                      <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
+                    </div>
+                  </div>
                 </div>
-                {showBack ? (
+
+                {(title || subtitle) && (
+                  <div className="mt-3 text-right">
+                    {title && <h1 className="text-xl font-extrabold text-text-strong truncate">{title}</h1>}
+                    {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <CourierMenuButton className="size-11 shadow-card border-0" />
+                <div className="min-w-0 flex-1 text-right">
+                  {title && <h1 className="text-base font-extrabold text-text-strong truncate leading-tight">{title}</h1>}
+                  {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
+                </div>
+                {showBack && (
                   <button
                     onClick={goBack}
                     className="size-11 grid place-items-center rounded-pill bg-muted text-text-strong active:bg-border transition-colors shrink-0"
@@ -380,21 +398,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
                   >
                     <ChevronRight className="size-6" />
                   </button>
-                ) : (
-                  <div className="relative shrink-0">
-                    <div className="size-11 rounded-pill bg-primary text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
-                      {initialsOf(me?.full_name)}
-                    </div>
-                    <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
-                  </div>
                 )}
-              </div>
-            </div>
-
-            {(title || subtitle) && !showBack && (
-              <div className="mt-3 text-right">
-                {title && <h1 className="text-xl font-extrabold text-text-strong truncate">{title}</h1>}
-                {subtitle && <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>}
               </div>
             )}
 
