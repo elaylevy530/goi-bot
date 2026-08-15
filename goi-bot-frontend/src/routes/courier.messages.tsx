@@ -15,7 +15,7 @@ export const Route = createFileRoute("/courier/messages")({
 function CourierMessagesPage() {
   const { c } = Route.useSearch();
   return (
-    <CourierShell title="הודעות" subtitle="צ'אט עם תמיכת המערכת ועם בתי העסק שאתה משלוח עבורם">
+    <CourierShell title="הודעות">
       <ChatCenter viewerRole="courier" initialConversationId={c} />
     </CourierShell>
   );

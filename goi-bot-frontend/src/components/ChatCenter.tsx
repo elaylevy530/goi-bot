@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2, Send, Paperclip, MessageSquare, Image as ImageIcon, ArrowRight, LifeBuoy, Plus, Briefcase, Mic, Square, FileText, X, Download } from "lucide-react";
+import { Loader2, Send, Paperclip, MessageSquare, Image as ImageIcon, ArrowRight, LifeBuoy, Plus, Briefcase, Mic, Square, FileText, X, Download, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { he } from "date-fns/locale";
@@ -82,6 +82,16 @@ function titleFor(c: ConversationRow, viewer: ViewerRole) {
 
 function unreadFor(c: ConversationRow, viewer: ViewerRole) {
   return viewer === "courier" ? c.unread_courier : viewer === "business" ? c.unread_business : c.unread_admin;
+}
+
+function initialsOf(name?: string | null) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]).join("");
+}
+
+function shortTimeAgo(iso: string) {
+  return formatDistanceToNow(new Date(iso), { locale: he, addSuffix: false });
 }
 
 type AdminFilter = "all" | "courier_support" | "business_support" | "courier_business" | "guest_support" | "unread";
@@ -225,17 +235,43 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[340px_minmax(0,1fr)] gap-3 flex-1 min-h-0 md:min-h-[520px]">
       {/* List */}
-      <aside className={`bg-card border rounded-2xl flex flex-col overflow-hidden ${mobileView === "thread" ? "hidden md:flex" : "flex"}`}>
-        <div className="px-4 py-3 border-b font-bold flex items-center gap-2">
-          <MessageSquare className="size-4" /> שיחות
-          {viewerRole === "admin" && adminCounts && adminCounts.unread > 0 && (
-            <Badge className="bg-primary text-primary-foreground mr-auto">{adminCounts.unread} חדשות</Badge>
-          )}
-        </div>
+      <aside className={`flex flex-col overflow-hidden ${mobileView === "thread" ? "hidden md:flex" : "flex"} ${
+        viewerRole === "courier" ? "bg-transparent" : "bg-card border rounded-2xl"
+      }`}>
+        {viewerRole !== "courier" && (
+          <div className="px-4 py-3 border-b font-bold flex items-center gap-2">
+            <MessageSquare className="size-4" /> שיחות
+            {viewerRole === "admin" && adminCounts && adminCounts.unread > 0 && (
+              <Badge className="bg-primary text-primary-foreground mr-auto">{adminCounts.unread} חדשות</Badge>
+            )}
+          </div>
+        )}
 
         {viewerRole === "courier" && courierCounts && (
-          <div className="border-b p-2">
-            <div className="flex w-full rounded-[14px] bg-border-strong/60 p-1">
+          <div className="space-y-3 pb-3">
+            <div className="flex items-center justify-end gap-3 px-1">
+              <div className="min-w-0 text-right">
+                <h1 className="text-xl font-extrabold text-text-strong leading-tight">הודעות</h1>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {courierCounts.unreadAll > 0 ? `${courierCounts.unreadAll} הודעות חדשות` : "הכל מעודכן"}
+                </p>
+              </div>
+              <div className="size-11 rounded-card bg-primary text-primary-foreground grid place-items-center shadow-card shrink-0">
+                <MessageSquare className="size-5" />
+              </div>
+            </div>
+
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-text-muted pointer-events-none" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="חיפוש שיחה..."
+                className="h-11 rounded-card border-border bg-surface pr-10 text-sm"
+              />
+            </div>
+
+            <div className="flex w-full rounded-[14px] bg-muted p-1 shadow-card">
               {([
                 ["all", "הכל", courierCounts.all, courierCounts.unreadAll],
                 ["support", "תמיכה", courierCounts.support, courierCounts.unreadSupport],
@@ -245,13 +281,13 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                   key={key}
                   type="button"
                   onClick={() => setCourierFilter(key)}
-                  className={`flex-1 min-h-11 rounded-[10px] px-1.5 py-2 text-[13px] text-center transition-all ${
+                  className={`flex-1 min-h-11 rounded-[10px] px-1.5 py-2 text-sm text-center transition-all ${
                     courierFilter === key
-                      ? "bg-surface font-bold text-primary shadow-card"
+                      ? "bg-surface font-bold text-text-strong shadow-card"
                       : "font-semibold text-text-subtle"
                   }`}
                 >
-                  {label} ({count})
+                  {label} {count}
                   {unread > 0 && (
                     <span className="mr-1 inline-flex min-w-4 justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                       {unread}
@@ -314,6 +350,46 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                 ? "אין שיחה עם בית עסק — תופיע כשתקבל משלוח"
                 : conversations.length === 0 ? "אין שיחות עדיין" : "אין שיחות תואמות"}
             </div>
+          ) : viewerRole === "courier" ? (
+            <ul className="space-y-2 pb-2">
+              {filteredConversations.map((c) => {
+                const unread = unreadFor(c, viewerRole);
+                const name = titleFor(c, viewerRole);
+                const isSupport = c.kind === "courier_support";
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveId(c.id); setMobileView("thread"); }}
+                      className={`w-full text-right rounded-card border border-border px-3 py-3 transition-colors ${
+                        unread > 0 ? "bg-primary-soft/70" : "bg-surface"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar className="size-11 shrink-0">
+                          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-extrabold">
+                            {isSupport ? <LifeBuoy className="size-4" /> : initialsOf(name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-text-muted shrink-0">{shortTimeAgo(c.last_message_at)}</span>
+                            <div className="min-w-0 font-bold text-sm text-text-strong truncate">{name}</div>
+                          </div>
+                          <div className="mt-1 flex items-center justify-end">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-success-text">
+                              {isSupport ? <LifeBuoy className="size-3" /> : <User className="size-3" />}
+                              {isSupport ? "תמיכה" : "לקוח"}
+                            </span>
+                          </div>
+                          <div className="mt-1.5 text-sm text-text-subtle truncate">{c.last_message_preview ?? "—"}</div>
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           ) : (
             <ul className="divide-y">
               {filteredConversations.map((c) => {
@@ -355,7 +431,6 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                 );
               })}
             </ul>
-
           )}
         </ScrollArea>
       </aside>
@@ -738,28 +813,50 @@ function StartChatPanel({
   });
 
   return (
-    <div className="border-b bg-muted/20 p-3 space-y-2">
+    <div className={`space-y-3 ${viewerRole === "courier" ? "pb-3" : "border-b bg-muted/20 p-3 space-y-2"}`}>
       {showSupport && (
-        <Button
+        <button
           type="button"
-          variant="outline"
-          size="sm"
-          className="w-full justify-start gap-2 h-auto py-2.5"
+          className={`w-full flex items-center gap-3 text-right transition-colors ${
+            viewerRole === "courier"
+              ? "rounded-card bg-primary text-primary-foreground px-4 py-3 shadow-card min-h-14"
+              : "rounded-lg border border-border bg-surface px-3 py-2.5"
+          }`}
           onClick={() => onStart({ kind: viewerRole === "courier" ? "courier_support" : "business_support" })}
         >
-          <LifeBuoy className="size-4 text-primary" />
-          <span className="flex-1 text-right font-semibold">פנייה לתמיכה</span>
-          <Plus className="size-4 opacity-60" />
-        </Button>
+          {viewerRole === "courier" ? (
+            <span className="size-8 grid place-items-center rounded-full bg-primary-foreground/15 shrink-0">
+              <LifeBuoy className="size-4" />
+            </span>
+          ) : (
+            <LifeBuoy className="size-4 text-primary" />
+          )}
+          <span className="flex-1 min-w-0">
+            <span className={`block font-bold leading-tight ${viewerRole === "courier" ? "text-sm" : "text-sm"}`}>
+              {viewerRole === "courier" ? "פנייה לתמיכת Goi" : "פנייה לתמיכה"}
+            </span>
+            {viewerRole === "courier" && (
+              <span className="block text-xs text-primary-foreground/80 mt-0.5">שאלה, תקלה או עזרה – אנחנו כאן</span>
+            )}
+          </span>
+          <Plus className={`size-5 shrink-0 ${viewerRole === "courier" ? "opacity-90" : "opacity-60"}`} />
+        </button>
       )}
 
       {showJobs && (
-      <div className="text-[11px] font-bold text-muted-foreground px-1 pt-1">
-        {viewerRole === "courier" ? "משלוחים פעילים — צ'אט עם בית העסק" : "משלוחים פעילים — צ'אט עם השליח"}
+      <div className={`font-bold px-1 pt-1 flex items-center justify-end gap-1.5 ${
+        viewerRole === "courier" ? "text-sm text-text-strong" : "text-[11px] text-muted-foreground"
+      }`}>
+        {viewerRole === "courier" ? "משלוחים פעילים – צ'אט עם הלקוח" : "משלוחים פעילים — צ'אט עם השליח"}
+        {viewerRole === "courier" && <Briefcase className="size-3.5 text-primary" />}
       </div>
       )}
       {showJobs && jobs.length === 0 ? (
-        <div className="text-[11px] text-muted-foreground px-1 py-2 bg-card/50 border border-dashed rounded-lg text-center">
+        <div className={`text-center border border-dashed rounded-card ${
+          viewerRole === "courier"
+            ? "text-sm text-text-muted px-3 py-4 bg-surface"
+            : "text-[11px] text-muted-foreground px-1 py-2 bg-card/50"
+        }`}>
           אין משלוחים פעילים כרגע
         </div>
       ) : showJobs ? (
@@ -794,7 +891,7 @@ function StartChatPanel({
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
