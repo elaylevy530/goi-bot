@@ -89,7 +89,7 @@ function BankDetailsPage() {
               </span>
             </div>
             <p className="text-xs text-text-subtle text-end">
-              הפרטים נשמרים לפרופיל ומשמשים את ההנהלה לתשלום. אותם פרטים יופיעו גם בבקשת משיכה.
+              הפרטים נשמרים לפרופיל ומשמשים את ההנהלה לתשלום.
             </p>
             {showVerifyHint && (
               <div className={`text-xs font-bold text-end rounded-xl px-3 py-2 ${

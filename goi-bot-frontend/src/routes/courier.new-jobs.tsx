@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
 import { isCourierApproved, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind } from "@/lib/courier-live-jobs";
-import { ContactBlock, ActiveJobs } from "@/routes/courier.history";
+import { ContactBlock } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
 import { PullToRefresh } from "@/components/courier/PullToRefresh";
@@ -34,8 +34,6 @@ export const Route = createFileRoute("/courier/new-jobs")({
   }),
   component: NewJobsPage,
 });
-
-type JobsTab = "available" | "active";
 
 function deliveryKindLabel(job: any) {
   const qty = Number(job?.number_of_packages ?? 0);
@@ -52,7 +50,6 @@ function NewJobsPage() {
   const navigate = useNavigate();
   const { jobId: focusJobId } = Route.useSearch();
   const isApproved = isCourierApproved(me);
-  const [tab, setTab] = useState<JobsTab>("available");
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
 
@@ -362,40 +359,23 @@ function NewJobsPage() {
             </div>
 
             <div className="flex w-full rounded-[14px] bg-muted/90 backdrop-blur p-1 shadow-card">
-              <button
-                type="button"
-                onClick={() => setTab("active")}
-                className={`flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center transition-all ${
-                  tab === "active"
-                    ? "bg-surface font-bold text-primary shadow-card"
-                    : "font-semibold text-text-subtle"
-                }`}
+              <Link
+                to="/courier/active"
+                className="flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center font-semibold text-text-subtle transition-all"
               >
                 {t.kind === "mover" ? `פעילות (${activeCount})` : `פעילים (${activeCount})`}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("available")}
-                className={`flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center transition-all ${
-                  tab === "available"
-                    ? "bg-surface font-bold text-primary shadow-card"
-                    : "font-semibold text-text-subtle"
-                }`}
+              </Link>
+              <span
+                aria-current="page"
+                className="flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center bg-surface font-bold text-primary shadow-card"
               >
                 {t.kind === "mover" ? `זמינות (${availableCount})` : `זמינים (${availableCount})`}
-              </button>
+              </span>
             </div>
           </div>
         </div>
 
-        {tab === "active" ? (
-          <div
-            data-ptr-scroll
-            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pt-[8.25rem] px-4 pb-4"
-          >
-            <ActiveJobs />
-          </div>
-        ) : isLoading && availableCount === 0 ? (
+        {isLoading && availableCount === 0 ? (
           <div className="flex-1 grid place-items-center text-text-muted">
             <Loader2 className="size-6 animate-spin" />
           </div>

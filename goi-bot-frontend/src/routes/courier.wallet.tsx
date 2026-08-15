@@ -1,28 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import {
-  nestListMyCourierOutcomes, nestListWithdrawals, nestCreateWithdrawal, nestListActiveBonuses,
+  nestListMyCourierOutcomes, nestListWithdrawals, nestListActiveBonuses,
 } from "@/lib/nest-domain";
 import {
-  Wallet as WalletIcon, Loader2, Send, ArrowDownLeft, ArrowUpRight, TrendingUp,
-  Clock, CheckCircle2, XCircle, Sparkles, Building2, Smartphone, Wallet,
+  Wallet as WalletIcon, Send, ArrowUpRight, TrendingUp,
+  Sparkles, Building2, Smartphone, Wallet,
   Route as RouteIcon, Coins, ChevronLeft, Gift, Calendar as CalendarIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { BankDetailsFields } from "@/components/courier/BankDetailsFields";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/courier/wallet")({
   head: () => ({ meta: [{ title: "הארנק שלי — Goi" }] }),
@@ -33,15 +28,6 @@ type Period = "day" | "week" | "month" | "custom";
 
 function WalletPage() {
   const { data: me } = useMyCourier();
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [bankBranch, setBankBranch] = useState("");
-  const [bankAccount, setBankAccount] = useState("");
-  const [accountOwner, setAccountOwner] = useState("");
-  const [note, setNote] = useState("");
-  const [editBank, setEditBank] = useState(false);
 
   // Period filter for "my deliveries" report
   const [period, setPeriod] = useState<Period>("day");
@@ -49,63 +35,6 @@ function WalletPage() {
   const [customFrom, setCustomFrom] = useState<string>(toDateInput(today));
   const [customTo, setCustomTo] = useState<string>(toDateInput(today));
   const [selectedOutcome, setSelectedOutcome] = useState<any | null>(null);
-
-  // Prefill bank details from courier profile (saved once, reused every time)
-  useEffect(() => {
-    if (!me) return;
-    setBankName((prev) => prev || (me as any).bank_name || "");
-    setBankBranch((prev) => prev || (me as any).bank_branch || "");
-    setBankAccount((prev) => prev || (me as any).bank_account || "");
-    setAccountOwner((prev) => prev || (me as any).bank_account_owner || me.full_name || "");
-  }, [me?.id]);
-
-  const hasSavedBank = !!((me as any)?.bank_name && (me as any)?.bank_account && (me as any)?.bank_account_owner);
-
-  const createWithdrawal = useMutation({
-    mutationFn: async () => {
-      if (!me?.id) throw new Error("לא נמצא שליח");
-      const amt = Number(amount);
-      if (!amt || amt <= 0) throw new Error("יש להזין סכום תקין");
-      if (availableToWithdraw <= 0) throw new Error("אין יתרה זמינה למשיכה בארנק");
-      if (amt > availableToWithdraw) throw new Error(`לא ניתן לבקש יותר מהיתרה הזמינה (₪${fmt(availableToWithdraw)})`);
-      if (!bankName || !bankAccount || !accountOwner) throw new Error("יש למלא פרטי חשבון בנק");
-
-      // Save bank details to courier profile so they're remembered next time
-      const profileChanged =
-        bankName !== ((me as any).bank_name ?? "") ||
-        bankBranch !== ((me as any).bank_branch ?? "") ||
-        bankAccount !== ((me as any).bank_account ?? "") ||
-        accountOwner !== ((me as any).bank_account_owner ?? "");
-      if (profileChanged) {
-        await nestUpdateMyCourier({
-          bank_name: bankName,
-          bank_branch: bankBranch || null,
-          bank_account: bankAccount,
-          bank_account_owner: accountOwner,
-        });
-      }
-
-      await nestCreateWithdrawal({
-        amount: amt,
-        payment_method: "bank",
-        note: note || null,
-        bank_name: bankName,
-        bank_branch: bankBranch || null,
-        bank_account: bankAccount,
-        account_owner: accountOwner,
-      });
-    },
-    onSuccess: () => {
-      toast.success("בקשת המשיכה נשלחה למנהל ✓");
-      setOpen(false);
-      setEditBank(false);
-      setAmount(""); setNote("");
-      qc.invalidateQueries({ queryKey: ["wallet-withdrawals"] });
-      qc.invalidateQueries({ queryKey: ["my-courier-me"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -223,7 +152,7 @@ function WalletPage() {
   const fmt1 = (n: number) => new Intl.NumberFormat("he-IL", { maximumFractionDigits: 1 }).format(n);
 
   return (
-    <CourierShell title="הארנק שלי" subtitle="רווחים יומיים ומשיכות">
+    <CourierShell title="הארנק שלי" subtitle="רווחים יומיים">
       <div className="-mx-1 sm:mx-0 space-y-4" dir="rtl">
         {/* ============ DAILY EARNINGS HERO (Figma 44:276) ============ */}
         <div className="relative overflow-hidden rounded-[1.75rem] bg-primary text-primary-foreground shadow-fab">
@@ -246,106 +175,12 @@ function WalletPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 mb-4">
+            <div className="grid grid-cols-2 gap-2.5">
               <HeroChip label="משלוחים" value={String(jobsToday)} />
               <HeroChip label="שעות פעילות" value={String(hoursOnlineToday)} />
               <HeroChip label="ממוצע למשלוח" value={`₪${fmt(avgPerDelivery)}`} />
               <HeroChip label="טיפים" value={`₪${fmt(tipsToday)}`} />
             </div>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <button
-                  disabled={availableToWithdraw <= 0}
-                  className="w-full bg-white text-primary py-3.5 rounded-2xl font-bold text-[15px] shadow-xl active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <Send className="size-4" /> בקשת משיכה
-                </button>
-              </DialogTrigger>
-              <DialogContent dir="rtl" className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-end">בקשת משיכה</DialogTitle>
-                  <DialogDescription className="text-end">הבקשה תישלח למנהל לאישור ותשלום</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-end block mb-1">סכום (₪)</Label>
-                    <Input type="number" inputMode="decimal" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="text-end" />
-                    <div className="flex items-center justify-between text-xs mt-1.5">
-                      <button type="button" className="text-primary font-bold" onClick={() => setAmount(String(Math.floor(availableToWithdraw)))}>הזן הכל</button>
-                      <span className="text-slate-500">זמין: ₪{fmt(availableToWithdraw)}</span>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border bg-muted/40 p-3 text-end">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <button
-                        type="button"
-                        className="text-[11px] text-primary font-bold"
-                        onClick={() => setEditBank((v) => !v)}
-                      >
-                        {editBank ? "סגור עריכה" : (hasSavedBank ? "עריכת פרטי בנק" : "הוסף פרטי בנק")}
-                      </button>
-                      <div>
-                        <Label className="text-[11px] block">חשבון לתשלום (העברה בנקאית)</Label>
-                        {hasSavedBank && !editBank && (
-                          <div className="text-[12px] font-bold mt-0.5">
-                            {accountOwner} · {bankName}{bankBranch ? ` (סניף ${bankBranch})` : ""} · חשבון {bankAccount}
-                          </div>
-                        )}
-                        {!hasSavedBank && !editBank && (
-                          <div className="text-[11px] text-amber-700 mt-0.5">לא נשמרו פרטי בנק — נדרש למילוי חד פעמי</div>
-                        )}
-                      </div>
-                    </div>
-                    {(editBank || !hasSavedBank) && (
-                      <div className="mt-2 space-y-2">
-                        <BankDetailsFields
-                          compact
-                          accountOwner={accountOwner}
-                          bankName={bankName}
-                          bankBranch={bankBranch}
-                          bankAccount={bankAccount}
-                          onAccountOwner={setAccountOwner}
-                          onBankName={setBankName}
-                          onBankBranch={setBankBranch}
-                          onBankAccount={setBankAccount}
-                        />
-                        <div className="text-[10px] text-muted-foreground">הפרטים יישמרו אוטומטית ויהיו מוכנים לכל בקשה הבאה.</div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div><Label className="text-end block mb-1">הערה (לא חובה)</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} className="text-end" rows={2} /></div>
-
-                  {availableToWithdraw <= 0 && (
-                    <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 text-end">
-                      אין יתרה זמינה למשיכה בארנק כרגע.
-                    </div>
-                  )}
-                  {Number(amount) > availableToWithdraw && availableToWithdraw > 0 && (
-                    <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 text-end">
-                      הסכום חורג מהיתרה הזמינה (₪{fmt(availableToWithdraw)}).
-                    </div>
-                  )}
-                </div>
-                <DialogFooter className="gap-2 sm:flex-row-reverse">
-                  <Button
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={
-                      createWithdrawal.isPending ||
-                      availableToWithdraw <= 0 ||
-                      !Number(amount) ||
-                      Number(amount) <= 0 ||
-                      Number(amount) > availableToWithdraw
-                    }
-                    onClick={() => createWithdrawal.mutate()}
-                  >
-                    {createWithdrawal.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} שלח בקשה
-                  </Button>
-                  <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
 
