@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   nestAddCourierDecline,
   nestClaimJob,
-  nestCourierActiveJobCount,
   nestListCourierDeclines,
   nestListCourierOffers,
   nestListCourierQuotes,
@@ -106,20 +105,12 @@ function NewJobsPage() {
     },
   });
 
-  const { data: activeCount = 0 } = useQuery({
-    queryKey: ["courier-active-count", me?.id],
-    enabled: !!me?.id,
-    refetchInterval: 15_000,
-    queryFn: () => nestCourierActiveJobCount(),
-  });
-
   useEffect(() => {
     if (!me?.id) return;
     const timer = window.setInterval(() => {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
-      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
     }, 20_000);
     return () => window.clearInterval(timer);
   }, [me?.id, qc]);
@@ -155,7 +146,6 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
-      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
       qc.invalidateQueries({ queryKey: ["active-jobs"] });
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
       if (v.response === "accepted" && v.jobId) {
@@ -200,7 +190,6 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
-      qc.invalidateQueries({ queryKey: ["courier-active-count"] });
       qc.invalidateQueries({ queryKey: ["active-jobs"] });
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
       navigate({ to: "/courier/active" });
@@ -327,8 +316,6 @@ function NewJobsPage() {
       qc.refetchQueries({ queryKey: ["new-jobs"] }),
       qc.refetchQueries({ queryKey: ["courier-open-jobs"] }),
       qc.refetchQueries({ queryKey: ["courier-quote-requests"] }),
-      qc.refetchQueries({ queryKey: ["courier-active-count"] }),
-      qc.refetchQueries({ queryKey: ["active-jobs"] }),
       qc.refetchQueries({ queryKey: ["my-courier-me"] }),
     ]);
   }, [qc]);
@@ -343,7 +330,7 @@ function NewJobsPage() {
       <div dir="rtl" className="relative h-full min-h-0 flex flex-col overflow-hidden">
         {/* Floating chrome only — map fills the viewport underneath */}
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
-          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/80 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3 space-y-2">
+          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/80 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
             <div className="flex items-center gap-2">
               <CourierMenuButton className="size-11 shadow-card border-0 shrink-0" />
               <div className="min-w-0 flex-1">
@@ -356,21 +343,6 @@ function NewJobsPage() {
               >
                 <Bell className="size-5" strokeWidth={2} />
               </Link>
-            </div>
-
-            <div className="flex w-full rounded-[14px] bg-muted/90 backdrop-blur p-1 shadow-card">
-              <Link
-                to="/courier/active"
-                className="flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center font-semibold text-text-subtle transition-all"
-              >
-                {t.kind === "mover" ? `פעילות (${activeCount})` : `פעילים (${activeCount})`}
-              </Link>
-              <span
-                aria-current="page"
-                className="flex-1 min-h-10 rounded-[10px] px-2 py-2 text-sm text-center bg-surface font-bold text-primary shadow-card"
-              >
-                {t.kind === "mover" ? `זמינות (${availableCount})` : `זמינים (${availableCount})`}
-              </span>
             </div>
           </div>
         </div>
@@ -388,7 +360,7 @@ function NewJobsPage() {
               onQuote={handleQuote}
               onDetails={openDetails}
               claiming={claim.isPending || respond.isPending}
-              controlsClassName="top-[8.5rem]"
+              controlsClassName="top-[5.5rem]"
             />
           </div>
         )}

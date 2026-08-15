@@ -1,10 +1,47 @@
 export type LatLng = { lat: number; lng: number };
 
+export type RouteStep = {
+  instruction: string;
+  distanceM: number;
+  durationSec: number;
+  maneuver: string | null;
+  start: LatLng;
+};
+
 export type DrivingRoute = {
   path: LatLng[];
   distanceKm: number;
   durationMin: number;
+  steps?: RouteStep[];
 };
+
+export function stripRouteHtml(html: string) {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Closest upcoming step for a live nav banner. */
+export function nextRouteStep(route: DrivingRoute | null, here: LatLng | null): RouteStep | null {
+  const steps = route?.steps;
+  if (!steps?.length) return null;
+  if (!here) return steps[0] ?? null;
+  let best = steps[0];
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const step of steps) {
+    const d = haversineKm(here, step.start);
+    if (d < bestD) {
+      bestD = d;
+      best = step;
+    }
+  }
+  const idx = steps.indexOf(best);
+  if (bestD < 0.04 && idx < steps.length - 1) return steps[idx + 1];
+  return best;
+}
 
 /** Round coords so tiny GPS jitter doesn't spam Directions. */
 export function routeCacheKey(origin: LatLng, destination: LatLng): string {
@@ -88,9 +125,20 @@ export async function fetchDrivingRoute(
   const meters = legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
   const seconds = legs.reduce((sum, leg) => sum + (leg.duration?.value ?? 0), 0);
 
+  const steps: RouteStep[] = legs.flatMap((leg) =>
+    (leg.steps ?? []).map((step) => ({
+      instruction: stripRouteHtml(step.instructions ?? ""),
+      distanceM: step.distance?.value ?? 0,
+      durationSec: step.duration?.value ?? 0,
+      maneuver: (step as { maneuver?: string }).maneuver ?? null,
+      start: { lat: step.start_location.lat(), lng: step.start_location.lng() },
+    })),
+  );
+
   return {
     path: overview.map((p) => ({ lat: p.lat(), lng: p.lng() })),
     distanceKm: Math.round((meters / 1000) * 10) / 10,
     durationMin: Math.max(1, Math.round(seconds / 60)),
+    steps,
   };
 }

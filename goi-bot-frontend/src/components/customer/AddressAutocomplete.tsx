@@ -27,7 +27,7 @@ export function loadGoogleMaps(): Promise<void> {
     }
     window.__initGmaps = () => resolve();
     const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${BROWSER_KEY}&libraries=places&loading=async&callback=__initGmaps${TRACKING_ID ? `&channel=${TRACKING_ID}` : ""}`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${BROWSER_KEY}&libraries=places&language=iw&region=IL&loading=async&callback=__initGmaps${TRACKING_ID ? `&channel=${TRACKING_ID}` : ""}`;
     s.async = true;
     s.onerror = () => reject(new Error("Failed to load Google Maps"));
     document.head.appendChild(s);

@@ -6,11 +6,13 @@ import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
 import { nestCourierUpdateProgress, nestGetJob, nestListJobStatusLogs } from "@/lib/nest-jobs";
 import { jobBusinessPhone, resolveCourierBusinessConversation } from "@/lib/nest-chat";
 import {
-  Camera, Check, CheckCircle2, MessageCircle, Navigation, Phone, PhoneCall, TriangleAlert,
+  ArrowLeft, ArrowRight, ArrowUp, Camera, Check, CheckCircle2, CornerUpLeft, CornerUpRight,
+  MessageCircle, Navigation, Phone, PhoneCall, TriangleAlert, Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { openWaze } from "@/lib/waze";
+import { MissionNavMap, type MissionRouteInfo, type MissionStop } from "@/components/courier/MissionNavMap";
 
 type MissionUiStage =
   | "accepted"
@@ -155,6 +157,16 @@ function MissionPage() {
 
   const pickup = String(job.pickup_address ?? job.pickup_area ?? "—");
   const dropoff = String(job.dropoff_address ?? job.dropoff_area ?? "—");
+  const pickupStop: MissionStop = {
+    address: pickup,
+    lat: (job as { pickup_lat?: number | null }).pickup_lat,
+    lng: (job as { pickup_lng?: number | null }).pickup_lng,
+  };
+  const dropoffStop: MissionStop = {
+    address: dropoff,
+    lat: (job as { dropoff_lat?: number | null }).dropoff_lat,
+    lng: (job as { dropoff_lng?: number | null }).dropoff_lng,
+  };
   const storeName = String(job.customer_name ?? "עסק");
   const recipient = String(job.recipient_name ?? "לקוח");
   const payment = Number(job.payment ?? 0);
@@ -179,10 +191,13 @@ function MissionPage() {
             storeName={storeName}
             pickup={pickup}
             dropoff={dropoff}
+            pickupStop={pickupStop}
+            dropoffStop={dropoffStop}
             payment={payment}
             onChatBusiness={() => { void openBusinessChat(); }}
             onCallBusiness={callBusiness}
-            onStart={() => {
+            onStart={() => setStep.mutate("בדרך לאיסוף")}
+            onStartWaze={() => {
               openWaze(pickup);
               setStep.mutate("בדרך לאיסוף");
             }}
@@ -196,9 +211,12 @@ function MissionPage() {
             name={storeName}
             subtitle={itemsLabel}
             address={pickup}
+            destination={pickupStop}
+            destinationKind="pickup"
             stepperActive={0}
             swipeLabel="החלק לאישור הגעה"
             ctaLabel="הגעתי לנקודת האיסוף"
+            wazeLabel="נווט לאיסוף בוויז"
             onSwipeOrCta={() => setUiStage("at_pickup")}
             onNavigate={() => openWaze(pickup)}
             onChatBusiness={() => { void openBusinessChat(); }}
@@ -227,6 +245,7 @@ function MissionPage() {
           <EnRouteStage
             recipient={recipient}
             address={dropoff}
+            destination={dropoffStop}
             onArrived={() => setUiStage("confirm")}
             onNavigate={() => openWaze(dropoff)}
             onCall={() => {
@@ -274,26 +293,54 @@ function MissionPage() {
   );
 }
 
-function MapBackdrop({ className = "" }: { className?: string }) {
+function formatRouteDistance(route: MissionRouteInfo | null) {
+  if (!route) return null;
+  if (route.nextDistanceM != null && route.nextDistanceM < 1000) {
+    return `${Math.max(10, Math.round(route.nextDistanceM / 10) * 10)} מ׳`;
+  }
+  return `${route.distanceKm} ק״מ`;
+}
+
+function ManeuverIcon({ maneuver }: { maneuver?: string | null }) {
+  const m = (maneuver ?? "").toLowerCase();
+  const Icon =
+    m.includes("left") && m.includes("sharp") ? Undo2
+    : m.includes("left") ? (m.includes("slight") ? CornerUpLeft : ArrowLeft)
+    : m.includes("right") && m.includes("sharp") ? Undo2
+    : m.includes("right") ? (m.includes("slight") ? CornerUpRight : ArrowRight)
+    : ArrowUp;
   return (
-    <div className={cn("relative overflow-hidden bg-[#e8edf3]", className)}>
-      <svg className="absolute inset-0 size-full opacity-70" aria-hidden>
-        <g stroke="#ffffff" strokeWidth="10" fill="none">
-          <path d="M-20 80 L420 200" />
-          <path d="M-40 180 L300 520" />
-          <path d="M40 320 L420 520" />
-          <path d="M160 -20 L280 520" />
-        </g>
-        <g stroke="var(--primary)" strokeWidth="5" fill="none" opacity="0.85">
-          <path d="M90 140 L210 200 L170 300" />
-        </g>
-        <circle cx="96" cy="136" r="8" fill="var(--primary)" />
-        <circle cx="96" cy="136" r="18" fill="var(--primary)" opacity="0.2" />
-        <circle cx="210" cy="200" r="10" fill="var(--primary)" />
-        <circle cx="210" cy="200" r="22" fill="var(--primary)" opacity="0.18" />
-        <circle cx="170" cy="300" r="8" fill="#ef4444" />
-        <circle cx="170" cy="300" r="18" fill="#ef4444" opacity="0.2" />
-      </svg>
+    <span className="size-11 rounded-xl bg-primary-foreground/15 grid place-items-center shrink-0">
+      <Icon className="size-6" strokeWidth={2.4} />
+    </span>
+  );
+}
+
+function NavBanner({
+  fallbackTitle, name, address, route,
+}: {
+  fallbackTitle: string; name: string; address: string; route: MissionRouteInfo | null;
+}) {
+  const dist = formatRouteDistance(route);
+  return (
+    <div className="rounded-2xl bg-map-nav-banner text-primary-foreground shadow-card-strong overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <ManeuverIcon maneuver={route?.maneuver} />
+        <div className="min-w-0 flex-1 text-right">
+          <p className="text-sm font-extrabold leading-snug">
+            {route?.nextInstruction || fallbackTitle}
+          </p>
+          <p className="text-xs text-primary-foreground/75 mt-0.5 tabular-nums">
+            {route
+              ? [dist, `${route.durationMin} דק׳`].filter(Boolean).join(" · ")
+              : "מחשב מסלול…"}
+          </p>
+        </div>
+      </div>
+      <div className="px-4 py-2.5 bg-surface text-text-strong text-right">
+        <p className="text-sm font-bold truncate">{name}</p>
+        <p className="text-xs text-text-subtle truncate">{address}</p>
+      </div>
     </div>
   );
 }
@@ -324,13 +371,15 @@ function BusinessContactRow({
 }
 
 function AcceptedStage({
-  jobNumber, storeName, pickup, dropoff, payment, onStart, onChatBusiness, onCallBusiness, pending,
+  jobNumber, storeName, pickup, dropoff, pickupStop, dropoffStop, payment, onStart, onStartWaze, onChatBusiness, onCallBusiness, pending,
 }: {
   jobNumber?: string; storeName: string; pickup: string; dropoff: string;
-  payment: number; onStart: () => void; onChatBusiness: () => void; onCallBusiness: () => void; pending?: boolean;
+  pickupStop: MissionStop; dropoffStop: MissionStop;
+  payment: number; onStart: () => void; onStartWaze: () => void;
+  onChatBusiness: () => void; onCallBusiness: () => void; pending?: boolean;
 }) {
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-y-auto pb-[calc(7rem+env(safe-area-inset-bottom))]">
+    <div className="flex-1 min-h-0 flex flex-col overflow-y-auto pb-[calc(9rem+env(safe-area-inset-bottom))]">
       <div className="px-5 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col items-center text-center gap-3">
         <div className="size-[72px] rounded-full bg-primary-soft grid place-items-center text-primary mt-2">
           <Check className="size-9" strokeWidth={2.5} />
@@ -371,18 +420,32 @@ function AcceptedStage({
         </div>
       </div>
 
-      <div className="mx-5 mt-4 h-40 rounded-2xl overflow-hidden border border-border">
-        <MapBackdrop className="size-full" />
+      <div className="mx-5 mt-4 h-44 rounded-2xl overflow-hidden border border-border">
+        <MissionNavMap
+          mode="preview"
+          destination={pickupStop}
+          destinationKind="pickup"
+          otherStop={dropoffStop}
+          className="size-full"
+        />
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 z-20 bg-bg/95 backdrop-blur border-t border-border px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-0 inset-x-0 z-20 bg-bg/95 backdrop-blur border-t border-border px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">
         <button
           type="button"
           disabled={pending}
           onClick={onStart}
           className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] disabled:opacity-60"
         >
-          נווט לאיסוף בוויז
+          התחל ניווט במפה
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onStartWaze}
+          className="w-full min-h-11 rounded-xl border border-border font-semibold text-sm flex items-center justify-center gap-2"
+        >
+          <Navigation className="size-4 text-primary" /> נווט לאיסוף בוויז
         </button>
       </div>
     </div>
@@ -426,28 +489,29 @@ function Stepper({ active }: { active: 0 | 1 | 2 }) {
 }
 
 function ActiveNavStage({
-  stepLabel, name, subtitle, address, stepperActive, swipeLabel, ctaLabel, onSwipeOrCta, onNavigate, onChatBusiness, onCallBusiness, pending,
+  stepLabel, name, subtitle, address, destination, destinationKind, stepperActive, swipeLabel, ctaLabel, wazeLabel, onSwipeOrCta, onNavigate, onChatBusiness, onCallBusiness, pending,
 }: {
   stepLabel: string; name: string; subtitle: string; address: string;
-  stepperActive: 0 | 1 | 2; swipeLabel: string; ctaLabel: string;
+  destination: MissionStop; destinationKind: "pickup" | "dropoff";
+  stepperActive: 0 | 1 | 2; swipeLabel: string; ctaLabel: string; wazeLabel: string;
   onSwipeOrCta: () => void; onNavigate: () => void; onChatBusiness: () => void; onCallBusiness: () => void; pending?: boolean;
 }) {
+  const [route, setRoute] = useState<MissionRouteInfo | null>(null);
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="relative flex-1 min-h-[45%]">
-        <MapBackdrop className="absolute inset-0" />
+        <MissionNavMap
+          mode="navigate"
+          destination={destination}
+          destinationKind={destinationKind}
+          className="absolute inset-0"
+          onRoute={setRoute}
+        />
         <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] inset-x-4 z-10">
-          <div className="rounded-2xl bg-surface/95 backdrop-blur border border-border shadow-card p-4">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="font-bold text-primary">{stepLabel}</span>
-              <span className="text-text-subtle">מרחק: —</span>
-            </div>
-            <p className="mt-2 text-base font-bold text-text-strong text-right">{name}</p>
-            <p className="text-sm text-text-subtle text-right">{subtitle}</p>
-            <div className="mt-2 border-t border-border pt-2 text-sm font-semibold text-text-strong text-right">
-              {address}
-            </div>
-          </div>
+          <NavBanner fallbackTitle={stepLabel} name={name} address={address} route={route} />
+          {subtitle && (
+            <p className="sr-only">{subtitle}</p>
+          )}
         </div>
       </div>
 
@@ -456,9 +520,9 @@ function ActiveNavStage({
         <button
           type="button"
           onClick={onNavigate}
-          className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-xl border border-border font-semibold text-sm flex items-center justify-center gap-2"
         >
-          <Navigation className="size-4" /> נווט לאיסוף בוויז
+          <Navigation className="size-4 text-primary" /> {wazeLabel}
         </button>
         <BusinessContactRow onChat={onChatBusiness} onCall={onCallBusiness} />
         <SwipeConfirm label={swipeLabel} onConfirm={onSwipeOrCta} disabled={pending} />
@@ -575,33 +639,25 @@ function AtPickupStage({
 }
 
 function EnRouteStage({
-  recipient, address, onArrived, onNavigate, onCall, onMessage, onChatBusiness, onCallBusiness,
+  recipient, address, destination, onArrived, onNavigate, onCall, onMessage, onChatBusiness, onCallBusiness,
 }: {
-  recipient: string; address: string;
+  recipient: string; address: string; destination: MissionStop;
   onArrived: () => void; onNavigate: () => void; onCall: () => void; onMessage: () => void;
   onChatBusiness: () => void; onCallBusiness: () => void;
 }) {
+  const [route, setRoute] = useState<MissionRouteInfo | null>(null);
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="relative flex-1 min-h-[50%]">
-        <MapBackdrop className="absolute inset-0" />
+        <MissionNavMap
+          mode="navigate"
+          destination={destination}
+          destinationKind="dropoff"
+          className="absolute inset-0"
+          onRoute={setRoute}
+        />
         <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] inset-x-4 z-10">
-          <div className="rounded-2xl bg-surface/95 backdrop-blur border border-border shadow-card p-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-bold text-text-strong">בדרך למסירה</p>
-              <Navigation className="size-4 text-primary" />
-            </div>
-            <div className="mt-2 flex items-end justify-between gap-3 border-t border-border pt-2">
-              <div className="text-left">
-                <p className="text-sm font-bold text-primary">—</p>
-                <p className="text-[11px] text-text-subtle">זמן הגעה (ETA)</p>
-              </div>
-              <div className="text-right min-w-0">
-                <p className="text-sm font-bold text-text-strong truncate">{recipient}</p>
-                <p className="text-xs text-text-subtle truncate">{address}</p>
-              </div>
-            </div>
-          </div>
+          <NavBanner fallbackTitle="בדרך למסירה" name={recipient} address={address} route={route} />
         </div>
       </div>
 
@@ -609,9 +665,9 @@ function EnRouteStage({
         <button
           type="button"
           onClick={onNavigate}
-          className="w-full min-h-[51px] rounded-xl border-2 border-primary text-primary font-bold text-[15px] flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-xl border border-border font-semibold text-sm flex items-center justify-center gap-2"
         >
-          <Navigation className="size-4" /> נווט למסירה בוויז
+          <Navigation className="size-4 text-primary" /> נווט למסירה בוויז
         </button>
         <BusinessContactRow onChat={onChatBusiness} onCall={onCallBusiness} />
         <div className="grid grid-cols-2 gap-2">
