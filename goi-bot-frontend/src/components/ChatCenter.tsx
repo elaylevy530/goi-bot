@@ -275,7 +275,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
               {([
                 ["all", "הכל", courierCounts.all, courierCounts.unreadAll],
                 ["support", "תמיכה", courierCounts.support, courierCounts.unreadSupport],
-                ["customers", "לקוחות", courierCounts.customers, courierCounts.unreadCustomers],
+                ["customers", "עסקים", courierCounts.customers, courierCounts.unreadCustomers],
               ] as const).map(([key, label, count, unread]) => (
                 <button
                   key={key}
