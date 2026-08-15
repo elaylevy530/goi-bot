@@ -39,7 +39,7 @@ function PaymentErrorBanner({ message }: { message: string }) {
 }
 
 function FieldSlot({ children }: { children: ReactNode }) {
-  return <div className="min-h-12 overflow-hidden rounded-md border border-border bg-surface">{children}</div>;
+  return <div className="min-h-12 rounded-md border border-border bg-surface px-1">{children}</div>;
 }
 
 function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
@@ -73,22 +73,6 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
   );
 }
 
-function cardFieldsEligible(): boolean {
-  const paypal = (window as unknown as {
-    paypal?: { CardFields?: ((opts?: unknown) => { isEligible?: () => boolean }) & { isEligible?: () => boolean } };
-  }).paypal;
-  const CardFields = paypal?.CardFields;
-  if (!CardFields) return false;
-  try {
-    if (typeof CardFields.isEligible === "function") return CardFields.isEligible();
-    const instance = CardFields();
-    if (typeof instance?.isEligible === "function") return instance.isEligible();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function VaultCardForm({
   createVaultSetupToken,
   onApprove,
@@ -96,19 +80,13 @@ function VaultCardForm({
   onFail,
 }: {
   createVaultSetupToken: () => Promise<string>;
-  onApprove: (data: { vaultSetupToken?: string; vault_setup_token?: string }) => Promise<void>;
+  onApprove: (data: { vaultSetupToken?: string; vault_setup_token?: string; orderID?: string }) => Promise<void>;
   onError: (err: Record<string, unknown>) => void;
   onFail: (message: string) => void;
 }) {
   const [{ isPending, isRejected, isResolved }] = usePayPalScriptReducer();
-  const [eligible, setEligible] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (!isResolved) return;
-    setEligible(cardFieldsEligible());
-  }, [isResolved]);
-
-  if (isPending || (isResolved && eligible === null)) {
+  if (isPending || !isResolved) {
     return (
       <div className="py-8 text-center text-sm text-text-muted">
         <Loader2 className="mx-auto mb-2 size-5 animate-spin" />
@@ -117,14 +95,13 @@ function VaultCardForm({
     );
   }
 
-  if (isRejected || eligible === false) {
-    return (
-      <PaymentErrorBanner message="טופס הכרטיס לא זמין כרגע. נסה לרענן, או חבר PayPal במקום." />
-    );
+  if (isRejected) {
+    return <PaymentErrorBanner message="טעינת PayPal נכשלה. רענן את העמוד או חבר PayPal במקום." />;
   }
 
   return (
     <PayPalCardFieldsProvider
+      createOrder={createVaultSetupToken}
       createVaultSetupToken={createVaultSetupToken}
       onApprove={onApprove}
       onError={onError}
@@ -171,8 +148,12 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
     return r.setup_token_id;
   };
 
-  const handleApprove = async (data: { vaultSetupToken?: string; vault_setup_token?: string }) => {
-    const setupToken = data.vaultSetupToken ?? data.vault_setup_token;
+  const handleApprove = async (data: {
+    vaultSetupToken?: string;
+    vault_setup_token?: string;
+    orderID?: string;
+  }) => {
+    const setupToken = data.vaultSetupToken ?? data.vault_setup_token ?? data.orderID;
     if (!setupToken) {
       setError(VAULT_FAIL);
       return;
@@ -190,8 +171,6 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
       setError(paypalErrorHe(e, VAULT_FAIL));
     }
   };
-
-  const showForm = open && !!cfg?.clientId;
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
@@ -212,7 +191,7 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
           </div>
         ) : !cfg?.clientId ? (
           <PaymentErrorBanner message="PayPal לא מוגדר בשרת. אפשר לחבר PayPal או לפנות לתמיכה." />
-        ) : showForm ? (
+        ) : open ? (
           <PayPalScriptProvider
             options={{
               clientId: cfg.clientId,
@@ -220,7 +199,6 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
               intent: "capture",
               components: "buttons,card-fields",
               locale: "he_IL",
-              vault: true,
             }}
           >
             <VaultCardForm

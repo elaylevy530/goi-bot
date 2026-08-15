@@ -65,7 +65,9 @@ export async function apiFetch<T = unknown>(
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
-  if (rest.body && !headers.has("Content-Type")) {
+  // FormData must keep the browser-generated multipart boundary. Setting
+  // application/json here makes Nest's FileInterceptor drop the file.
+  if (rest.body && !headers.has("Content-Type") && !(rest.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
