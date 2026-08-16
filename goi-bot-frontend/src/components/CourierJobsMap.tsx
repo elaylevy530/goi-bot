@@ -1,5 +1,5 @@
 /// <reference types="google.maps" />
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Layers, Plus, Minus, Crosshair,
   ChevronRight, ChevronLeft,
@@ -114,9 +114,12 @@ type Props = {
   claiming?: boolean;
   /** Extra classes for the floating zoom/layers cluster (e.g. to clear an overlay). */
   controlsClassName?: string;
+  leftExtra?: ReactNode;
+  rightExtra?: ReactNode;
+  emptyState?: ReactNode;
 };
 
-export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName }: Props) {
+export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, rightExtra, emptyState }: Props) {
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -572,19 +575,20 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
         {/* Floating map controls — sit below the page overlay when one is present */}
         <div className={`absolute left-3 flex flex-col gap-2 z-10 ${controlsClassName ?? "top-3"}`}>
-          <button onClick={cycleMapType} className="size-10 rounded-card bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95" aria-label="שכבות">
+          {leftExtra}
+          <button onClick={cycleMapType} className="size-10 rounded-full bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95" aria-label="שכבות">
             <Layers className="size-4" />
           </button>
           {myPos && (
             <button
               onClick={() => { mapRef.current?.panTo(myPos); mapRef.current?.setZoom(14); }}
-              className="size-10 rounded-card bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95"
+              className="size-10 rounded-full bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95"
               aria-label="מרכז עליי"
             >
               <Crosshair className="size-4" />
             </button>
           )}
-          <div className="rounded-card bg-surface shadow-card border border-border overflow-hidden flex flex-col">
+          <div className="rounded-full bg-surface shadow-card border border-border overflow-hidden flex flex-col">
             <button onClick={() => zoomBy(1)} className="size-10 flex items-center justify-center text-text-strong active:scale-95 border-b border-border" aria-label="הגדל">
               <Plus className="size-4" />
             </button>
@@ -593,6 +597,12 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
             </button>
           </div>
         </div>
+
+        {rightExtra && (
+          <div className={`absolute right-3 z-10 flex flex-col gap-3 ${controlsClassName ?? "top-3"}`}>
+            {rightExtra}
+          </div>
+        )}
 
         {/* Compact offer carousel — map stays dominant */}
         {scoredJobs.length > 0 && active && (() => {
@@ -684,17 +694,19 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
         })()}
 
         {scoredJobs.length === 0 && (
-          <div
-            dir="rtl"
-            className="absolute inset-x-3 bottom-3 z-10 rounded-card bg-surface/95 backdrop-blur-md border border-border shadow-card px-5 py-5 text-center"
-          >
-            <div className="text-sm font-bold text-text-strong">
-              {t.kind === "mover" ? "אין כרגע הובלות באזורכם" : "אין כרגע משלוחים באזורכם"}
+          emptyState ?? (
+            <div
+              dir="rtl"
+              className="absolute inset-x-3 bottom-3 z-10 rounded-card bg-surface/95 backdrop-blur-md border border-border shadow-card px-5 py-5 text-center"
+            >
+              <div className="text-sm font-bold text-text-strong">
+                {t.kind === "mover" ? "אין כרגע הובלות באזורכם" : "אין כרגע משלוחים באזורכם"}
+              </div>
+              <div className="text-xs text-text-subtle mt-1 leading-snug">
+                משכו למטה לרענון, או נסעו לאזור עמוס יותר.
+              </div>
             </div>
-            <div className="text-xs text-text-subtle mt-1 leading-snug">
-              משכו למטה לרענון, או נסעו לאזור עמוס יותר.
-            </div>
-          </div>
+          )
         )}
       </div>
     </div>

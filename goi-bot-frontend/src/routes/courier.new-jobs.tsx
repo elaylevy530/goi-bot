@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   nestAddCourierDecline,
   nestClaimJob,
+  nestCourierActiveJobCount,
   nestListCourierDeclines,
   nestListCourierOffers,
   nestListCourierQuotes,
@@ -16,7 +17,8 @@ import {
   nestRespondOffer,
 } from "@/lib/nest-jobs";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
-import { Bell, Loader2 } from "lucide-react";
+import { nestListConversations } from "@/lib/nest-chat";
+import { Bell, Loader2, MessageCircle, Search, ShoppingBag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
@@ -49,6 +51,7 @@ function NewJobsPage() {
   const navigate = useNavigate();
   const { jobId: focusJobId } = Route.useSearch();
   const isApproved = isCourierApproved(me);
+  const isAvailable = isApproved && me?.accepting_jobs !== false;
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
 
@@ -309,6 +312,22 @@ function NewJobsPage() {
     });
   };
 
+  const { data: activeCount = 0 } = useQuery({
+    queryKey: ["courier-active-count", me?.id],
+    enabled: !!me?.id,
+    refetchInterval: 15_000,
+    queryFn: nestCourierActiveJobCount,
+  });
+  const { data: unreadChat = 0 } = useQuery({
+    queryKey: ["courier-chat-unread", me?.id],
+    enabled: !!me?.id,
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const convos = await nestListConversations();
+      return convos.reduce((n, c) => n + Number(c.unread_courier ?? 0), 0);
+    },
+  });
+
   const availableCount = mapJobs.length;
 
   const refreshJobs = useCallback(async () => {
@@ -330,19 +349,10 @@ function NewJobsPage() {
       <div dir="rtl" className="relative h-full min-h-0 flex flex-col overflow-hidden">
         {/* Floating chrome only — map fills the viewport underneath */}
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
-          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/80 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
-            <div className="flex items-center gap-2">
-              <CourierMenuButton className="size-11 shadow-card border-0 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <AcceptJobsToggle me={me} compact />
-              </div>
-              <Link
-                to="/courier/messages"
-                aria-label="הודעות"
-                className="size-11 grid place-items-center rounded-full bg-surface shadow-card text-text-strong active:bg-muted transition-colors shrink-0"
-              >
-                <Bell className="size-5" strokeWidth={2} />
-              </Link>
+          <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/70 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
+            <div className="relative flex items-center justify-center">
+              <CourierMenuButton className="absolute start-0 size-11 shadow-card border-0 shrink-0" />
+              <AcceptJobsToggle me={me} compact />
             </div>
           </div>
         </div>
@@ -361,6 +371,34 @@ function NewJobsPage() {
               onDetails={openDetails}
               claiming={claim.isPending || respond.isPending}
               controlsClassName="top-[5.5rem]"
+              leftExtra={
+                <Link
+                  to="/courier/messages"
+                  aria-label="התראות"
+                  className="size-10 grid place-items-center rounded-full bg-surface shadow-card border border-border text-text-strong active:scale-95"
+                >
+                  <Bell className="size-4" strokeWidth={2} />
+                </Link>
+              }
+              rightExtra={
+                <>
+                  <MapFab
+                    to="/courier/active"
+                    label="פעילים"
+                    icon={ShoppingBag}
+                    count={Number(activeCount) || 0}
+                  />
+                  <MapFab
+                    to="/courier/messages"
+                    label="צ'אט"
+                    icon={MessageCircle}
+                    count={unreadChat}
+                  />
+                </>
+              }
+              emptyState={
+                <SearchingCard available={isAvailable} jobWord={t.jobPlural} />
+              }
             />
           </div>
         )}
@@ -457,6 +495,77 @@ function NewJobsPage() {
   );
 }
 
+function MapFab({
+  to,
+  label,
+  icon: Icon,
+  count,
+}: {
+  to: "/courier/active" | "/courier/messages";
+  label: string;
+  icon: typeof ShoppingBag;
+  count: number;
+}) {
+  return (
+    <Link
+      to={to}
+      className="relative flex size-14 flex-col items-center justify-center rounded-full bg-surface shadow-fab border border-border text-text-strong active:scale-95"
+      aria-label={label}
+    >
+      <Icon className="size-5" strokeWidth={2} />
+      <span className="mt-0.5 text-[9px] font-bold leading-none text-text-muted">{label}</span>
+      {count > 0 && (
+        <span className="absolute -top-0.5 -end-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-extrabold text-primary-foreground">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function SearchingCard({ available, jobWord }: { available: boolean; jobWord: string }) {
+  if (!available) {
+    return (
+      <div
+        dir="rtl"
+        className="absolute inset-x-3 bottom-3 z-10 rounded-card bg-surface/95 backdrop-blur-md border border-border shadow-card px-5 py-5 text-center"
+      >
+        <div className="text-sm font-bold text-text-strong">הסטטוס כבוי</div>
+        <div className="text-xs text-text-subtle mt-1 leading-snug">
+          הפעילו קבלת עבודות כדי שנחפש {jobWord} באזור.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      dir="rtl"
+      className="absolute inset-x-3 bottom-3 z-10 rounded-[1.5rem] bg-surface shadow-card-strong border border-border px-5 pb-4 pt-6 text-center"
+    >
+      <div className="mx-auto mb-4 grid size-16 place-items-center">
+        <div className="relative size-16">
+          <div className="absolute inset-0 rounded-full border-2 border-dashed border-primary animate-[spin_10s_linear_infinite]" />
+          <div className="absolute inset-2 grid place-items-center rounded-full bg-success-bg">
+            <Search className="size-6 text-primary" strokeWidth={2.2} />
+          </div>
+        </div>
+      </div>
+      <div className="text-base font-extrabold text-text-strong leading-snug">
+        מחפש {jobWord} זמינים עבורך
+      </div>
+      <div className="mt-1.5 text-xs text-text-subtle leading-snug">
+        אנחנו סורקים את האזור ומחפשים {jobWord} שמתאימים עבורך
+      </div>
+      <div className="mt-4 flex items-center justify-center gap-1.5" aria-hidden>
+        <span className="size-1.5 rounded-full bg-border-strong" />
+        <span className="size-1.5 rounded-full bg-primary" />
+        <span className="size-1.5 rounded-full bg-border-strong" />
+      </div>
+    </div>
+  );
+}
+
 function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean }) {
   const qc = useQueryClient();
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
@@ -510,7 +619,7 @@ function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean 
   const title = !approved
     ? "סטטוס - לא פעיל"
     : on
-      ? "חיבור פעיל לקבלת הזמנות"
+      ? "פעיל לקבלת עבודות"
       : "סטטוס - לא פעיל";
   const subtitle = !approved
     ? "החשבון ממתין לאישור או מושהה"
@@ -520,8 +629,8 @@ function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean 
 
   return (
     <div
-      className={`w-full bg-surface shadow-card flex items-center justify-between gap-3 ${
-        compact ? "rounded-card px-3.5 py-2.5" : "rounded-[20px] p-5 gap-4"
+      className={`bg-surface shadow-card flex items-center justify-between gap-3 ${
+        compact ? "w-auto max-w-[min(100%,20rem)] rounded-pill px-3.5 py-2" : "w-full rounded-[20px] p-5 gap-4"
       } ${!approved ? "opacity-70" : ""}`}
     >
       <Switch
