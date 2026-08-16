@@ -18,7 +18,7 @@ import {
 } from "@/lib/nest-jobs";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { nestListConversations } from "@/lib/nest-chat";
-import { Bell, Loader2, MessageCircle, Search, ShoppingBag } from "lucide-react";
+import { Bell, ChevronDown, Loader2, MessageCircle, Search, ShoppingBag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
@@ -54,6 +54,7 @@ function NewJobsPage() {
   const isAvailable = isApproved && me?.accepting_jobs !== false;
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
+  const [activeOffer, setActiveOffer] = useState<MapJob | null>(null);
 
   const { data: declinedRows = [] } = useQuery({
     queryKey: ["courier-job-declines", me?.id],
@@ -329,6 +330,7 @@ function NewJobsPage() {
   });
 
   const availableCount = mapJobs.length;
+  const showingOffer = availableCount > 0;
 
   const refreshJobs = useCallback(async () => {
     await Promise.all([
@@ -352,7 +354,17 @@ function NewJobsPage() {
           <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/70 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
             <div className="relative flex items-center justify-center">
               <CourierMenuButton className="absolute start-0 size-11 shadow-card border-0 shrink-0" />
-              <AcceptJobsToggle me={me} compact />
+              <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
+              {showingOffer && (
+                <button
+                  type="button"
+                  onClick={() => activeOffer && handleDecline(activeOffer)}
+                  disabled={!activeOffer || claim.isPending || respond.isPending}
+                  className="absolute end-0 size-11 rounded-full bg-surface shadow-card text-sm font-extrabold text-destructive disabled:opacity-50 active:scale-95"
+                >
+                  דלג
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -369,32 +381,37 @@ function NewJobsPage() {
               onDecline={handleDecline}
               onQuote={handleQuote}
               onDetails={openDetails}
+              onActiveChange={setActiveOffer}
               claiming={claim.isPending || respond.isPending}
               controlsClassName="top-[5.5rem]"
               leftExtra={
-                <Link
-                  to="/courier/messages"
-                  aria-label="התראות"
-                  className="size-10 grid place-items-center rounded-full bg-surface shadow-card border border-border text-text-strong active:scale-95"
-                >
-                  <Bell className="size-4" strokeWidth={2} />
-                </Link>
+                showingOffer ? undefined : (
+                  <Link
+                    to="/courier/messages"
+                    aria-label="התראות"
+                    className="size-10 grid place-items-center rounded-full bg-surface shadow-card border border-border text-text-strong active:scale-95"
+                  >
+                    <Bell className="size-4" strokeWidth={2} />
+                  </Link>
+                )
               }
               rightExtra={
-                <>
-                  <MapFab
-                    to="/courier/active"
-                    label="פעילים"
-                    icon={ShoppingBag}
-                    count={Number(activeCount) || 0}
-                  />
-                  <MapFab
-                    to="/courier/messages"
-                    label="צ'אט"
-                    icon={MessageCircle}
-                    count={unreadChat}
-                  />
-                </>
+                showingOffer ? undefined : (
+                  <>
+                    <MapFab
+                      to="/courier/active"
+                      label="פעילים"
+                      icon={ShoppingBag}
+                      count={Number(activeCount) || 0}
+                    />
+                    <MapFab
+                      to="/courier/messages"
+                      label="צ'אט"
+                      icon={MessageCircle}
+                      count={unreadChat}
+                    />
+                  </>
+                )
               }
               emptyState={
                 <SearchingCard available={isAvailable} jobWord={t.jobPlural} />
@@ -566,7 +583,15 @@ function SearchingCard({ available, jobWord }: { available: boolean; jobWord: st
   );
 }
 
-function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean }) {
+function AcceptJobsToggle({
+  me,
+  compact = false,
+  mini = false,
+}: {
+  me: any;
+  compact?: boolean;
+  mini?: boolean;
+}) {
   const qc = useQueryClient();
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
   const [on, setOn] = useState<boolean>(false);
@@ -619,13 +644,42 @@ function AcceptJobsToggle({ me, compact = false }: { me: any; compact?: boolean 
   const title = !approved
     ? "סטטוס - לא פעיל"
     : on
-      ? "פעיל לקבלת עבודות"
-      : "סטטוס - לא פעיל";
+      ? mini
+        ? "פעיל"
+        : "פעיל לקבלת עבודות"
+      : mini
+        ? "כבוי"
+        : "סטטוס - לא פעיל";
   const subtitle = !approved
     ? "החשבון ממתין לאישור או מושהה"
     : on
       ? "תקבלו משלוחים והתראות"
       : "הפעילו כדי לקבל משלוחים והתראות";
+
+  const flip = () => {
+    if (!approved || toggle.isPending) return;
+    const next = !on;
+    setOn(next);
+    toggle.mutate(next);
+  };
+
+  if (mini) {
+    return (
+      <button
+        type="button"
+        onClick={flip}
+        disabled={!approved || toggle.isPending}
+        aria-label={title}
+        className={`flex items-center gap-1.5 rounded-pill bg-surface px-3.5 py-2 shadow-card ${
+          !approved ? "opacity-70" : ""
+        }`}
+      >
+        {on && approved && <span className="size-2 rounded-full bg-primary shrink-0" aria-hidden />}
+        <span className="text-sm font-bold text-text-strong">{title}</span>
+        <ChevronDown className="size-3.5 text-text-muted" aria-hidden />
+      </button>
+    );
+  }
 
   return (
     <div

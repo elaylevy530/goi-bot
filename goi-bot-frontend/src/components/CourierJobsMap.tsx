@@ -14,7 +14,7 @@ const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
 
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
-const MAP_FIT_PAD = { top: 200, right: 48, bottom: 320, left: 56 } as const;
+const MAP_FIT_PAD = { top: 200, right: 48, bottom: 400, left: 56 } as const;
 
 function tokenColor(el: HTMLElement | null, name: string, fallback: string) {
   if (!el) return fallback;
@@ -117,9 +117,10 @@ type Props = {
   leftExtra?: ReactNode;
   rightExtra?: ReactNode;
   emptyState?: ReactNode;
+  onActiveChange?: (job: MapJob | null) => void;
 };
 
-export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, rightExtra, emptyState }: Props) {
+export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, rightExtra, emptyState, onActiveChange }: Props) {
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -272,6 +273,10 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   }, [scoredJobs, activeId]);
 
   const active = useMemo(() => visibleJobs.find(j => j.id === activeId) ?? null, [visibleJobs, activeId]);
+
+  useEffect(() => {
+    onActiveChange?.(active);
+  }, [active, onActiveChange]);
 
   const activeIdx = useMemo(
     () => scoredJobs.findIndex((s) => s.job.id === activeId),
@@ -625,13 +630,6 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
           return (
             <div className="absolute inset-x-3 bottom-3 z-10 pointer-events-none">
-              {activeRoute && (
-                <div className="pointer-events-none flex justify-center mb-2">
-                  <div className="rounded-pill bg-navy text-primary-foreground shadow-fab px-3 py-1.5 text-xs font-bold tabular-nums">
-                    {activeRoute.durationMin} דק׳ · {activeRoute.distanceKm} ק״מ
-                  </div>
-                </div>
-              )}
               {hasMultiple && (
                 <div dir="rtl" className="pointer-events-auto flex items-center justify-between gap-2 mb-2">
                   <button
