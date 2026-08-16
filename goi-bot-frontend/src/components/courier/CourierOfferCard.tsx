@@ -95,59 +95,53 @@ export function CourierOfferCard({
 
   return (
     <div data-job-id={job.id} dir="rtl" className="snap-center w-full shrink-0">
-      <article className="overflow-hidden rounded-[1.5rem] bg-surface shadow-card-strong">
-        <header className="flex items-start justify-between gap-3 px-4 pt-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <BusinessLogo path={job.customer_logo_path} name={businessName} size={48} />
+      <article className="overflow-hidden rounded-card bg-surface shadow-card-strong">
+        <header className="flex items-center justify-between gap-2 px-3 pt-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <BusinessLogo path={job.customer_logo_path} name={businessName} size={36} />
             <div className="min-w-0 text-right">
               <h3 className="truncate text-sm font-extrabold text-text-strong">{businessName}</h3>
-              {jobNumber && <p className="mt-0.5 text-xs font-semibold text-text-muted">{jobNumber}</p>}
-              {distToPickupKm != null && (
-                <span className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-muted px-2 py-0.5 text-[11px] font-bold text-text-subtle">
-                  <MapPin className="size-3 text-primary" aria-hidden />
-                  {formatKm(distToPickupKm)} ממך
-                </span>
-              )}
+              <div className="mt-0.5 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
+                {jobNumber && <p className="truncate text-[11px] font-semibold text-text-muted">{jobNumber}</p>}
+                {distToPickupKm != null && (
+                  <span className="inline-flex items-center gap-0.5 rounded-pill bg-muted px-1.5 py-px text-[10px] font-bold text-text-subtle">
+                    <MapPin className="size-2.5 text-primary" aria-hidden />
+                    {formatKm(distToPickupKm)} ממך
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="shrink-0 text-left">
             {isQuote ? (
-              <p className="text-[1.75rem] font-black leading-none text-warning tabular-nums">₪?</p>
+              <p className="text-xl font-black leading-none text-warning tabular-nums">₪?</p>
             ) : (
-              <p className="text-[1.75rem] font-black leading-none text-text-strong tabular-nums">
+              <p className="text-xl font-black leading-none text-text-strong tabular-nums">
                 ₪ {Number(job.payment ?? 0).toFixed(0)}
               </p>
             )}
-            <p className="mt-1 text-xs font-semibold text-text-muted">תשלום לשליח</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-text-muted">תשלום לשליח</p>
           </div>
         </header>
 
-        <div className="space-y-4 px-4 pb-4 pt-3">
-          <div className="flex gap-3">
-            <div className="flex flex-col items-center pt-1" aria-hidden>
-              <span className="grid size-8 place-items-center rounded-full bg-success-bg text-primary">
-                <ShoppingBag className="size-4" />
+        <div className="space-y-2.5 px-3 pb-3 pt-2">
+          <div className="flex gap-2">
+            <div className="flex flex-col items-center pt-0.5" aria-hidden>
+              <span className="grid size-6 place-items-center rounded-full bg-success-bg text-primary">
+                <ShoppingBag className="size-3.5" />
               </span>
-              <span className="my-1 w-px flex-1 min-h-6 border-e border-dashed border-primary/50" />
-              <span className="grid size-8 place-items-center rounded-full bg-success-bg text-primary">
-                <Home className="size-4" />
+              <span className="my-0.5 w-px flex-1 min-h-3 border-e border-dashed border-primary/50" />
+              <span className="grid size-6 place-items-center rounded-full bg-success-bg text-primary">
+                <Home className="size-3.5" />
               </span>
             </div>
-            <div className="min-w-0 flex-1 space-y-3">
-              <StopRow
-                label="איסוף"
-                address={pickup}
-                chip={`להגיע לעסק עד ${pickupEta}`}
-              />
-              <StopRow
-                label="מסירה"
-                address={dropoff}
-                chip={`למסור עד ${dropoffEta}`}
-              />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <StopRow address={pickup} chip={`להגיע עד ${pickupEta}`} />
+              <StopRow address={dropoff} chip={`למסור עד ${dropoffEta}`} />
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1 border-y border-border py-3 text-center">
+          <div className="grid grid-cols-4 gap-1 border-y border-border py-1.5 text-center">
             <Stat icon={MapPin} value={tripKm != null ? formatKm(tripKm) : "—"} />
             <Stat icon={Clock} value={tripMin != null ? `${tripMin} דק׳` : "—"} />
             <Stat icon={CreditCard} value={payLabel} />
@@ -158,7 +152,7 @@ export function CourierOfferCard({
             <button
               type="button"
               onClick={() => onQuote(job)}
-              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-card bg-primary px-4 text-sm font-extrabold text-primary-foreground shadow-fab active:scale-[0.99]"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-card bg-primary px-3 text-sm font-extrabold text-primary-foreground shadow-fab active:scale-[0.99]"
             >
               הגש הצעת מחיר
             </button>
@@ -167,11 +161,11 @@ export function CourierOfferCard({
               type="button"
               disabled={claiming}
               onClick={() => onClaim(job)}
-              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-card bg-primary px-4 text-sm font-extrabold text-primary-foreground shadow-fab disabled:opacity-60 active:scale-[0.99]"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-card bg-primary px-3 text-sm font-extrabold text-primary-foreground shadow-fab disabled:opacity-60 active:scale-[0.99]"
             >
               לקחתי את {t.theJob}
-              <span className="grid size-9 place-items-center rounded-full bg-surface">
-                <ChevronsRight className="size-5 text-primary" aria-hidden />
+              <span className="grid size-7 place-items-center rounded-full bg-surface">
+                <ChevronsRight className="size-4 text-primary" aria-hidden />
               </span>
             </button>
           )}
@@ -180,7 +174,7 @@ export function CourierOfferCard({
             <button
               type="button"
               onClick={() => onDetails(job)}
-              className="w-full text-center text-xs font-bold text-text-muted"
+              className="w-full text-center text-[11px] font-bold text-text-muted"
             >
               פרטים נוספים
             </button>
@@ -191,14 +185,11 @@ export function CourierOfferCard({
   );
 }
 
-function StopRow({ label, address, chip }: { label: string; address: string; chip: string }) {
+function StopRow({ address, chip }: { address: string; chip: string }) {
   return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0 text-right">
-        <p className="text-[11px] font-semibold text-text-muted">{label}</p>
-        <p className="text-sm font-bold leading-snug text-text-strong line-clamp-2">{address}</p>
-      </div>
-      <span className="shrink-0 rounded-pill bg-success-bg px-2.5 py-1 text-[11px] font-bold text-success-text">
+    <div className="flex items-center justify-between gap-2">
+      <p className="min-w-0 truncate text-xs font-bold text-text-strong">{address}</p>
+      <span className="shrink-0 rounded-pill bg-success-bg px-2 py-0.5 text-[10px] font-bold text-success-text">
         {chip}
       </span>
     </div>
@@ -207,8 +198,8 @@ function StopRow({ label, address, chip }: { label: string; address: string; chi
 
 function Stat({ icon: Icon, value }: { icon: typeof Clock; value: string }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <Icon className="size-4 text-text-muted" aria-hidden />
+    <div className="flex items-center justify-center gap-1">
+      <Icon className="size-3.5 text-text-muted" aria-hidden />
       <span className="text-[11px] font-bold text-text-strong">{value}</span>
     </div>
   );

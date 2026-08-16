@@ -14,7 +14,7 @@ const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
 
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
-const MAP_FIT_PAD = { top: 200, right: 48, bottom: 400, left: 56 } as const;
+const MAP_FIT_PAD = { top: 180, right: 48, bottom: 260, left: 56 } as const;
 
 function tokenColor(el: HTMLElement | null, name: string, fallback: string) {
   if (!el) return fallback;

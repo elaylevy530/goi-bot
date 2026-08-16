@@ -1,32 +1,12 @@
-import { Link, useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
+import { useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Inbox, Wallet, User, Navigation, ChevronRight, X,
-} from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useCourierGpsTracker } from "@/hooks/useCourierGpsTracker";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
-import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
-import {
-  nestCourierActiveJobCount,
-  nestGetJob,
-  nestListCourierDeclines,
-  nestListCourierOffers,
-  nestListOpenBroadcastJobs,
-} from "@/lib/nest-jobs";
-
-// Primary tabs shown on the bottom nav.
-function buildMobileTabs(kind: "courier" | "mover") {
-  const jobsLabel = kind === "mover" ? "הובלות" : "משלוחים";
-  return [
-    { to: "/courier/active", label: "פעילים", icon: Navigation },
-    { to: "/courier/new-jobs", label: jobsLabel, icon: Inbox },
-    { to: "/courier/wallet", label: "רווחים", icon: Wallet },
-    { to: "/courier/profile", label: "אזור אישי", icon: User },
-  ] as const;
-}
-
+import { isLivePendingOffer } from "@/lib/courier-live-jobs";
+import { nestGetJob, nestListCourierOffers } from "@/lib/nest-jobs";
 
 export function useMyCourier() {
   return useQuery({
@@ -39,48 +19,6 @@ export function useMyCourier() {
     staleTime: 10_000,
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
-  });
-}
-
-type CourierNavCounts = {
-  pendingOffers: number;
-  openJobs: number;
-  activeJobs: number;
-};
-
-function useCourierNavCounts(courier?: any | null) {
-  const courierId = courier?.id ?? null;
-  return useQuery<CourierNavCounts>({
-    queryKey: ["courier-nav-counts", courierId],
-    enabled: !!courierId,
-    refetchInterval: 15_000,
-    refetchOnWindowFocus: true,
-    staleTime: 5_000,
-    queryFn: async () => {
-      const [pendingOffers, openJobs, activeJobs, declinedRows] = await Promise.all([
-        nestListCourierOffers("pending"),
-        nestListOpenBroadcastJobs(),
-        nestCourierActiveJobCount(),
-        nestListCourierDeclines(),
-      ]);
-      const declined = new Set(declinedRows.map((r) => r.job_id));
-      const unique = new Set<string>();
-      for (const o of pendingOffers) {
-        if (isLivePendingOffer(o, courier)) {
-          const jobId = (o.jobs as { id?: string } | null)?.id ?? o.job_id;
-          if (jobId && !declined.has(jobId)) unique.add(jobId);
-        }
-      }
-      for (const j of openJobs) {
-        if (declined.has(j.id)) continue;
-        if (isOpenBroadcastJobForCourier(j, courier)) unique.add(j.id);
-      }
-      return {
-        pendingOffers: unique.size,
-        openJobs: 0,
-        activeJobs,
-      };
-    },
   });
 }
 
@@ -211,11 +149,10 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: me } = useMyCourier();
-  const { data: navCounts } = useCourierNavCounts(me);
 
   const incomingSeenRef = useRef(new Set<string>());
 
-  // App-like back button: hidden on primary bottom-tab screens.
+  // App-like back button: hidden on primary sidebar destinations.
   const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/wallet", "/courier/profile", "/courier"];
   const isPersonalArea = path === "/courier/profile";
   const showBack = !PRIMARY_PATHS.includes(path);
@@ -338,7 +275,6 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   });
 
   const kind: "courier" | "mover" = (me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind === "mover" ? "mover" : "courier";
-  const MOBILE_TABS = buildMobileTabs(kind);
 
   return (
     <div
@@ -406,53 +342,8 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         <div className={`flex min-h-0 flex-1 flex-col scroll-smooth ${
           fullBleed
             ? "overflow-hidden p-0"
-            : "overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-3 sm:px-5 sm:py-4 lg:p-6 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] [&>*]:shrink-0"
+            : "overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 sm:pt-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))] lg:p-6 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] [&>*]:shrink-0"
         }`}>{children}</div>
-
-        {/* Bottom tab bar sits in-flow so it stays flush with the screen bottom.
-            Home-indicator inset is padding inside the bar, not a gap below it. */}
-        <nav
-          className="shrink-0 z-30 border-t border-border bg-surface/95 backdrop-blur shadow-bottom-bar px-1.5 pt-1.5 flex justify-around items-stretch pb-[max(0.375rem,env(safe-area-inset-bottom,0px))]"
-          aria-label="תפריט ראשי"
-        >
-          {MOBILE_TABS.map((item) => {
-            const active =
-              path === item.to ||
-              (item.to === "/courier/new-jobs" && (path === "/courier" || path === "/courier/dashboard")) ||
-              (item.to === "/courier/profile" && path.startsWith("/courier/profile"));
-            const Icon = item.icon;
-            const badge =
-              item.to === "/courier/new-jobs"
-                ? (navCounts?.pendingOffers ?? 0) + (navCounts?.openJobs ?? 0)
-                : item.to === "/courier/active"
-                  ? (navCounts?.activeJobs ?? 0)
-                  : 0;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                aria-current={active ? "page" : undefined}
-                className={`relative flex flex-col items-center justify-center gap-1 flex-1 mx-0.5 py-2 rounded-pill transition-all duration-200 ease-out ${
-                  active
-                    ? "text-primary bg-primary-soft scale-[1.02]"
-                    : "text-text-muted active:text-text-strong active:bg-muted"
-                }`}
-              >
-                <div className="relative">
-                  <Icon className={`size-6 transition-all ${active ? "stroke-[2.5]" : "stroke-2"}`} />
-                  {badge > 0 && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-pill bg-warning text-warning-foreground text-[10px] font-extrabold ring-2 ring-surface">
-                      {badge > 99 ? "99+" : badge}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-[11px] leading-none ${active ? "font-extrabold" : "font-semibold"}`}>
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
       </main>
     </div>
   );
