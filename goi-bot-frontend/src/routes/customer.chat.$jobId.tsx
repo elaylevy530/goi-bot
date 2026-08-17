@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMyChatMessagesFn, sendCourierMessageFn } from "@/lib/customer-account.functions";
-import { ArrowRight, Bike, Loader2, Phone, Send, FileText, Download, Image as ImageIcon, Video, Music } from "lucide-react";
+import { ArrowRight, Bike, Loader2, Phone, Send, FileText, Download, Image as ImageIcon, Video, Music, Lock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/customer/chat/$jobId")({
@@ -149,6 +149,11 @@ function ChatThreadPage() {
   }
 
   const { job, courier, messages } = data;
+  
+  // Check if chat is locked (job completed or cancelled)
+  const isChatLocked = job.status === "הושלמה" || job.status === "בוטלה";
+  const isCompleted = job.status === "הושלמה";
+  const isCancelled = job.status === "בוטלה";
 
   return (
     <div className="fixed inset-x-0 top-14 bottom-16 md:bottom-0 flex flex-col bg-[#f5f6f8]">
@@ -184,6 +189,30 @@ function ChatThreadPage() {
         )}
       </div>
 
+      {/* Locked Chat Banner */}
+      {isChatLocked && (
+        <div className="bg-white border-b border-black/5 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <div className={`size-10 rounded-full grid place-items-center shrink-0 ${
+              isCompleted ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+            }`}>
+              {isCompleted ? <CheckCircle2 className="size-5" /> : <XCircle className="size-5" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold text-[#101418]">
+                {isCompleted ? "המשלוח הושלם בהצלחה" : "המשלוח בוטל"}
+              </div>
+              <div className="text-xs text-[#101418]/60 mt-0.5">
+                {isCompleted 
+                  ? "השיחה עם המוביל הסתיימה. לא ניתן לשלוח הודעות נוספות."
+                  : "השיחה נסגרה כי ההזמנה בוטלה. לא ניתן לשלוח הודעות נוספות."}
+              </div>
+            </div>
+            <Lock className="size-4 text-[#101418]/40 shrink-0" />
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {messages.length === 0 ? (
@@ -208,33 +237,42 @@ function ChatThreadPage() {
       </div>
 
       {/* Composer */}
-      <form
-        onSubmit={(e) => { e.preventDefault(); if (text.trim()) send.mutate(text.trim()); }}
-        className="bg-white border-t border-black/5 p-2.5 flex items-end gap-2"
-      >
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="כתוב הודעה למוביל…"
-          rows={1}
-          maxLength={500}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (text.trim()) send.mutate(text.trim());
-            }
-          }}
-          className="flex-1 resize-none bg-[#f5f6f8] rounded-2xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#F5C518] max-h-32"
-        />
-        <button
-          type="submit"
-          disabled={send.isPending || !text.trim()}
-          className="size-11 rounded-full bg-[#25D366] disabled:bg-black/10 disabled:text-[#101418]/30 text-white grid place-items-center shrink-0"
-          aria-label="שלח"
+      {isChatLocked ? (
+        <div className="bg-white border-t border-black/5 p-4">
+          <div className="flex items-center justify-center gap-2 text-sm text-[#101418]/50">
+            <Lock className="size-4" />
+            <span>לא ניתן לשלוח הודעות נוספות</span>
+          </div>
+        </div>
+      ) : (
+        <form
+          onSubmit={(e) => { e.preventDefault(); if (text.trim()) send.mutate(text.trim()); }}
+          className="bg-white border-t border-black/5 p-2.5 flex items-end gap-2"
         >
-          {send.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-        </button>
-      </form>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="כתוב הודעה למוביל…"
+            rows={1}
+            maxLength={500}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (text.trim()) send.mutate(text.trim());
+              }
+            }}
+            className="flex-1 resize-none bg-[#f5f6f8] rounded-2xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#F5C518] max-h-32"
+          />
+          <button
+            type="submit"
+            disabled={send.isPending || !text.trim()}
+            className="size-11 rounded-full bg-[#25D366] disabled:bg-black/10 disabled:text-[#101418]/30 text-white grid place-items-center shrink-0"
+            aria-label="שלח"
+          >
+            {send.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
