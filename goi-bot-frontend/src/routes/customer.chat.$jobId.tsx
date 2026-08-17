@@ -116,24 +116,72 @@ function ChatThreadPage() {
   const getMessages = useServerFn(getMyChatMessagesFn);
   const sendMsg = useServerFn(sendCourierMessageFn);
 
+  // Track if page is visible (for smart polling)
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+  
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
   const { data, isLoading } = useQuery({
     queryKey: ["chat-thread", jobId],
     queryFn: () => getMessages({ data: { job_id: jobId } }),
-    refetchInterval: 4_000,
+    // Smart polling: only poll when chat is active, visible, and not locked
+    refetchInterval: (query) => {
+      const jobData = query.state.data as typeof data;
+      if (!jobData?.job) return false;
+      
+      // Stop polling if page is not visible (tab is in background)
+      if (!isPageVisible) return false;
+      
+      // Stop polling if chat is locked (completed or cancelled)
+      const isChatLocked = jobData.job.status === "הושלמה" || jobData.job.status === "בוטלה";
+      if (isChatLocked) return false;
+      
+      // Poll every 5 seconds when active and visible
+      return 5_000;
+    },
+    // Refetch when user returns to the tab
+    refetchOnWindowFocus: true,
+    // Refetch when user reconnects
+    refetchOnReconnect: true,
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState("");
+  const prevMessagesLengthRef = useRef(0);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+    
+    const messagesLength = data?.messages?.length ?? 0;
+    const isNewMessage = messagesLength > prevMessagesLengthRef.current;
+    prevMessagesLengthRef.current = messagesLength;
+    
+    if (isNewMessage) {
+      // Check if user is already near the bottom (within 100px)
+      const isNearBottom = 
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
+      
+      // Only auto-scroll if user was already at the bottom or if it's the first load
+      if (isNearBottom || prevMessagesLengthRef.current === messagesLength) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
   }, [data?.messages?.length]);
 
   const send = useMutation({
     mutationFn: (m: string) => sendMsg({ data: { job_id: jobId, message: m } }),
-    onSuccess: () => {
+    onSuccess: async () => {
       setText("");
-      qc.invalidateQueries({ queryKey: ["chat-thread", jobId] });
+      // Immediately refetch messages after sending (don't wait for polling)
+      await qc.refetchQueries({ queryKey: ["chat-thread", jobId] });
     },
     onError: (e: any) => toast.error(e?.message ?? "שליחה נכשלה"),
   });
