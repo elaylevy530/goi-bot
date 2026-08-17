@@ -39,6 +39,13 @@ type NestChatMessage = {
   [key: string]: unknown;
 };
 
+type NestCourier = {
+  id: string;
+  full_name?: string | null;
+  whatsapp_phone?: string | null;
+  [key: string]: unknown;
+};
+
 async function openJobConversation(
   accessToken: string,
   job: NestJob,
@@ -173,15 +180,28 @@ export const getMyChatThreadsFn = createServerFn({ method: "GET" })
     const jobs = await nestServerFetch<NestJob[]>("/api/jobs", {
       accessToken: context.accessToken,
     });
-    return (jobs ?? [])
-      .filter((j) => !!j.selected_courier_id)
-      .map((j) => ({
-        id: j.id,
-        job_number: j.job_number,
-        pickup_address: j.pickup_address,
-        dropoff_address: j.dropoff_address,
-        couriers: { full_name: null as string | null },
-      }));
+    
+    const jobsWithCourier = (jobs ?? []).filter((j) => !!j.selected_courier_id);
+    
+    // Fetch courier info for all jobs in parallel
+    const courierIds = [...new Set(jobsWithCourier.map((j) => j.selected_courier_id).filter(Boolean))] as string[];
+    const courierPromises = courierIds.map((id) =>
+      nestServerFetch<NestCourier>(`/api/accounts/couriers/${id}`, {
+        accessToken: context.accessToken,
+      }).catch(() => null)
+    );
+    const couriers = await Promise.all(courierPromises);
+    const courierMap = new Map(couriers.filter(Boolean).map((c) => [c!.id, c!]));
+    
+    return jobsWithCourier.map((j) => ({
+      id: j.id,
+      job_number: j.job_number,
+      pickup_address: j.pickup_address,
+      dropoff_address: j.dropoff_address,
+      couriers: {
+        full_name: courierMap.get(j.selected_courier_id!)?.full_name ?? null,
+      },
+    }));
   });
 
 export const getMyChatMessagesFn = createServerFn({ method: "POST" })
@@ -196,12 +216,23 @@ export const getMyChatMessagesFn = createServerFn({ method: "POST" })
       `/api/chat/conversations/${conversation.id}/messages`,
       { accessToken: context.accessToken },
     );
+    
+    // Fetch courier info if available
+    let courier: NestCourier | null = null;
+    if (job.selected_courier_id) {
+      courier = await nestServerFetch<NestCourier>(
+        `/api/accounts/couriers/${job.selected_courier_id}`,
+        { accessToken: context.accessToken }
+      ).catch(() => null);
+    }
+    
     return {
       job,
-      courier: null,
+      courier,
       messages: (messages ?? []).map((m) => ({
         ...m,
-        direction: m.sender_role === "business" ? "outbound" : "inbound",
+        // Business sends outbound, everyone else (courier, admin, guest) sends inbound to the business
+        direction: m.sender_role === "business" || m.sender_role === "customer" ? "outbound" : "inbound",
       })),
     };
   });
