@@ -14,6 +14,9 @@ const ISSUE_HE: Record<string, string> = {
   TRANSACTION_REFUSED: "העסקה נדחתה. נסה כרטיס אחר או שלם עם PayPal.",
   CAPTURE_FAILED: "התשלום לא אושר. נסה שוב או כרטיס אחר.",
   DECLINED: "הבנק דחה את החיוב. נסה כרטיס אחר.",
+  BILLING_ADDRESS_INVALID: "כתובת החיוב נדחתה. מלאו רחוב, מספר בית, עיר ומיקוד מלאים.",
+  INVALID_BILLING_ADDRESS: "כתובת החיוב נדחתה. מלאו רחוב, מספר בית, עיר ומיקוד מלאים.",
+  ADDRESS_INVALID: "כתובת החיוב לא תקינה. הוסיפו עיר ומיקוד לכתובת הרחוב.",
 };
 
 const DEFAULT_HE = "לא הצלחנו לחייב את הכרטיס. נסה כרטיס אחר או שלם עם PayPal.";

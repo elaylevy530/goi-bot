@@ -12,6 +12,8 @@
  * missing build-time values with empty strings.
  */
 
+import type { PaypalApiBillingAddress } from "@/lib/paypal-billing-address";
+
 const BASE_LIVE = "https://api-m.paypal.com";
 const BASE_SANDBOX = "https://api-m.sandbox.paypal.com";
 
@@ -85,12 +87,14 @@ export async function createSetupToken(input: {
   return_url: string;
   cancel_url: string;
   source: "paypal" | "card";
+  billing_address?: PaypalApiBillingAddress;
 }): Promise<{ id: string; status: string; links: Array<{ href: string; rel: string; method: string }> }> {
   const payment_source =
     input.source === "paypal"
       ? {
           paypal: {
             usage_type: "MERCHANT",
+            ...(input.billing_address ? { address: input.billing_address } : {}),
             experience_context: {
               return_url: input.return_url,
               cancel_url: input.cancel_url,
@@ -102,6 +106,7 @@ export async function createSetupToken(input: {
         }
       : {
           card: {
+            ...(input.billing_address ? { billing_address: input.billing_address } : {}),
             experience_context: {
               brand_name: "Goi",
               locale: "he-IL",
@@ -197,7 +202,19 @@ export async function createCheckoutOrder(input: {
   description?: string;
   return_url: string;
   cancel_url: string;
+  billing_address?: PaypalApiBillingAddress;
 }): Promise<{ id: string; status: string; links: Array<{ href: string; rel: string; method: string }> }> {
+  const paypalSource: Record<string, unknown> = {
+    experience_context: {
+      return_url: input.return_url,
+      cancel_url: input.cancel_url,
+      brand_name: "Goi",
+      shipping_preference: "NO_SHIPPING",
+      user_action: "PAY_NOW",
+    },
+  };
+  if (input.billing_address) paypalSource.address = input.billing_address;
+
   return call("/v2/checkout/orders", {
     method: "POST",
     idempotencyKey: input.invoice_id,
@@ -208,17 +225,7 @@ export async function createCheckoutOrder(input: {
         description: input.description?.slice(0, 127),
         amount: { currency_code: input.currency, value: input.amount },
       }],
-      payment_source: {
-        paypal: {
-          experience_context: {
-            return_url: input.return_url,
-            cancel_url: input.cancel_url,
-            brand_name: "Goi",
-            shipping_preference: "NO_SHIPPING",
-            user_action: "PAY_NOW",
-          },
-        },
-      },
+      payment_source: { paypal: paypalSource },
     }),
   });
 }

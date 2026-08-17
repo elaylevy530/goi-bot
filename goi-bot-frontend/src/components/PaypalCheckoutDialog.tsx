@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { PayPalScriptProvider, PayPalButtons, PayPalCardFieldsProvider, PayPalNameField, PayPalNumberField, PayPalExpiryField, PayPalCVVField, usePayPalCardFields } from "@paypal/react-paypal-js";
@@ -8,6 +8,17 @@ import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { createPerJobOrderFn, capturePerJobOrderFn, getPaypalConfigFn } from "@/lib/paypal-billing.functions";
 import { cardFieldsInvalidHe, paypalErrorHe } from "@/lib/paypal-errors";
+import {
+  billingFromBusiness,
+  toPaypalApiBilling,
+  submitPaypalCardFields,
+  validatePaypalIlBilling,
+  type PaypalBillingDraft,
+} from "@/lib/paypal-billing-address";
+import { PaypalBillingAddressFields } from "@/components/PaypalBillingAddressFields";
+import { useMyBusiness } from "@/components/BusinessShell";
+
+const EMPTY_BILLING: PaypalBillingDraft = { street: "", city: "", postalCode: "" };
 
 type Props = {
   open: boolean;
@@ -29,7 +40,13 @@ function PaymentErrorBanner({ message }: { message: string }) {
   );
 }
 
-function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
+function CardSubmit({
+  onFail,
+  getBilling,
+}: {
+  onFail: (message: string) => void;
+  getBilling: () => PaypalBillingDraft;
+}) {
   const { cardFieldsForm } = usePayPalCardFields();
   const [busy, setBusy] = useState(false);
   return (
@@ -37,6 +54,11 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
       disabled={busy}
       onClick={async () => {
         if (!cardFieldsForm) return;
+        const billingError = validatePaypalIlBilling(getBilling());
+        if (billingError) {
+          onFail(billingError);
+          return;
+        }
         setBusy(true);
         try {
           const state = await cardFieldsForm.getState();
@@ -45,7 +67,7 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
             setBusy(false);
             return;
           }
-          await cardFieldsForm.submit();
+          await submitPaypalCardFields(cardFieldsForm, getBilling());
         } catch (e: unknown) {
           onFail(paypalErrorHe(e));
         } finally {
@@ -61,19 +83,40 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
 }
 
 export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: Props) {
+  const { data: me } = useMyBusiness();
   const createOrder = useServerFn(createPerJobOrderFn);
   const captureOrder = useServerFn(capturePerJobOrderFn);
   const getCfg = useServerFn(getPaypalConfigFn);
   const { data: cfg } = useQuery({ queryKey: ["paypal-config"], queryFn: () => getCfg(), staleTime: 60 * 60_000, enabled: open });
   const [error, setError] = useState<string | null>(null);
+  const [billing, setBilling] = useState<PaypalBillingDraft>(EMPTY_BILLING);
+  const billingRef = useRef(billing);
+  billingRef.current = billing;
 
   useEffect(() => {
-    if (open) setError(null);
+    if (!open) return;
+    setError(null);
+    setBilling(billingFromBusiness(me as { address?: string | null; city?: string | null; pickup_address?: string | null } | null));
+    // Seed once per open from the cached business profile — don't reset while typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleCreate = async (): Promise<string> => {
+    const draft = billingRef.current;
+    const billingError = validatePaypalIlBilling(draft);
+    if (billingError) {
+      setError(billingError);
+      throw new Error(billingError);
+    }
     const origin = window.location.origin;
-    const r = await createOrder({ data: { job_id: jobId, return_url: origin, cancel_url: origin } });
+    const r = await createOrder({
+      data: {
+        job_id: jobId,
+        return_url: origin,
+        cancel_url: origin,
+        billing_address: toPaypalApiBilling(draft),
+      },
+    });
     if (!r?.order_id) throw new Error("לא ניתן ליצור הזמנה ב-PayPal");
     return r.order_id;
   };
@@ -91,7 +134,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
-      <DialogContent className="max-w-md" dir="rtl">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle>תשלום מאובטח עבור המשלוח</DialogTitle>
           <DialogDescription>
@@ -117,6 +160,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
             }}
           >
             <div className="space-y-3">
+              <PaypalBillingAddressFields value={billing} onChange={setBilling} />
               <PayPalButtons
                 style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
                 createOrder={handleCreate}
@@ -147,7 +191,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
                     <PayPalExpiryField />
                     <PayPalCVVField />
                   </div>
-                  <CardSubmit onFail={setError} />
+                  <CardSubmit onFail={setError} getBilling={() => billingRef.current} />
                 </div>
               </PayPalCardFieldsProvider>
             </div>

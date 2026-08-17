@@ -5,6 +5,29 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireNestAuth, assertNestAdmin } from "@/integrations/nest/auth-middleware";
 import { nestServerFetch } from "@/lib/nest-server";
+import {
+  billingFromBusiness,
+  toPaypalApiBilling,
+  validatePaypalIlBilling,
+  type PaypalApiBillingAddress,
+} from "@/lib/paypal-billing-address";
+
+const billingAddressSchema = z.object({
+  address_line_1: z.string().min(3).max(300),
+  admin_area_2: z.string().min(2).max(120),
+  postal_code: z.string().regex(/^\d{7}$/),
+  country_code: z.literal("IL"),
+});
+
+function billingFromCustomer(me: {
+  address?: string | null;
+  city?: string | null;
+  pickup_address?: string | null;
+} | null | undefined): PaypalApiBillingAddress | undefined {
+  const draft = billingFromBusiness(me);
+  if (validatePaypalIlBilling(draft)) return undefined;
+  return toPaypalApiBilling(draft);
+}
 
 export const getPaypalConfigFn = createServerFn({ method: "GET" }).handler(async () => {
   return {
@@ -20,14 +43,25 @@ export const createSetupTokenFn = createServerFn({ method: "POST" })
     source: z.enum(["paypal", "card"]).default("paypal"),
     return_url: z.string().url(),
     cancel_url: z.string().url(),
+    billing_address: billingAddressSchema.optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { createSetupToken } = await import("@/lib/paypal/client.server");
+    let billing = data.billing_address;
+    if (!billing) {
+      const me = await nestServerFetch<{
+        address?: string | null;
+        city?: string | null;
+        pickup_address?: string | null;
+      }>("/api/accounts/customers/me", { accessToken: context.accessToken });
+      billing = billingFromCustomer(me);
+    }
     const token = await createSetupToken({
       customer_id: context.userId,
       source: data.source,
       return_url: data.return_url,
       cancel_url: data.cancel_url,
+      billing_address: billing,
     });
     const approve = token.links.find((l) => l.rel === "approve" || l.rel === "payer-action");
     return { setup_token_id: token.id, approve_url: approve?.href ?? null };
@@ -35,7 +69,11 @@ export const createSetupTokenFn = createServerFn({ method: "POST" })
 
 export const confirmVaultFn = createServerFn({ method: "POST" })
   .middleware([requireNestAuth])
-  .inputValidator((d: unknown) => z.object({ setup_token_id: z.string().min(8) }).parse(d))
+  .inputValidator((d: unknown) => z.object({
+    setup_token_id: z.string().min(8),
+    address: z.string().min(3).max(300).optional(),
+    city: z.string().min(2).max(120).optional(),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     const { createPaymentToken, deletePaymentToken } = await import("@/lib/paypal/client.server");
     const existing = await nestServerFetch<{ paypal_vault_id?: string | null }>(
@@ -64,6 +102,8 @@ export const confirmVaultFn = createServerFn({ method: "POST" })
         paypal_payer_id: pm.payment_source.paypal?.payer_id ?? null,
         paypal_email: pm.payment_source.paypal?.email_address ?? null,
         dispatch_blocked_reason: null,
+        ...(data.address ? { address: data.address } : {}),
+        ...(data.city ? { city: data.city } : {}),
       },
     });
     return { ok: true, brand, last4 };
@@ -158,6 +198,7 @@ export const createPerJobOrderFn = createServerFn({ method: "POST" })
     job_id: z.string().uuid(),
     return_url: z.string().url(),
     cancel_url: z.string().url(),
+    billing_address: billingAddressSchema.optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const job = await nestServerFetch<{
@@ -175,6 +216,16 @@ export const createPerJobOrderFn = createServerFn({ method: "POST" })
     const amount = Number(job.customer_price ?? 0);
     if (!(amount > 0)) throw new Error("מחיר משלוח לא תקין — לא ניתן ליצור תשלום");
 
+    let billing = data.billing_address;
+    if (!billing) {
+      const me = await nestServerFetch<{
+        address?: string | null;
+        city?: string | null;
+        pickup_address?: string | null;
+      }>("/api/accounts/customers/me", { accessToken: context.accessToken });
+      billing = billingFromCustomer(me);
+    }
+
     const { createCheckoutOrder } = await import("@/lib/paypal/client.server");
     const order = await createCheckoutOrder({
       amount: amount.toFixed(2),
@@ -183,6 +234,7 @@ export const createPerJobOrderFn = createServerFn({ method: "POST" })
       description: `Goi משלוח ${job.job_number ?? job.id.slice(0, 8)}`,
       return_url: data.return_url,
       cancel_url: data.cancel_url,
+      billing_address: billing,
     });
     const approve = order.links.find((l) => l.rel === "payer-action" || l.rel === "approve");
 

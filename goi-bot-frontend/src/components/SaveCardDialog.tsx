@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -17,8 +17,18 @@ import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { confirmVaultFn, createSetupTokenFn, getPaypalConfigFn } from "@/lib/paypal-billing.functions";
 import { cardFieldsInvalidHe, paypalErrorHe } from "@/lib/paypal-errors";
+import {
+  billingFromBusiness,
+  toPaypalApiBilling,
+  submitPaypalCardFields,
+  validatePaypalIlBilling,
+  type PaypalBillingDraft,
+} from "@/lib/paypal-billing-address";
+import { PaypalBillingAddressFields } from "@/components/PaypalBillingAddressFields";
+import { useMyBusiness } from "@/components/BusinessShell";
 
 const VAULT_FAIL = "לא הצלחנו לשמור את הכרטיס. נסה שוב או כרטיס אחר.";
+const EMPTY_BILLING: PaypalBillingDraft = { street: "", city: "", postalCode: "" };
 
 type Props = {
   open: boolean;
@@ -42,7 +52,13 @@ function FieldSlot({ children }: { children: ReactNode }) {
   return <div className="min-h-12 rounded-md border border-border bg-surface px-1">{children}</div>;
 }
 
-function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
+function CardSubmit({
+  onFail,
+  getBilling,
+}: {
+  onFail: (message: string) => void;
+  getBilling: () => PaypalBillingDraft;
+}) {
   const { cardFieldsForm } = usePayPalCardFields();
   const [busy, setBusy] = useState(false);
   return (
@@ -50,6 +66,11 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
       disabled={busy || !cardFieldsForm}
       onClick={async () => {
         if (!cardFieldsForm) return;
+        const billingError = validatePaypalIlBilling(getBilling());
+        if (billingError) {
+          onFail(billingError);
+          return;
+        }
         setBusy(true);
         try {
           const state = await cardFieldsForm.getState();
@@ -58,7 +79,7 @@ function CardSubmit({ onFail }: { onFail: (message: string) => void }) {
             setBusy(false);
             return;
           }
-          await cardFieldsForm.submit();
+          await submitPaypalCardFields(cardFieldsForm, getBilling());
         } catch (e: unknown) {
           onFail(paypalErrorHe(e, VAULT_FAIL));
         } finally {
@@ -78,11 +99,17 @@ function VaultCardForm({
   onApprove,
   onError,
   onFail,
+  billing,
+  onBillingChange,
+  getBilling,
 }: {
   createVaultSetupToken: () => Promise<string>;
   onApprove: (data: { vaultSetupToken?: string; vault_setup_token?: string; orderID?: string }) => Promise<void>;
   onError: (err: Record<string, unknown>) => void;
   onFail: (message: string) => void;
+  billing: PaypalBillingDraft;
+  onBillingChange: (next: PaypalBillingDraft) => void;
+  getBilling: () => PaypalBillingDraft;
 }) {
   const [{ isPending, isRejected, isResolved }] = usePayPalScriptReducer();
 
@@ -113,13 +140,15 @@ function VaultCardForm({
           <FieldSlot><PayPalExpiryField /></FieldSlot>
           <FieldSlot><PayPalCVVField /></FieldSlot>
         </div>
-        <CardSubmit onFail={onFail} />
+        <PaypalBillingAddressFields value={billing} onChange={onBillingChange} />
+        <CardSubmit onFail={onFail} getBilling={getBilling} />
       </div>
     </PayPalCardFieldsProvider>
   );
 }
 
 export function SaveCardDialog({ open, onClose, onSaved }: Props) {
+  const { data: me } = useMyBusiness();
   const setupFn = useServerFn(createSetupTokenFn);
   const confirmFn = useServerFn(confirmVaultFn);
   const getCfg = useServerFn(getPaypalConfigFn);
@@ -130,18 +159,32 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
     enabled: open,
   });
   const [error, setError] = useState<string | null>(null);
+  const [billing, setBilling] = useState<PaypalBillingDraft>(EMPTY_BILLING);
+  const billingRef = useRef(billing);
+  billingRef.current = billing;
 
   useEffect(() => {
-    if (open) setError(null);
+    if (!open) return;
+    setError(null);
+    setBilling(billingFromBusiness(me as { address?: string | null; city?: string | null; pickup_address?: string | null } | null));
+    // Seed once per open from the cached business profile — don't reset while typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const createVaultSetupToken = async (): Promise<string> => {
+    const draft = billingRef.current;
+    const billingError = validatePaypalIlBilling(draft);
+    if (billingError) {
+      setError(billingError);
+      throw new Error(billingError);
+    }
     const origin = window.location.origin;
     const r = await setupFn({
       data: {
         source: "card",
         return_url: `${origin}/business/billing`,
         cancel_url: `${origin}/business/billing?paypal=cancel`,
+        billing_address: toPaypalApiBilling(draft),
       },
     });
     if (!r?.setup_token_id) throw new Error("לא ניתן להתחיל שמירת כרטיס");
@@ -159,7 +202,14 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
       return;
     }
     try {
-      const saved = await confirmFn({ data: { setup_token_id: setupToken } });
+      const draft = billingRef.current;
+      const saved = await confirmFn({
+        data: {
+          setup_token_id: setupToken,
+          address: draft.street.trim(),
+          city: draft.city.trim(),
+        },
+      });
       setError(null);
       toast.success(
         saved.last4
@@ -174,7 +224,7 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent className="max-w-md" dir="rtl">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle>הוספת כרטיס אשראי</DialogTitle>
           <DialogDescription>
@@ -206,6 +256,9 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
               onApprove={handleApprove}
               onError={(err) => setError(paypalErrorHe(err, VAULT_FAIL))}
               onFail={setError}
+              billing={billing}
+              onBillingChange={setBilling}
+              getBilling={() => billingRef.current}
             />
           </PayPalScriptProvider>
         ) : null}
