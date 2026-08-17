@@ -44,6 +44,15 @@ function deliveryKindLabel(job: any) {
   return category && category !== baseType ? `${label} · ${category}` : label;
 }
 
+function DetailRow({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={`flex flex-wrap justify-start gap-x-1 ${className ?? ""}`}>
+      <b>{label}:</b>
+      <span>{value}</span>
+    </div>
+  );
+}
+
 function NewJobsPage() {
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -423,14 +432,14 @@ function NewJobsPage() {
       </PullToRefresh>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent dir="rtl">
-          <DialogHeader>
-            <DialogTitle>פרטי העבודה {detail?.job_number}</DialogTitle>
-            <DialogDescription className="text-right">כל פרטי האיסוף, המסירה והתשלום לפני אישור או דחייה.</DialogDescription>
+        <DialogContent dir="rtl" className="text-start [&>button]:right-auto [&>button]:left-4">
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle className="text-start">פרטי העבודה {detail?.job_number}</DialogTitle>
+            <DialogDescription className="text-start">כל פרטי האיסוף, המסירה והתשלום לפני אישור או דחייה.</DialogDescription>
           </DialogHeader>
           {detail && (
-            <div className="space-y-3 text-sm text-end">
-              <div><b>כמות וסוג:</b> {deliveryKindLabel(detail)}</div>
+            <div className="space-y-3 text-sm text-start">
+              <DetailRow label="כמות וסוג" value={deliveryKindLabel(detail)} />
 
               <ContactBlock
                 label="איסוף"
@@ -446,23 +455,33 @@ function NewJobsPage() {
                 phone={detail.recipient_phone}
               />
 
-              <div><b>תאריך:</b> {detail.job_date ?? "—"} {detail.job_time ?? ""}</div>
-              {detail.customer_name && <div><b>לקוח/עסק:</b> {detail.customer_name}</div>}
-              {detail.payment != null && !detail.isQuoteRequest && <div><b>תשלום:</b> {Number(detail.payment).toFixed(0)} ₪</div>}
-              {detail.isQuoteRequest && <div className="text-amber-700"><b>תמחור:</b> בקשת הצעת מחיר — אתה קובע את המחיר</div>}
-              {detail.vehicle_required && <div><b>רכב נדרש:</b> {detail.vehicle_required}</div>}
+              <DetailRow label="תאריך" value={`${detail.job_date ?? "—"} ${detail.job_time ?? ""}`.trim()} />
+              {detail.customer_name && <DetailRow label="לקוח/עסק" value={detail.customer_name} />}
+              {detail.payment != null && !detail.isQuoteRequest && (
+                <DetailRow label="תשלום" value={`${Number(detail.payment).toFixed(0)} ₪`} />
+              )}
+              {detail.isQuoteRequest && (
+                <DetailRow
+                  label="תמחור"
+                  value="בקשת הצעת מחיר — אתה קובע את המחיר"
+                  className="text-warning"
+                />
+              )}
+              {detail.vehicle_required && <DetailRow label="רכב נדרש" value={detail.vehicle_required} />}
               {(detail.service_category === "small_move" || detail.service_category === "big_move") && (
                 <>
-                  {detail.item_category && <div><b>תכולה:</b> {detail.item_category}</div>}
-                  {detail.dropoff_floor != null && String(detail.dropoff_floor) !== "" && <div><b>קומה ביעד:</b> {detail.dropoff_floor}</div>}
+                  {detail.item_category && <DetailRow label="תכולה" value={detail.item_category} />}
+                  {detail.dropoff_floor != null && String(detail.dropoff_floor) !== "" && (
+                    <DetailRow label="קומה ביעד" value={String(detail.dropoff_floor)} />
+                  )}
                 </>
               )}
-              {detail.description && <div className="bg-slate-50 p-3 rounded">{detail.description}</div>}
+              {detail.description && <div className="bg-muted p-3 rounded-md text-start">{detail.description}</div>}
             </div>
           )}
 
           {detail && (
-            <DialogFooter className="flex-row-reverse gap-2 sm:gap-2">
+            <DialogFooter className="flex-row justify-start gap-2 sm:flex-row sm:justify-start sm:space-x-0 sm:space-x-reverse">
               {detail.isOpenQuote ? (
                 <>
                   <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number, quote: detail.existingQuote }); setDetail(null); }}>

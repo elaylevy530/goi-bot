@@ -827,12 +827,12 @@ function BonBlock({ badge, accent, icon: Icon, address, area, extras, name, phon
 export function ContactBlock({ label, address, name, phone }: { label: string; address?: string | null; name?: string | null; phone?: string | null }) {
   const digits = phone ? String(phone).replace(/\D/g, "") : "";
   return (
-    <div className="rounded-xl border border-slate-200 p-3 bg-white">
-      <div className="text-xs text-slate-500 mb-1">{label}</div>
+    <div className="rounded-xl border border-border p-3 bg-surface text-start">
+      <div className="text-xs text-text-muted mb-1">{label}</div>
       <div className="font-bold">{address ?? "—"}</div>
       {(name || phone) && (
-        <div className="mt-2 flex flex-wrap-reverse items-center justify-end gap-2">
-          {name && <span className="text-slate-700">{name}</span>}
+        <div className="mt-2 flex flex-wrap items-center justify-start gap-2">
+          {name && <span className="text-text">{name}</span>}
           {phone && (
             <>
               <a href={`tel:${phone}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold">
@@ -846,7 +846,7 @@ export function ContactBlock({ label, address, name, phone }: { label: string; a
         </div>
       )}
       {!name && !phone && (
-        <div className="mt-2 text-xs text-slate-400">לא הוזנו פרטי איש קשר</div>
+        <div className="mt-2 text-xs text-text-muted">לא הוזנו פרטי איש קשר</div>
       )}
     </div>
   );
