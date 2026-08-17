@@ -22,6 +22,7 @@ type NestJob = {
   dropoff_address?: string | null;
   selected_courier_id?: string | null;
   status?: string | null;
+  conversation_id?: string | null;
   [key: string]: unknown;
 };
 
@@ -145,9 +146,16 @@ export const sendCourierMessageFn = createServerFn({ method: "POST" })
     const job = await nestServerFetch<NestJob>(`/api/jobs/${data.job_id}`, {
       accessToken: context.accessToken,
     });
-    const conversation = await openJobConversation(context.accessToken, job);
+    
+    // Use existing conversation_id if available, otherwise create/find one
+    let conversationId = job.conversation_id;
+    if (!conversationId) {
+      const conversation = await openJobConversation(context.accessToken, job);
+      conversationId = conversation.id;
+    }
+    
     const message = typeof data.message === "string" ? data.message : "";
-    return nestServerFetch(`/api/chat/conversations/${conversation.id}/messages`, {
+    return nestServerFetch(`/api/chat/conversations/${conversationId}/messages`, {
       method: "POST",
       body: { body: message },
       accessToken: context.accessToken,
@@ -211,20 +219,27 @@ export const getMyChatMessagesFn = createServerFn({ method: "POST" })
     const job = await nestServerFetch<NestJob>(`/api/jobs/${data.job_id}`, {
       accessToken: context.accessToken,
     });
-    const conversation = await openJobConversation(context.accessToken, job);
-    const messages = await nestServerFetch<NestChatMessage[]>(
-      `/api/chat/conversations/${conversation.id}/messages`,
-      { accessToken: context.accessToken },
-    );
     
-    // Fetch courier info if available
-    let courier: NestCourier | null = null;
-    if (job.selected_courier_id) {
-      courier = await nestServerFetch<NestCourier>(
-        `/api/accounts/couriers/${job.selected_courier_id}`,
-        { accessToken: context.accessToken }
-      ).catch(() => null);
+    // Use existing conversation_id if available, otherwise create/find one
+    let conversationId = job.conversation_id;
+    if (!conversationId) {
+      const conversation = await openJobConversation(context.accessToken, job);
+      conversationId = conversation.id;
     }
+    
+    // Fetch messages and courier info in parallel
+    const [messages, courier] = await Promise.all([
+      nestServerFetch<NestChatMessage[]>(
+        `/api/chat/conversations/${conversationId}/messages`,
+        { accessToken: context.accessToken },
+      ),
+      job.selected_courier_id
+        ? nestServerFetch<NestCourier>(
+            `/api/accounts/couriers/${job.selected_courier_id}`,
+            { accessToken: context.accessToken }
+          ).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     
     return {
       job,
