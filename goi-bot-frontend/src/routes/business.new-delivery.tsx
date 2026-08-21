@@ -6,7 +6,6 @@ import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { BusinessNewOrder, type ExtraStop } from "@/components/business/BusinessNewOrder";
 import { nestCreateJob, nestUpdateJob } from "@/lib/nest-jobs";
 import { nestComputePrice, nestGetPricing } from "@/lib/nest-domain";
-import { PaypalCheckoutDialog } from "@/components/PaypalCheckoutDialog";
 import { notifyCouriersOfQuoteRequest } from "@/lib/whatsapp-quotes.functions";
 import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import { geocodeJob } from "@/lib/geocode-job.functions";
@@ -147,11 +146,9 @@ function NewDeliveryPage() {
   const [offeredPrice, setOfferedPrice] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [pricePerKm, setPricePerKm] = useState("");
-  const [payDialog, setPayDialog] = useState<{ jobId: string; amount: number } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [driveRoute, setDriveRoute] = useState<DrivingRoute | null>(null);
   const asDraftRef = useRef(false);
-  const payDialogRef = useRef(false);
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
@@ -390,13 +387,8 @@ function NewDeliveryPage() {
         return data;
       }
 
-      const hasPayment = !!(me as { payment_method_on_file?: boolean } | null)?.payment_method_on_file;
       if (pricingModel === "quote_request") {
         notify({ data: { jobId: data.id } }).catch((e) => console.error(e));
-      } else if (!hasPayment && price > 0) {
-        payDialogRef.current = true;
-        setPayDialog({ jobId: data.id, amount: price });
-        return data;
       } else {
         try {
           const res = await dispatch({ data: { jobId: data.id } });
@@ -414,10 +406,6 @@ function NewDeliveryPage() {
       return data;
     },
     onSuccess: (data) => {
-      if (payDialogRef.current) {
-        payDialogRef.current = false;
-        return;
-      }
       toast.success("המשלוח נוצר");
       navigate({ to: "/business/order/$id", params: { id: data.id } });
     },
@@ -426,28 +414,6 @@ function NewDeliveryPage() {
 
   return (
     <BusinessShell title="משלוח חדש">
-      {payDialog && (
-        <PaypalCheckoutDialog
-          open={!!payDialog}
-          jobId={payDialog.jobId}
-          amount={payDialog.amount}
-          onCancel={() => {
-            const id = payDialog.jobId;
-            setPayDialog(null);
-            toast.message("התשלום בוטל — המשלוח לא שודר");
-            navigate({ to: "/business/order/$id", params: { id } });
-          }}
-          onPaid={async () => {
-            const id = payDialog.jobId;
-            setPayDialog(null);
-            try {
-              const res = await dispatch({ data: { jobId: id } });
-              if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
-            } catch (e) { console.error(e); }
-            navigate({ to: "/business/order/$id", params: { id } });
-          }}
-        />
-      )}
       <BusinessNewOrder
         pickupText={pickupText}
         pickup={pickup}

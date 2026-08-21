@@ -2,9 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
-import { PaymentLockGate } from "@/components/PaymentGate";
-
+import { BusinessShell } from "@/components/BusinessShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +35,6 @@ export const Route = createFileRoute("/business/new-multi-delivery")({
 
 function NewMultiDeliveryPage() {
   const navigate = useNavigate();
-  const { data: me } = useMyBusiness();
   const createFn = useServerFn(createMultiStopJob);
   const dispatchFn = useServerFn(dispatchJobToCouriers);
 
@@ -159,15 +156,6 @@ function NewMultiDeliveryPage() {
     },
     onError: (e: any) => toast.error(e?.message || "שגיאה ביצירת המשלוח"),
   });
-
-  const hasPayment = !!(me as { payment_method_on_file?: boolean } | null)?.payment_method_on_file;
-  if (me && !hasPayment) {
-    return (
-      <BusinessShell title="משלוח מרובה נקודות">
-        <PaymentLockGate title="לא ניתן לשדר משלוח חדש" />
-      </BusinessShell>
-    );
-  }
 
   return (
     <BusinessShell title="משלוח מרובה נקודות">

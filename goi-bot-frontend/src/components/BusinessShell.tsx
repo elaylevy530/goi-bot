@@ -18,7 +18,6 @@ import {
   X,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { PaymentBanner } from "@/components/PaymentGate";
 import { BusinessLogo } from "@/components/BusinessLogo";
 import { cn } from "@/lib/utils";
 import { formatHebrewDate, walletBalance } from "@/lib/business-panel";
@@ -376,9 +375,6 @@ export function BusinessShell({
           </header>
         )}
 
-        <div className="shrink-0">
-          <PaymentBanner />
-        </div>
         <main className="relative min-h-0 overflow-x-hidden overflow-y-auto [-webkit-overflow-scrolling:touch] [touch-action:pan-y] lg:flex-1">{children}</main>
       </div>
 
