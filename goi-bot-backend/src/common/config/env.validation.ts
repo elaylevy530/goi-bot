@@ -55,6 +55,9 @@ const envSchema = z
 
     // Admin assistant (Lovable AI Gateway) — optional; endpoint returns 500 when unset.
     LOVABLE_API_KEY: z.string().optional(),
+
+    // Shared access token for goi-task frontend (Netlify). Required in production.
+    GOI_TASK_ACCESS_TOKEN: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.DATABASE_URL) return;

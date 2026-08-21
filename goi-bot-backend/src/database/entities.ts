@@ -47,6 +47,8 @@ import { CourierTag } from "../platform/entities/courier-tag.entity";
 import { PlatformSetting } from "../platform/entities/platform-setting.entity";
 import { Tag } from "../platform/entities/tag.entity";
 import { SupportTicket } from "../support/entities/support-ticket.entity";
+import { GoiTask } from "../goi-task/entities/goi-task.entity";
+import { GoiTaskCounter } from "../goi-task/entities/goi-task-counter.entity";
 import { GreenApiWebhookEvent } from "../whatsapp/entities/green-webhook-event.entity";
 import { WaBotState } from "../whatsapp/entities/wa-bot-state.entity";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
@@ -117,4 +119,6 @@ export const TYPEORM_ENTITIES = [
   MunchOrder,
   WhatsappDispatchSettings,
   WaMaintenance,
+  GoiTask,
+  GoiTaskCounter,
 ] as const;

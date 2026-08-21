@@ -68,5 +68,8 @@ export default () => {
     ai: {
       lovableApiKey: process.env.LOVABLE_API_KEY || undefined,
     },
+    goiTask: {
+      accessToken: process.env.GOI_TASK_ACCESS_TOKEN || undefined,
+    },
   };
 };

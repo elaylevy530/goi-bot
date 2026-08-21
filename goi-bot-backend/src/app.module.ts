@@ -8,6 +8,7 @@ import { validateEnv } from "./common/config/env.validation";
 import { DatabaseModule } from "./database/database.module";
 import { DomainModule } from "./domain/domain.module";
 import { FilesModule } from "./files/files.module";
+import { GoiTaskModule } from "./goi-task/goi-task.module";
 import { HealthModule } from "./health/health.module";
 import { JobsModule } from "./jobs/jobs.module";
 import { MunchModule } from "./munch/munch.module";
@@ -47,6 +48,7 @@ import { WorkersModule } from "./workers/workers.module";
     PushModule,
     HealthModule,
     WorkersModule,
+    GoiTaskModule,
   ],
 })
 export class AppModule {}

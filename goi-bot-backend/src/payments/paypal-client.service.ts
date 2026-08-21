@@ -85,9 +85,22 @@ export class PaypalClientService {
     const text = await res.text();
     const body = text ? (JSON.parse(text) as unknown) : null;
     if (!res.ok) {
-      const err = body as { message?: string } | null;
-      throw new Error(`PayPal ${path} ${res.status}: ${err?.message ?? text}`);
+      const rec = body && typeof body === "object" ? (body as { message?: string; debug_id?: string; name?: string; details?: unknown }) : null;
+      this.logger.error(
+        JSON.stringify({
+          tag: "paypal",
+          event: "api_error",
+          path,
+          status: res.status,
+          name: rec?.name,
+          message: rec?.message,
+          debug_id: rec?.debug_id,
+          details: rec?.details,
+        }),
+      );
+      throw new Error(`PayPal ${path} ${res.status}: ${rec?.message ?? text}`);
     }
+    this.logger.log(JSON.stringify({ tag: "paypal", event: "api_ok", path, status: res.status }));
     return body as T;
   }
 
@@ -121,6 +134,7 @@ export class PaypalClientService {
             brand_name: "Goi",
             shipping_preference: "NO_SHIPPING",
             user_action: "PAY_NOW",
+            landing_page: "LOGIN",
           },
         },
       };
