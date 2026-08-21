@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { PayPalScriptProvider, PayPalButtons, PayPalCardFieldsProvider, PayPalNameField, PayPalNumberField, PayPalExpiryField, PayPalCVVField, usePayPalCardFields } from "@paypal/react-paypal-js";
+import { PayPalScriptProvider, PayPalButtons, PayPalCardFieldsProvider, PayPalNameField, PayPalNumberField, PayPalExpiryField, PayPalCVVField, usePayPalCardFields, FUNDING } from "@paypal/react-paypal-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { createPerJobOrderFn, capturePerJobOrderFn, getPaypalConfigFn } from "@/lib/paypal-billing.functions";
+import { createPerJobOrderFn, capturePerJobOrderFn, getPaypalConfigFn, logPaypalClientFn } from "@/lib/paypal-billing.functions";
 import { cardFieldsInvalidHe, paypalErrorHe } from "@/lib/paypal-errors";
 import {
   billingFromBusiness,
@@ -87,6 +87,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
   const createOrder = useServerFn(createPerJobOrderFn);
   const captureOrder = useServerFn(capturePerJobOrderFn);
   const getCfg = useServerFn(getPaypalConfigFn);
+  const logClient = useServerFn(logPaypalClientFn);
   const { data: cfg } = useQuery({ queryKey: ["paypal-config"], queryFn: () => getCfg(), staleTime: 60 * 60_000, enabled: open });
   const [error, setError] = useState<string | null>(null);
   const [billing, setBilling] = useState<PaypalBillingDraft>(EMPTY_BILLING);
@@ -101,24 +102,33 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handleCreate = async (): Promise<string> => {
+  const handleCreate = async (attachPaypalWallet: boolean): Promise<string> => {
     const draft = billingRef.current;
     const billingError = validatePaypalIlBilling(draft);
     if (billingError) {
       setError(billingError);
+      void logClient({ data: { event: "checkout_billing_invalid", message: billingError } }).catch(() => {});
       throw new Error(billingError);
     }
     const origin = window.location.origin;
-    const r = await createOrder({
-      data: {
-        job_id: jobId,
-        return_url: origin,
-        cancel_url: origin,
-        billing_address: toPaypalApiBilling(draft),
-      },
-    });
-    if (!r?.order_id) throw new Error("לא ניתן ליצור הזמנה ב-PayPal");
-    return r.order_id;
+    try {
+      const r = await createOrder({
+        data: {
+          job_id: jobId,
+          return_url: origin,
+          cancel_url: origin,
+          billing_address: toPaypalApiBilling(draft),
+          attach_paypal_wallet: attachPaypalWallet,
+        },
+      });
+      if (!r?.order_id) throw new Error("לא ניתן ליצור הזמנה ב-PayPal");
+      return r.order_id;
+    } catch (e: unknown) {
+      void logClient({
+        data: { event: "checkout_create_fail", message: e instanceof Error ? e.message : String(e) },
+      }).catch(() => {});
+      throw e;
+    }
   };
 
   const handleApprove = async (orderId: string) => {
@@ -129,6 +139,7 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
       onPaid();
     } catch (e: unknown) {
       setError(paypalErrorHe(e));
+      void logClient({ data: { event: "checkout_capture_fail", message: e instanceof Error ? e.message : String(e) } }).catch(() => {});
     }
   };
 
@@ -162,10 +173,14 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
             <div className="space-y-3">
               <PaypalBillingAddressFields value={billing} onChange={setBilling} />
               <PayPalButtons
+                fundingSource={FUNDING.PAYPAL}
                 style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
-                createOrder={handleCreate}
+                createOrder={() => handleCreate(true)}
                 onApprove={async (data) => { await handleApprove(data.orderID); }}
-                onError={(err) => setError(paypalErrorHe(err))}
+                onError={(err) => {
+                  setError(paypalErrorHe(err));
+                  void logClient({ data: { event: "checkout_buttons_error", message: paypalErrorHe(err) } }).catch(() => {});
+                }}
                 onCancel={() => {
                   setError(null);
                   toast.message("התשלום בוטל");
@@ -180,9 +195,12 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
               </div>
 
               <PayPalCardFieldsProvider
-                createOrder={handleCreate}
+                createOrder={() => handleCreate(false)}
                 onApprove={async (data) => { await handleApprove(data.orderID); }}
-                onError={(err) => setError(paypalErrorHe(err))}
+                onError={(err) => {
+                  setError(paypalErrorHe(err));
+                  void logClient({ data: { event: "checkout_card_error", message: paypalErrorHe(err) } }).catch(() => {});
+                }}
               >
                 <div className="space-y-2">
                   <PayPalNameField />
@@ -191,7 +209,13 @@ export function PaypalCheckoutDialog({ open, jobId, amount, onCancel, onPaid }: 
                     <PayPalExpiryField />
                     <PayPalCVVField />
                   </div>
-                  <CardSubmit onFail={setError} getBilling={() => billingRef.current} />
+                  <CardSubmit
+                    onFail={(message) => {
+                      setError(message);
+                      void logClient({ data: { event: "checkout_card_submit_fail", message } }).catch(() => {});
+                    }}
+                    getBilling={() => billingRef.current}
+                  />
                 </div>
               </PayPalCardFieldsProvider>
             </div>

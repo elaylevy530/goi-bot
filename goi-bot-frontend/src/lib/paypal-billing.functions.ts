@@ -11,6 +11,7 @@ import {
   validatePaypalIlBilling,
   type PaypalApiBillingAddress,
 } from "@/lib/paypal-billing-address";
+import { paypalLog } from "@/lib/paypal-log";
 
 const billingAddressSchema = z.object({
   address_line_1: z.string().min(3).max(300),
@@ -56,15 +57,28 @@ export const createSetupTokenFn = createServerFn({ method: "POST" })
       }>("/api/accounts/customers/me", { accessToken: context.accessToken });
       billing = billingFromCustomer(me);
     }
-    const token = await createSetupToken({
-      customer_id: context.userId,
+    paypalLog("setup_token_start", {
       source: data.source,
-      return_url: data.return_url,
-      cancel_url: data.cancel_url,
-      billing_address: billing,
-    });
-    const approve = token.links.find((l) => l.rel === "approve" || l.rel === "payer-action");
-    return { setup_token_id: token.id, approve_url: approve?.href ?? null };
+      has_billing: !!billing,
+      street_len: billing?.address_line_1?.length ?? 0,
+      city: billing?.admin_area_2 ?? null,
+      zip_len: billing?.postal_code?.length ?? 0,
+    }, "info");
+    try {
+      const token = await createSetupToken({
+        customer_id: context.userId,
+        source: data.source,
+        return_url: data.return_url,
+        cancel_url: data.cancel_url,
+        billing_address: billing,
+      });
+      const approve = token.links.find((l) => l.rel === "approve" || l.rel === "payer-action");
+      paypalLog("setup_token_ok", { source: data.source, setup_token_id: token.id, status: token.status }, "info");
+      return { setup_token_id: token.id, approve_url: approve?.href ?? null };
+    } catch (e: unknown) {
+      paypalLog("setup_token_fail", { source: data.source, error: e instanceof Error ? e.message : String(e) });
+      throw e;
+    }
   });
 
 export const confirmVaultFn = createServerFn({ method: "POST" })
@@ -85,28 +99,35 @@ export const confirmVaultFn = createServerFn({ method: "POST" })
         await deletePaymentToken(existing.paypal_vault_id);
       } catch { /* previous token may already be gone */ }
     }
-    const pm = await createPaymentToken(data.setup_token_id);
-    const isPaypal = !!pm.payment_source.paypal;
-    const brand = isPaypal ? "PayPal" : (pm.payment_source.card?.brand ?? "Card");
-    const last4 = isPaypal ? null : (pm.payment_source.card?.last_digits ?? null);
+    paypalLog("confirm_vault_start", { setup_token_id: data.setup_token_id.slice(0, 12) }, "info");
+    try {
+      const pm = await createPaymentToken(data.setup_token_id);
+      const isPaypal = !!pm.payment_source.paypal;
+      const brand = isPaypal ? "PayPal" : (pm.payment_source.card?.brand ?? "Card");
+      const last4 = isPaypal ? null : (pm.payment_source.card?.last_digits ?? null);
+      paypalLog("confirm_vault_ok", { brand, last4, vault_id: pm.id, paypal_customer: pm.customer?.id ?? null }, "info");
 
-    await nestServerFetch("/api/accounts/customers/me", {
-      accessToken: context.accessToken,
-      method: "PATCH",
-      body: {
-        payment_method_on_file: true,
-        payment_provider: "paypal",
-        payment_method_brand: brand,
-        payment_method_last4: last4,
-        paypal_vault_id: pm.id,
-        paypal_payer_id: pm.payment_source.paypal?.payer_id ?? null,
-        paypal_email: pm.payment_source.paypal?.email_address ?? null,
-        dispatch_blocked_reason: null,
-        ...(data.address ? { address: data.address } : {}),
-        ...(data.city ? { city: data.city } : {}),
-      },
-    });
-    return { ok: true, brand, last4 };
+      await nestServerFetch("/api/accounts/customers/me", {
+        accessToken: context.accessToken,
+        method: "PATCH",
+        body: {
+          payment_method_on_file: true,
+          payment_provider: "paypal",
+          payment_method_brand: brand,
+          payment_method_last4: last4,
+          paypal_vault_id: pm.id,
+          paypal_payer_id: pm.payment_source.paypal?.payer_id ?? null,
+          paypal_email: pm.payment_source.paypal?.email_address ?? null,
+          dispatch_blocked_reason: null,
+          ...(data.address ? { address: data.address } : {}),
+          ...(data.city ? { city: data.city } : {}),
+        },
+      });
+      return { ok: true, brand, last4 };
+    } catch (e: unknown) {
+      paypalLog("confirm_vault_fail", { error: e instanceof Error ? e.message : String(e) });
+      throw e;
+    }
   });
 
 export const removeVaultFn = createServerFn({ method: "POST" })
@@ -158,20 +179,23 @@ export const chargeBillingRecordFn = createServerFn({ method: "POST" })
       return { ok: true, already: true, capture_id: rec.paypal_capture_id };
     }
 
-    const biz = await nestServerFetch<{ paypal_vault_id?: string | null; business_name?: string | null }>(
+    const biz = await nestServerFetch<{ paypal_vault_id?: string | null; business_name?: string | null; payment_method_brand?: string | null }>(
       `/api/accounts/customers/${rec.business_id}`,
       { accessToken: context.accessToken },
     );
     const vaultId = biz?.paypal_vault_id;
     if (!vaultId) throw new Error("Business has no PayPal vault token");
+    const vaultSource = biz?.payment_method_brand === "PayPal" ? "paypal" : "card";
 
     const invoiceId = `goi-${rec.id}`;
+    paypalLog("charge_vault_start", { billing_record_id: rec.id, vault_source: vaultSource }, "info");
     const order = await createOrderWithVault({
       vault_id: vaultId,
       amount: Number(rec.customer_price).toFixed(2),
       currency: "ILS",
       invoice_id: invoiceId,
       description: `Goi משלוח ${rec.job_number ?? rec.id.slice(0, 8)}`,
+      source: vaultSource,
     });
     const captured = await captureOrder(order.id);
     const capture = captured.purchase_units?.[0]?.payments?.captures?.[0];
@@ -199,6 +223,7 @@ export const createPerJobOrderFn = createServerFn({ method: "POST" })
     return_url: z.string().url(),
     cancel_url: z.string().url(),
     billing_address: billingAddressSchema.optional(),
+    attach_paypal_wallet: z.boolean().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const job = await nestServerFetch<{
@@ -226,25 +251,36 @@ export const createPerJobOrderFn = createServerFn({ method: "POST" })
       billing = billingFromCustomer(me);
     }
 
-    const { createCheckoutOrder } = await import("@/lib/paypal/client.server");
-    const order = await createCheckoutOrder({
-      amount: amount.toFixed(2),
-      currency: "ILS",
-      invoice_id: `goi-job-${job.id}`,
-      description: `Goi משלוח ${job.job_number ?? job.id.slice(0, 8)}`,
-      return_url: data.return_url,
-      cancel_url: data.cancel_url,
-      billing_address: billing,
-    });
-    const approve = order.links.find((l) => l.rel === "payer-action" || l.rel === "approve");
+    paypalLog("per_job_order_start", {
+      job_id: job.id,
+      attach_paypal_wallet: data.attach_paypal_wallet !== false,
+      has_billing: !!billing,
+    }, "info");
+    try {
+      const { createCheckoutOrder } = await import("@/lib/paypal/client.server");
+      const order = await createCheckoutOrder({
+        amount: amount.toFixed(2),
+        currency: "ILS",
+        invoice_id: `goi-job-${job.id}`,
+        description: `Goi משלוח ${job.job_number ?? job.id.slice(0, 8)}`,
+        return_url: data.return_url,
+        cancel_url: data.cancel_url,
+        billing_address: billing,
+        attach_paypal_wallet: data.attach_paypal_wallet,
+      });
+      const approve = order.links.find((l) => l.rel === "payer-action" || l.rel === "approve");
 
-    await nestServerFetch(`/api/jobs/${job.id}`, {
-      accessToken: context.accessToken,
-      method: "PATCH",
-      body: { paypal_order_id: order.id, per_job_amount: amount },
-    });
-
-    return { already_paid: false, approve_url: approve?.href ?? null, order_id: order.id };
+      await nestServerFetch(`/api/jobs/${job.id}`, {
+        accessToken: context.accessToken,
+        method: "PATCH",
+        body: { paypal_order_id: order.id, per_job_amount: amount },
+      });
+      paypalLog("per_job_order_ok", { job_id: job.id, order_id: order.id }, "info");
+      return { already_paid: false, approve_url: approve?.href ?? null, order_id: order.id };
+    } catch (e: unknown) {
+      paypalLog("per_job_order_fail", { job_id: job.id, error: e instanceof Error ? e.message : String(e) });
+      throw e;
+    }
   });
 
 export const capturePerJobOrderFn = createServerFn({ method: "POST" })
@@ -267,23 +303,47 @@ export const capturePerJobOrderFn = createServerFn({ method: "POST" })
       throw new Error("Order mismatch");
     }
 
-    const { captureOrder } = await import("@/lib/paypal/client.server");
-    const captured = await captureOrder(data.order_id);
-    const cap = captured.purchase_units?.[0]?.payments?.captures?.[0];
-    if (cap?.status !== "COMPLETED") {
-      const { paypalErrorHe } = await import("@/lib/paypal-errors");
-      throw new Error(paypalErrorHe({ details: [{ issue: cap?.status ?? "CAPTURE_FAILED" }] }));
+    paypalLog("per_job_capture_start", { job_id: job.id, order_id: data.order_id }, "info");
+    try {
+      const { captureOrder } = await import("@/lib/paypal/client.server");
+      const captured = await captureOrder(data.order_id);
+      const cap = captured.purchase_units?.[0]?.payments?.captures?.[0];
+      if (cap?.status !== "COMPLETED") {
+        paypalLog("per_job_capture_fail", { job_id: job.id, capture_status: cap?.status ?? null });
+        const { paypalErrorHe } = await import("@/lib/paypal-errors");
+        throw new Error(paypalErrorHe({ details: [{ issue: cap?.status ?? "CAPTURE_FAILED" }] }));
+      }
+
+      await nestServerFetch("/api/payments/per-job/capture", {
+        accessToken: context.accessToken,
+        method: "POST",
+        body: {
+          job_id: job.id,
+          order_id: data.order_id,
+          capture_id: cap.id,
+        },
+      });
+      paypalLog("per_job_capture_ok", { job_id: job.id, capture_id: cap.id }, "info");
+      return { ok: true };
+    } catch (e: unknown) {
+      paypalLog("per_job_capture_fail", { job_id: job.id, error: e instanceof Error ? e.message : String(e) });
+      throw e;
     }
+  });
 
-    await nestServerFetch("/api/payments/per-job/capture", {
-      accessToken: context.accessToken,
-      method: "POST",
-      body: {
-        job_id: job.id,
-        order_id: data.order_id,
-        capture_id: cap.id,
-      },
+export const logPaypalClientFn = createServerFn({ method: "POST" })
+  .middleware([requireNestAuth])
+  .inputValidator((d: unknown) => z.object({
+    event: z.string().min(2).max(80),
+    message: z.string().max(1000).optional(),
+    debug_id: z.string().max(80).optional(),
+    extra: z.record(z.string(), z.unknown()).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    paypalLog(`client_${data.event}`, {
+      message: data.message ?? null,
+      debug_id: data.debug_id ?? null,
+      extra: data.extra ?? null,
     });
-
     return { ok: true };
   });

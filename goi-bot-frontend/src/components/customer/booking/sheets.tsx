@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { PayPalScriptProvider, PayPalButtons, FUNDING } from "@paypal/react-paypal-js";
 import { toast } from "sonner";
 import { ArrowRight, Radar, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import {
@@ -62,9 +62,10 @@ export function PaymentSheet({ created, onDone, onBack }: { created: CreatedOrde
 
           {cfg?.clientId ? (
             <PayPalScriptProvider
-              options={{ clientId: cfg.clientId, currency: cfg.currency, intent: "capture", components: "buttons", locale: "he_IL" }}
+              options={{ clientId: cfg.clientId, currency: cfg.currency, intent: "capture", components: "buttons", locale: "he_IL", disableFunding: "card,credit" }}
             >
               <PayPalButtons
+                fundingSource={FUNDING.PAYPAL}
                 style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
                 createOrder={async () => {
                   const r = await createPP({ data: { job_id: created.job_id, tracking_token: created.tracking_token, amount: created.amount_to_charge_now } });

@@ -13,6 +13,7 @@
  */
 
 import type { PaypalApiBillingAddress } from "@/lib/paypal-billing-address";
+import { paypalErrorFields, paypalLog } from "@/lib/paypal-log";
 
 const BASE_LIVE = "https://api-m.paypal.com";
 const BASE_SANDBOX = "https://api-m.sandbox.paypal.com";
@@ -69,9 +70,16 @@ async function call<T = unknown>(
   const text = await res.text();
   const body = text ? (JSON.parse(text) as unknown) : null;
   if (!res.ok) {
+    paypalLog("api_error", {
+      path,
+      method: String(init.method ?? "GET"),
+      status: res.status,
+      ...paypalErrorFields(body),
+    });
     const { paypalApiErrorMessage } = await import("@/lib/paypal-errors");
     throw new Error(paypalApiErrorMessage(body, `PayPal ${path} ${res.status}: ${text}`));
   }
+  paypalLog("api_ok", { path, method: String(init.method ?? "GET"), status: res.status }, "info");
   return body as T;
 }
 
@@ -101,12 +109,16 @@ export async function createSetupToken(input: {
               payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED",
               brand_name: "Goi",
               shipping_preference: "NO_SHIPPING",
+              landing_page: "LOGIN",
+              user_action: "CONTINUE",
             },
           },
         }
       : {
+          // Docs: empty `card` — Card Fields attach PAN/billing on submit.
+          // https://developer.paypal.com/docs/checkout/save-payment-methods/purchase-later/js-sdk/cards/
           card: {
-            ...(input.billing_address ? { billing_address: input.billing_address } : {}),
+            verification_method: "SCA_WHEN_REQUIRED",
             experience_context: {
               brand_name: "Goi",
               locale: "he-IL",
@@ -160,7 +172,12 @@ export async function createOrderWithVault(input: {
   currency: string; // e.g. "ILS"
   invoice_id: string; // unique per charge (idempotency)
   description?: string;
+  source?: "paypal" | "card";
 }): Promise<{ id: string; status: string }> {
+  const payment_source =
+    input.source === "card"
+      ? { card: { vault_id: input.vault_id } }
+      : { paypal: { vault_id: input.vault_id } };
   return call("/v2/checkout/orders", {
     method: "POST",
     idempotencyKey: input.invoice_id,
@@ -173,7 +190,7 @@ export async function createOrderWithVault(input: {
           amount: { currency_code: input.currency, value: input.amount },
         },
       ],
-      payment_source: { paypal: { vault_id: input.vault_id } },
+      payment_source,
     }),
   });
 }
@@ -203,30 +220,36 @@ export async function createCheckoutOrder(input: {
   return_url: string;
   cancel_url: string;
   billing_address?: PaypalApiBillingAddress;
+  /** Card Fields need a bare order. PayPal Buttons need payment_source.paypal. */
+  attach_paypal_wallet?: boolean;
 }): Promise<{ id: string; status: string; links: Array<{ href: string; rel: string; method: string }> }> {
-  const paypalSource: Record<string, unknown> = {
-    experience_context: {
-      return_url: input.return_url,
-      cancel_url: input.cancel_url,
-      brand_name: "Goi",
-      shipping_preference: "NO_SHIPPING",
-      user_action: "PAY_NOW",
-    },
+  const body: Record<string, unknown> = {
+    intent: "CAPTURE",
+    purchase_units: [{
+      invoice_id: input.invoice_id,
+      description: input.description?.slice(0, 127),
+      amount: { currency_code: input.currency, value: input.amount },
+    }],
   };
-  if (input.billing_address) paypalSource.address = input.billing_address;
+  if (input.attach_paypal_wallet !== false) {
+    const paypalSource: Record<string, unknown> = {
+      experience_context: {
+        return_url: input.return_url,
+        cancel_url: input.cancel_url,
+        brand_name: "Goi",
+        shipping_preference: "NO_SHIPPING",
+        user_action: "PAY_NOW",
+        landing_page: "LOGIN",
+      },
+    };
+    if (input.billing_address) paypalSource.address = input.billing_address;
+    body.payment_source = { paypal: paypalSource };
+  }
 
   return call("/v2/checkout/orders", {
     method: "POST",
     idempotencyKey: input.invoice_id,
-    body: JSON.stringify({
-      intent: "CAPTURE",
-      purchase_units: [{
-        invoice_id: input.invoice_id,
-        description: input.description?.slice(0, 127),
-        amount: { currency_code: input.currency, value: input.amount },
-      }],
-      payment_source: { paypal: paypalSource },
-    }),
+    body: JSON.stringify(body),
   });
 }
 

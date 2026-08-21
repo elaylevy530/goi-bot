@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-ro
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { PayPalScriptProvider, PayPalButtons, FUNDING } from "@paypal/react-paypal-js";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, ShieldCheck, Bike, Calendar, Truck, PackageCheck, Sofa, Refrigerator, Bed, Tv, WashingMachine, Armchair, Package, Boxes, Piano, Bike as BikeIcon, Utensils, Home as HomeIcon } from "lucide-react";
 import {
@@ -417,9 +417,11 @@ function PaymentStep({ created, onDone, onBack }: {
                 intent: "capture",
                 components: "buttons",
                 locale: "he_IL",
+                disableFunding: "card,credit",
               }}
             >
               <PayPalButtons
+                fundingSource={FUNDING.PAYPAL}
                 style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
                 createOrder={async () => {
                   const r = await createPP({ data: {

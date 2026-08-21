@@ -82,7 +82,7 @@ export function validatePaypalIlBilling(input: PaypalBillingDraft): string | nul
   const city = input.city.trim();
   const postal = input.postalCode.replace(/\D/g, "");
   if (street.length < 3) return "יש למלא רחוב ומספר בית";
-  if (!/\d/.test(street)) return "יש לכלול מספר בית בכתובת (למשל המור 3)";
+  if (!/\d/.test(street)) return "יש לכלול מספר בית בכתובת (למשל רחוב הרצל 12)";
   if (city.length < 2) return "יש למלא עיר";
   if (postal.length !== 7) return "מיקוד ישראלי הוא 7 ספרות";
   return null;

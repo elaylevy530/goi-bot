@@ -14,7 +14,7 @@ export function PaypalBillingAddressFields({ value, onChange }: Props) {
     <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
       <p className="text-xs font-semibold text-text-strong">כתובת לחיוב</p>
       <p className="text-xs text-text-muted">
-        חייבת להתאים לכתובת אצל חברת האשראי. רחוב קצר בלי עיר (למשל Mor 3) נדחה.
+        חייבת להתאים לכתובת אצל חברת האשראי. רחוב קצר בלי עיר (למשל רחוב הרצל 12) נדחה.
       </p>
       <div className="space-y-1">
         <Label htmlFor="paypal-billing-street" className="text-xs text-text-muted">רחוב ומספר בית</Label>
@@ -24,7 +24,7 @@ export function PaypalBillingAddressFields({ value, onChange }: Props) {
           value={value.street}
           onChange={(e) => set({ street: e.target.value })}
           autoComplete="street-address"
-          placeholder="המור 3"
+          placeholder="רחוב הרצל 12"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -36,7 +36,7 @@ export function PaypalBillingAddressFields({ value, onChange }: Props) {
             value={value.city}
             onChange={(e) => set({ city: e.target.value })}
             autoComplete="address-level2"
-            placeholder="יבנה"
+            placeholder="תל אביב"
           />
         </div>
         <div className="space-y-1">
@@ -48,7 +48,7 @@ export function PaypalBillingAddressFields({ value, onChange }: Props) {
             onChange={(e) => set({ postalCode: e.target.value.replace(/\D/g, "").slice(0, 7) })}
             inputMode="numeric"
             autoComplete="postal-code"
-            placeholder="8122407"
+            placeholder="1234567"
             maxLength={7}
           />
         </div>

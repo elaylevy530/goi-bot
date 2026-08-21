@@ -130,13 +130,13 @@ function PaymentMethodCard() {
           </div>
           <p className="text-sm font-bold text-text-strong">אין אמצעי תשלום</p>
         </div>
-        <p className="text-sm text-text-subtle">חבר PayPal או כרטיס כדי לשדר משלוחים.</p>
+        <p className="text-sm text-text-subtle">הוסיפו כרטיס אשראי כאן. חשבון PayPal הוא אפשרות נפרדת — בלי טופס כתובת של PayPal.</p>
         <div className="mt-auto flex flex-wrap gap-2">
-          <Button onClick={() => startPaypal.mutate()} disabled={busy} className="bg-navy text-white hover:bg-navy/90">
-            {busy && <Loader2 className="size-4 animate-spin" />} חבר PayPal
+          <Button onClick={() => setCardOpen(true)} disabled={busy}>
+            <CreditCard className="size-4" /> הוסף כרטיס
           </Button>
-          <Button onClick={() => setCardOpen(true)} disabled={busy} variant="outline">
-            <CreditCard className="size-4" /> כרטיס
+          <Button onClick={() => startPaypal.mutate()} disabled={busy} variant="outline">
+            {busy && <Loader2 className="size-4 animate-spin" />} חשבון PayPal
           </Button>
         </div>
       </article>

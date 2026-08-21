@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { confirmVaultFn, createSetupTokenFn, getPaypalConfigFn } from "@/lib/paypal-billing.functions";
+import { confirmVaultFn, createSetupTokenFn, getPaypalConfigFn, logPaypalClientFn } from "@/lib/paypal-billing.functions";
 import { cardFieldsInvalidHe, paypalErrorHe } from "@/lib/paypal-errors";
 import {
   billingFromBusiness,
@@ -128,7 +128,6 @@ function VaultCardForm({
 
   return (
     <PayPalCardFieldsProvider
-      createOrder={createVaultSetupToken}
       createVaultSetupToken={createVaultSetupToken}
       onApprove={onApprove}
       onError={onError}
@@ -152,6 +151,7 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
   const setupFn = useServerFn(createSetupTokenFn);
   const confirmFn = useServerFn(confirmVaultFn);
   const getCfg = useServerFn(getPaypalConfigFn);
+  const logClient = useServerFn(logPaypalClientFn);
   const { data: cfg, isLoading: cfgLoading } = useQuery({
     queryKey: ["paypal-config"],
     queryFn: () => getCfg(),
@@ -176,19 +176,27 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
     const billingError = validatePaypalIlBilling(draft);
     if (billingError) {
       setError(billingError);
+      void logClient({ data: { event: "vault_billing_invalid", message: billingError } }).catch(() => {});
       throw new Error(billingError);
     }
     const origin = window.location.origin;
-    const r = await setupFn({
-      data: {
-        source: "card",
-        return_url: `${origin}/business/billing`,
-        cancel_url: `${origin}/business/billing?paypal=cancel`,
-        billing_address: toPaypalApiBilling(draft),
-      },
-    });
-    if (!r?.setup_token_id) throw new Error("לא ניתן להתחיל שמירת כרטיס");
-    return r.setup_token_id;
+    try {
+      const r = await setupFn({
+        data: {
+          source: "card",
+          return_url: `${origin}/business/billing`,
+          cancel_url: `${origin}/business/billing?paypal=cancel`,
+          billing_address: toPaypalApiBilling(draft),
+        },
+      });
+      if (!r?.setup_token_id) throw new Error("לא ניתן להתחיל שמירת כרטיס");
+      return r.setup_token_id;
+    } catch (e: unknown) {
+      void logClient({
+        data: { event: "vault_setup_fail", message: e instanceof Error ? e.message : String(e) },
+      }).catch(() => {});
+      throw e;
+    }
   };
 
   const handleApprove = async (data: {
@@ -199,6 +207,7 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
     const setupToken = data.vaultSetupToken ?? data.vault_setup_token ?? data.orderID;
     if (!setupToken) {
       setError(VAULT_FAIL);
+      void logClient({ data: { event: "vault_approve_missing_token" } }).catch(() => {});
       return;
     }
     try {
@@ -219,6 +228,7 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
       onSaved();
     } catch (e: unknown) {
       setError(paypalErrorHe(e, VAULT_FAIL));
+      void logClient({ data: { event: "vault_confirm_fail", message: e instanceof Error ? e.message : String(e) } }).catch(() => {});
     }
   };
 
@@ -246,16 +256,27 @@ export function SaveCardDialog({ open, onClose, onSaved }: Props) {
             options={{
               clientId: cfg.clientId,
               currency: cfg.currency,
-              intent: "capture",
-              components: "buttons,card-fields",
+              components: "card-fields",
               locale: "he_IL",
             }}
           >
             <VaultCardForm
               createVaultSetupToken={createVaultSetupToken}
               onApprove={handleApprove}
-              onError={(err) => setError(paypalErrorHe(err, VAULT_FAIL))}
-              onFail={setError}
+              onError={(err) => {
+                setError(paypalErrorHe(err, VAULT_FAIL));
+                void logClient({
+                  data: {
+                    event: "vault_sdk_error",
+                    message: paypalErrorHe(err, VAULT_FAIL),
+                    extra: { keys: Object.keys(err ?? {}) },
+                  },
+                }).catch(() => {});
+              }}
+              onFail={(message) => {
+                setError(message);
+                void logClient({ data: { event: "vault_submit_fail", message } }).catch(() => {});
+              }}
               billing={billing}
               onBillingChange={setBilling}
               getBilling={() => billingRef.current}
