@@ -427,79 +427,165 @@ function NewJobsPage() {
 
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent dir="rtl">
-          <DialogHeader>
-            <DialogTitle>פרטי העבודה {detail?.job_number}</DialogTitle>
-            <DialogDescription className="text-right">כל פרטי האיסוף, המסירה והתשלום לפני אישור או דחייה.</DialogDescription>
-          </DialogHeader>
+        <DialogContent dir="rtl" className="p-0 gap-0 max-w-[min(95vw,400px)]">
           {detail && (
-            <div className="space-y-3 text-sm text-end">
-              <div><b>כמות וסוג:</b> {deliveryKindLabel(detail)}</div>
+            <>
+              {/* Hero section with payment */}
+              <div className="relative px-5 pt-6 pb-5 bg-gradient-to-br from-emerald-600 to-emerald-500 text-white overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.15),transparent_50%)]" aria-hidden />
+                <div className="relative">
+                  <div className="text-center mb-4">
+                    {detail.payment != null && !detail.isQuoteRequest ? (
+                      <>
+                        <div className="text-5xl font-black leading-none mb-1.5">{Number(detail.payment).toFixed(0)} ₪</div>
+                        <div className="text-emerald-100 text-sm font-semibold">תשלום עבור המשלוח</div>
+                      </>
+                    ) : detail.isQuoteRequest ? (
+                      <>
+                        <div className="text-4xl font-black leading-none mb-1.5">הצעת מחיר</div>
+                        <div className="text-emerald-100 text-sm font-semibold">אתה קובע את המחיר</div>
+                      </>
+                    ) : (
+                      <div className="text-4xl font-black">משלוח #{detail.job_number}</div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm">
+                    <span className="text-emerald-100">{detail.pickup_area ?? "איסוף"}</span>
+                    <span className="text-white/60">→</span>
+                    <span className="text-emerald-100">{detail.dropoff_area ?? "מסירה"}</span>
+                  </div>
+                </div>
+              </div>
 
-              <ContactBlock
-                label="איסוף"
-                address={detail.pickup_address ?? detail.pickup_area}
-                name={null}
-                phone={null}
-              />
+              {/* Content */}
+              <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                {/* Timeline */}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="relative mt-1">
+                      <div className="size-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
+                      <div className="absolute top-3 right-[5px] bottom-[-1rem] w-px bg-slate-200" />
+                    </div>
+                    <div className="flex-1 pb-3">
+                      <div className="text-[11px] text-slate-500 font-semibold mb-1">איסוף</div>
+                      <div className="font-bold text-slate-900 text-[15px] leading-snug">{detail.pickup_address ?? detail.pickup_area ?? "—"}</div>
+                      {detail.pickup_notes && (
+                        <div className="text-[12px] text-slate-600 mt-1 bg-slate-50 rounded px-2 py-1">{detail.pickup_notes}</div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="size-3 rounded-full bg-rose-500 ring-4 ring-rose-100 mt-1" />
+                    <div className="flex-1">
+                      <div className="text-[11px] text-slate-500 font-semibold mb-1">מסירה</div>
+                      <div className="font-bold text-slate-900 text-[15px] leading-snug">{detail.dropoff_address ?? detail.dropoff_area ?? "—"}</div>
+                      {detail.recipient_name && (
+                        <div className="text-[13px] text-slate-600 mt-1">נמען: {detail.recipient_name}</div>
+                      )}
+                      {detail.dropoff_notes && (
+                        <div className="text-[12px] text-slate-600 mt-1 bg-slate-50 rounded px-2 py-1">{detail.dropoff_notes}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-              <ContactBlock
-                label="מסירה"
-                address={detail.dropoff_address ?? detail.dropoff_area}
-                name={detail.recipient_name}
-                phone={detail.recipient_phone}
-              />
-
-
-              <div><b>תאריך:</b> {detail.job_date ?? "—"} {detail.job_time ?? ""}</div>
-              {detail.customer_name && <div><b>לקוח/עסק:</b> {detail.customer_name}</div>}
-              {detail.payment != null && !detail.isQuoteRequest && <div><b>תשלום:</b> {Number(detail.payment).toFixed(0)} ₪</div>}
-              {detail.isQuoteRequest && <div className="text-amber-700"><b>תמחור:</b> בקשת הצעת מחיר — אתה קובע את המחיר</div>}
-              {detail.vehicle_required && <div><b>רכב נדרש:</b> {detail.vehicle_required}</div>}
-              {(detail.service_category === "small_move" || detail.service_category === "big_move") && (
-                <>
-                  {detail.item_category && <div><b>תכולה:</b> {detail.item_category}</div>}
-                  {detail.dropoff_floor != null && String(detail.dropoff_floor) !== "" && <div><b>קומה ביעד:</b> {detail.dropoff_floor}</div>}
-                </>
-              )}
-              {detail.description && <div className="bg-slate-50 p-3 rounded">{detail.description}</div>}
-            </div>
-          )}
-
-          {detail && (
-            <DialogFooter className="flex-row-reverse gap-2 sm:gap-2">
-              {detail.isOpenQuote ? (
-                <>
-                  <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number, quote: detail.existingQuote }); setDetail(null); }}>
-                    {detail.existingQuote ? "עדכן הצעה" : "הגש הצעת מחיר"}
-                  </Button>
-                  {!detail.existingQuote && (
-                    <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => declineQuoteJob(detail.id)}>דחה</Button>
+                {/* Compact details */}
+                <div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-600 pt-2 border-t border-slate-200">
+                  <span className="inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 font-medium">
+                    📦 {deliveryKindLabel(detail)}
+                  </span>
+                  {detail.job_date && (
+                    <span className="inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 font-medium">
+                      🕐 {detail.job_date} {detail.job_time}
+                    </span>
                   )}
-                </>
-              ) : detail.offerId ? (
-                <>
-                  {detail.isQuoteRequest ? (
-                    <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number }); setDetail(null); }}>
-                      הגש הצעת מחיר
-                    </Button>
-                  ) : (
-                    <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => respond.mutate({ id: detail.offerId, response: "accepted", jobId: detail.id })} disabled={respond.isPending}>
-                      {respond.isPending && <Loader2 className="size-3 animate-spin" />} {t.takeJob}
-                    </Button>
+                  {detail.vehicle_required && (
+                    <span className="inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 font-medium">
+                      🚗 {detail.vehicle_required}
+                    </span>
                   )}
-                  <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => respond.mutate({ id: detail.offerId, response: "declined" })} disabled={respond.isPending}>דחה</Button>
-                </>
-              ) : (
-                <>
-                  <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => claim.mutate(detail.id)} disabled={claim.isPending}>
-                    {claim.isPending && <Loader2 className="size-3 animate-spin" />} {t.takeJob}
-                  </Button>
-                  <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => declineOpenJob(detail.id)}>דחה</Button>
-                </>
-              )}
-              <Button variant="outline" onClick={() => setDetail(null)}>סגור</Button>
-            </DialogFooter>
+                  {detail.customer_name && (
+                    <span className="inline-flex items-center gap-1 bg-slate-100 rounded-full px-2.5 py-1 font-medium truncate max-w-full">
+                      👤 {detail.customer_name}
+                    </span>
+                  )}
+                </div>
+
+                {detail.description && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <div className="text-[11px] text-amber-800 font-bold mb-1">הערות נוספות</div>
+                    <div className="text-[13px] text-amber-900 leading-relaxed">{detail.description}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer with actions */}
+              <div className="px-5 py-4 border-t border-slate-200 bg-slate-50/50 flex flex-col gap-2">
+                {detail.isOpenQuote ? (
+                  <>
+                    <Button 
+                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                      onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number, quote: detail.existingQuote }); setDetail(null); }}
+                    >
+                      {detail.existingQuote ? "עדכן הצעת מחיר" : "הגש הצעת מחיר"}
+                    </Button>
+                    <div className="flex gap-2">
+                      {!detail.existingQuote && (
+                        <Button variant="outline" className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" onClick={() => declineQuoteJob(detail.id)}>דחה</Button>
+                      )}
+                      <Button variant="outline" className="flex-1 h-10 rounded-xl font-semibold" onClick={() => setDetail(null)}>סגור</Button>
+                    </div>
+                  </>
+                ) : detail.offerId ? (
+                  <>
+                    {detail.isQuoteRequest ? (
+                      <Button 
+                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                        onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number }); setDetail(null); }}
+                      >
+                        הגש הצעת מחיר
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                        onClick={() => respond.mutate({ id: detail.offerId, response: "accepted", jobId: detail.id })} 
+                        disabled={respond.isPending}
+                      >
+                        {respond.isPending && <Loader2 className="size-4 animate-spin" />}
+                        {!respond.isPending && "אני לוקח את המשלוח"}
+                      </Button>
+                    )}
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" 
+                        onClick={() => respond.mutate({ id: detail.offerId, response: "declined" })} 
+                        disabled={respond.isPending}
+                      >
+                        דחה
+                      </Button>
+                      <Button variant="outline" className="flex-1 h-10 rounded-xl font-semibold" onClick={() => setDetail(null)}>סגור</Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                      onClick={() => claim.mutate(detail.id)} 
+                      disabled={claim.isPending}
+                    >
+                      {claim.isPending && <Loader2 className="size-4 animate-spin" />}
+                      {!claim.isPending && "אני לוקח את המשלוח"}
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" onClick={() => declineOpenJob(detail.id)}>דחה</Button>
+                      <Button variant="outline" className="flex-1 h-10 rounded-xl font-semibold" onClick={() => setDetail(null)}>סגור</Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
