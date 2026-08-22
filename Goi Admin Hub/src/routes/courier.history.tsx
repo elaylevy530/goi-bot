@@ -277,43 +277,69 @@ export function ActiveJobs() {
               </div>
 
               {/* Contact row */}
-              <div className="grid grid-cols-3 gap-1.5">
-                <SoftBtn
-                  icon={MessageCircle}
-                  label="צ׳אט עסק"
-                  tint="green"
-                  onClick={() => {
-                    const p = j.pickup_contact_phone;
-                    if (!p) return toast.error("אין מספר עסק");
-                    window.open(`https://wa.me/${String(p).replace(/\D/g, "")}`, "_blank");
-                  }}
-                />
-                <SoftBtn
-                  icon={Phone}
-                  label="חיוג ללקוח"
-                  tint="blue"
-                  onClick={() => {
-                    const p = j.recipient_phone;
-                    if (p) window.location.href = `tel:${p}`;
-                    else toast.error("אין מספר לקוח");
-                  }}
-                />
-                <SoftBtn icon={Info} label="פרטים" tint="slate" onClick={() => setContactJob(j)} />
-              </div>
+              {/* Contact and details */}
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center justify-center gap-2 text-slate-600 text-[12px] font-medium py-2 hover:text-slate-800 transition-colors">
+                    <ChevronDown className="size-4" />
+                    יצירת קשר ופרטים
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <SoftBtn
+                      icon={MessageCircle}
+                      label="צ׳אט עסק"
+                      tint="green"
+                      onClick={() => {
+                        const p = j.pickup_contact_phone;
+                        if (!p) return toast.error("אין מספר עסק");
+                        window.open(`https://wa.me/${String(p).replace(/\D/g, "")}`, "_blank");
+                      }}
+                    />
+                    <SoftBtn
+                      icon={Phone}
+                      label="חיוג ללקוח"
+                      tint="blue"
+                      onClick={() => {
+                        const p = j.recipient_phone;
+                        if (p) window.location.href = `tel:${p}`;
+                        else toast.error("אין מספר לקוח");
+                      }}
+                    />
+                    <SoftBtn icon={Info} label="פרטים" tint="slate" onClick={() => setContactJob(j)} />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
-              {/* Navigation row */}
-              <div className="grid grid-cols-2 gap-1.5">
-                <SoftNavBtn label="לאיסוף" sublabel={j.pickup_area ?? ""} tint="indigo" onClick={() => openNav(j.pickup_address ?? j.pickup_area)} />
-                <SoftNavBtn label="למסירה" sublabel={j.dropoff_area ?? ""} tint="rose" onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)} />
-              </div>
+              {!pickedUp && !delivered && (
+                <button
+                  type="button"
+                  onClick={() => openNav(j.pickup_address ?? j.pickup_area)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl min-h-14 font-bold text-[15px] text-white bg-gradient-to-l from-emerald-600 to-emerald-500 shadow-[0_4px_14px_-2px_rgba(5,150,105,0.5)] active:scale-[0.99] transition-all"
+                >
+                  <Navigation className="size-5" strokeWidth={2.5} />
+                  התחל ניווט לאיסוף
+                </button>
+              )}
+              {pickedUp && !delivered && (
+                <button
+                  type="button"
+                  onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl min-h-14 font-bold text-[15px] text-white bg-gradient-to-l from-blue-600 to-blue-500 shadow-[0_4px_14px_-2px_rgba(37,99,235,0.5)] active:scale-[0.99] transition-all"
+                >
+                  <Navigation className="size-5" strokeWidth={2.5} />
+                  התחל ניווט למסירה
+                </button>
+              )}
 
-              {/* Primary action — refined, system-green pill */}
+              {/* Primary action — status update button */}
               {primary && (
                 <button
                   onClick={() => setStep.mutate({ job_id: j.id, step: primary.step })}
                   disabled={setStep.isPending}
                   className={cn(
-                    "group relative w-full overflow-hidden rounded-xl h-12 font-semibold text-[14px] text-white",
+                    "group relative w-full overflow-hidden rounded-xl min-h-14 font-bold text-[15px] text-white",
                     primary.btn,
                     "transition-all active:scale-[0.99] disabled:opacity-60",
                     primary.shadow,
@@ -321,7 +347,7 @@ export function ActiveJobs() {
 
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    <primary.icon className="size-4" strokeWidth={2.25} />
+                    <primary.icon className="size-5" strokeWidth={2.5} />
                     <span className="tracking-tight">{primary.label}</span>
                   </span>
                 </button>
