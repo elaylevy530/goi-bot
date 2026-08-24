@@ -221,6 +221,21 @@ export class AccountDomainController {
     return this.domain.myNotificationUnread(auth.userId);
   }
 
+  @Get("couriers/me/notifications")
+  async myCourierNotifications(@CurrentUser() auth: AuthUserContext) {
+    const courierId = await this.domain["requireCourierId"](auth.userId);
+    return this.domain.listCourierNotifications(courierId);
+  }
+
+  @Patch("couriers/me/notifications/:id/read")
+  async markMyNotificationRead(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    const courierId = await this.domain["requireCourierId"](auth.userId);
+    return this.domain.markCourierNotificationRead(courierId, id);
+  }
+
   @Get("couriers/:id/stats")
   @UseGuards(RolesGuard)
   @Roles("admin", "manager")

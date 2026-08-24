@@ -145,6 +145,17 @@ export function nestMyNotificationUnreadCount() {
   return apiFetch<number>("/api/accounts/couriers/me/notification-unread", options());
 }
 
+export function nestListMyCourierNotifications() {
+  return apiFetch<Record<string, unknown>[]>("/api/accounts/couriers/me/notifications", options());
+}
+
+export function nestMarkCourierNotificationRead(id: string) {
+  return apiFetch<{ ok: true }>(`/api/accounts/couriers/me/notifications/${id}/read`, {
+    method: "PATCH",
+    ...options(),
+  });
+}
+
 export function nestListMyBranches() {
   return apiFetch<Record<string, unknown>[]>("/api/accounts/customers/me/branches", options());
 }

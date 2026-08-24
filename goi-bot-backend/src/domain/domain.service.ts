@@ -788,6 +788,34 @@ export class DomainService {
       .getCount();
   }
 
+  async listCourierNotifications(courierId: string) {
+    return this.notifications
+      .createQueryBuilder("n")
+      .where("(n.courier_id = :courierId OR n.audience = :all)", {
+        courierId,
+        all: "all",
+      })
+      .orderBy("n.created_at", "DESC")
+      .limit(100)
+      .getMany();
+  }
+
+  async markCourierNotificationRead(courierId: string, notificationId: string) {
+    const notification = await this.notifications.findOne({
+      where: { id: notificationId },
+    });
+    if (!notification) throw new NotFoundException("Notification not found");
+    if (
+      notification.audience !== "all" &&
+      notification.courier_id !== courierId
+    ) {
+      throw new NotFoundException("Notification not found");
+    }
+    notification.read_at = new Date();
+    await this.notifications.save(notification);
+    return { ok: true as const };
+  }
+
   private async requireBusinessId(userId: string) {
     const previewId = previewCustomerId();
     const customer = previewId
