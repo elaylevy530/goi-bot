@@ -25,6 +25,7 @@ ROUTES = [
     "/courier/dashboard",
     "/courier/jobs",
     "/courier/active",
+    "/courier/performance",
     "/courier/wallet",
     "/courier/profile",
     "/courier/settings",

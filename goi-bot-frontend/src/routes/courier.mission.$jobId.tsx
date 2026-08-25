@@ -285,7 +285,7 @@ function MissionPage() {
             payment={payment}
             tip={tip}
             onMap={() => navigate({ to: "/courier/new-jobs" })}
-            onSummary={() => navigate({ to: "/courier/wallet" })}
+            onSummary={() => navigate({ to: "/courier/performance" })}
           />
         )}
       </div>

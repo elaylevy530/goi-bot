@@ -22,10 +22,10 @@ import {
   MapPin,
   Bike,
   Wallet as WalletIcon,
-  History,
+  TrendingUp,
+  Star,
   KeyRound,
   Loader2,
-  Star,
   Building2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,8 +40,9 @@ function buildMenu(t: CourierTerms) {
   return [
     { to: "/courier/profile/edit", label: "הפרופיל שלי", sub: "תמונה, פרטים אישיים ורכב", icon: User },
     { to: "/courier/profile/bank", label: "פרטי חשבון בנק", sub: "בנק, סניף ומספר חשבון לתשלום", icon: Building2 },
-    { to: "/courier/history", label: "העבודות שלי", sub: `היסטוריית ${t.jobPlural} שבוצעו`, icon: History },
-    { to: "/courier/wallet", label: "רווחים", sub: "יתרה, תשלומים ומשיכות", icon: WalletIcon },
+    { to: "/courier/performance", label: "ביצועים", sub: `הכנסות והיסטוריית ${t.jobPlural}`, icon: TrendingUp },
+    { to: "/courier/ratings", label: "דירוגים וביצועים", sub: "ציון לקוחות ומדדי שירות", icon: Star },
+    { to: "/courier/wallet", label: "ארנק ומשיכות", sub: "יתרה, תשלומים ומשיכות", icon: WalletIcon },
   ];
 }
 
@@ -164,13 +165,13 @@ function ProfilePage() {
                   <Bike className="size-3.5 text-slate-400 shrink-0" />
                 </div>
               </div>
-              <div className="text-center border-r border-slate-100 pr-2">
+              <Link to="/courier/ratings" className="text-center border-r border-slate-100 pr-2">
                 <div className="text-[11px] text-slate-500 mb-1">דירוג</div>
                 <div className="flex items-center justify-center gap-1 font-extrabold text-slate-900">
                   <span>{stats?.avg_rating ? Number(stats.avg_rating).toFixed(1) : "—"}</span>
                   <Star className="size-4 fill-amber-400 text-amber-400" />
                 </div>
-              </div>
+              </Link>
               <div className="text-center border-r border-slate-100 pr-2">
                 <div className="text-[11px] text-slate-500 mb-1">יתרה זמינה למשיכה</div>
                 <div className="flex items-center justify-center gap-1.5">

@@ -1,20 +1,19 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCourierTerms } from "@/lib/courier-kind";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { CourierShell, useMyCourier } from "@/components/CourierShell";
+import { useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { JobDetailsSheet } from "@/components/courier/JobDetailsSheet";
 import {
   nestListCourierActiveJobs, nestCourierUpdateProgress, nestListJobStatusLogs,
 } from "@/lib/nest-jobs";
 import { jobBusinessPhone, resolveCourierBusinessConversation } from "@/lib/nest-chat";
 import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import {
-  CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Clock, History as HistoryIcon,
+  CheckCircle2, ChevronDown, Clock, Filter, History as HistoryIcon,
   Info, MapPin, MessageCircle, Navigation, Package, Phone, Star, Truck, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,8 +23,9 @@ import { openWaze } from "@/lib/waze";
 
 
 export const Route = createFileRoute("/courier/history")({
-  head: () => ({ meta: [{ title: "היסטוריית משלוחים — Goi" }] }),
-  component: HistoryPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/courier/performance" });
+  },
 });
 
 // ============ pipeline definition ============
@@ -79,6 +79,7 @@ export function ActiveJobs() {
   const navigate = useNavigate();
   const [contactJob, setContactJob] = useState<any>(null);
   const [tab, setTab] = useState<ActiveTab>("today");
+  const [statusFilter, setStatusFilter] = useState<"all" | Stage>("all");
 
 
   const { data: jobs = [] } = useQuery({
@@ -168,47 +169,70 @@ export function ActiveJobs() {
   };
 
   const tabs: { key: ActiveTab; label: string; count: number }[] = [
-    { key: "today", label: "להיום", count: todayJobs.length },
+    { key: "today", label: "היום", count: todayJobs.length },
     { key: "scheduled", label: "מתוזמנות", count: scheduledJobs.length },
   ];
 
+  const filtered = useMemo(() => {
+    if (statusFilter === "all") return visible;
+    return visible.filter((j) => stageOf(j, (lastSteps as Record<string, string>)[j.id]) === statusFilter);
+  }, [visible, statusFilter, lastSteps]);
+
   return (
     <div className="space-y-3">
-      <div className="flex w-full rounded-[14px] bg-border-strong/60 p-1">
-        {tabs.map((t) => (
+      <div className="flex w-full border-b border-border">
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
+            key={tabItem.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => setTab(tabItem.key)}
             className={cn(
-              "flex-1 min-h-11 rounded-[10px] px-2 py-2.5 text-[13px] text-center transition-all",
-              tab === t.key
-                ? "bg-surface font-bold text-primary shadow-card"
+              "relative flex-1 min-h-11 px-2 text-sm text-center transition-colors",
+              tab === tabItem.key
+                ? "font-extrabold text-primary"
                 : "font-semibold text-text-subtle",
             )}
           >
-            {t.label} ({t.count})
+            {tabItem.label}
+            {tab === tabItem.key && (
+              <span className="absolute inset-x-6 bottom-0 h-0.5 rounded-pill bg-primary" />
+            )}
           </button>
         ))}
       </div>
 
+      <label className="sr-only" htmlFor="active-status-filter">סינון לפי סטטוס</label>
+      <div className="relative">
+        <Filter className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-primary" aria-hidden />
+        <select
+          id="active-status-filter"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | Stage)}
+          className="min-h-12 w-full appearance-none rounded-card border border-border bg-surface px-10 py-3 text-right text-sm font-semibold text-text-strong shadow-card"
+        >
+          <option value="all">סינון לפי סטטוס</option>
+          <option value="assigned">אושר</option>
+          <option value="to_pickup">בדרך לאיסוף</option>
+          <option value="picked_up">נאסף</option>
+        </select>
+        <ChevronDown className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" aria-hidden />
+      </div>
+
       {jobs.length > 0 && (
         <div className="flex items-end justify-between px-1">
-          <div className="text-sm text-slate-500">{jobs.length} משלוחים בביצוע</div>
-          <div className="rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold">משמרת פעילה</div>
+          <div className="text-sm text-text-subtle">{jobs.length} משלוחים בביצוע</div>
+          <div className="rounded-pill bg-primary-soft px-3 py-1 text-xs font-bold text-success-text">משמרת פעילה</div>
         </div>
       )}
 
-      {visible.length === 0 && (
-        <Card className="rounded-2xl">
-          <CardContent className="py-14 text-center text-slate-500">
-            <ClipboardCheck className="size-10 mx-auto mb-3 opacity-50" />
-            {tab === "today" ? "אין משלוחים להיום" : "אין משלוחים מתוזמנים"}
-          </CardContent>
-        </Card>
+      {filtered.length === 0 && (
+        <ActiveEmptyState
+          hasJobsInTab={visible.length > 0}
+          tab={tab}
+        />
       )}
 
-      {visible.map((j) => {
+      {filtered.map((j) => {
         const step = (lastSteps as Record<string, string>)[j.id];
         const stage = stageOf(j, step);
         const sIdx = stageIndex(stage);
@@ -380,32 +404,53 @@ export function ActiveJobs() {
         );
       })}
 
-      <Dialog open={!!contactJob} onOpenChange={(o) => !o && setContactJob(null)}>
-        <DialogContent dir="rtl" className="max-w-md max-h-[92vh] overflow-hidden p-0 gap-0 border border-black/15 rounded-2xl">
-          {/* Granite header */}
-          <div className="relative px-4 pt-4 pb-4 text-white bg-gradient-to-l from-[#0b3b2e] via-[#12604a] to-[#1c8a5b]">
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent" />
-            <DialogHeader className="relative space-y-1">
-              <DialogTitle className="text-end text-white text-[16px] font-extrabold">
-                בון משלוח
-              </DialogTitle>
-              <DialogDescription className="text-end text-white/80 text-[11.5px] font-mono">
-                #{contactJob?.job_number}
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-
-          <div className="overflow-y-auto max-h-[calc(92vh-140px)] px-4 py-3 bg-slate-50/60">
-            {contactJob && <BonDetails job={contactJob} />}
-          </div>
-
-          <DialogFooter className="px-4 py-3 border-t border-black/10 bg-white">
-            <Button variant="outline" className="w-full h-10 rounded-xl" onClick={() => setContactJob(null)}>סגור</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <JobDetailsSheet
+        job={contactJob}
+        open={!!contactJob}
+        onOpenChange={(o) => { if (!o) setContactJob(null); }}
+        onChatPickup={() => { if (contactJob) void openBusinessChat(contactJob); }}
+        onChatDropoff={() => {
+          const phone = contactJob?.recipient_phone ? String(contactJob.recipient_phone).replace(/\D/g, "") : "";
+          if (phone) window.open(`https://wa.me/${phone}`, "_blank", "noreferrer");
+          else toast.error("אין מספר לקוח");
+        }}
+      />
     </div>
+  );
+}
+
+function ActiveEmptyState({ hasJobsInTab, tab }: { hasJobsInTab: boolean; tab: ActiveTab }) {
+  return (
+    <div className="flex flex-col items-center px-4 py-10 text-center">
+      <ActiveEmptyArt />
+      <h2 className="mt-5 text-lg font-extrabold text-text-strong">
+        {hasJobsInTab
+          ? "אין משלוחים בסטטוס הזה"
+          : tab === "scheduled"
+            ? "אין משלוחים מתוזמנים"
+            : "אין משלוחים פעילים כרגע"}
+      </h2>
+      <p className="mt-2 max-w-xs text-sm text-text-subtle">
+        {hasJobsInTab
+          ? "נסו לבחור סטטוס אחר או לחזור לכל המשלוחים"
+          : "כשתהיה לך משלוח חדש, הוא יופיע כאן"}
+      </p>
+    </div>
+  );
+}
+
+function ActiveEmptyArt() {
+  return (
+    <svg viewBox="0 0 220 140" className="h-36 w-56" aria-hidden>
+      <rect x="18" y="78" width="184" height="8" rx="4" className="fill-muted" />
+      <path d="M28 78h18l8-22h20l-6 22h24l10-30h22l-8 30h30l12-36h20l-10 36h28" className="fill-border-strong/70" />
+      <circle cx="78" cy="52" r="16" className="fill-primary" />
+      <path d="M78 40c-7 0-12 5-12 12 0 9 12 22 12 22s12-13 12-22c0-7-5-12-12-12zm0 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" className="fill-primary-foreground" />
+      <path d="M86 68c10 8 22 14 34 16" className="stroke-primary fill-none" strokeWidth="2" strokeDasharray="4 4" />
+      <rect x="118" y="78" width="52" height="38" rx="6" className="fill-surface stroke-border" strokeWidth="2" />
+      <rect x="118" y="78" width="52" height="10" rx="4" className="fill-primary" />
+      <path d="M130 100h28M130 108h16" className="stroke-text-muted" strokeWidth="2" />
+    </svg>
   );
 }
 
@@ -990,42 +1035,4 @@ export function PastJobs() {
   );
 }
 
-function HistoryPage() {
-  const t = useCourierTerms();
-  const navigate = useNavigate();
-  const title = t.kind === "mover" ? "היסטוריית הובלות" : "היסטוריית משלוחים";
-
-  return (
-    <CourierShell fullBleed>
-      <div dir="rtl" className="relative flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-bg">
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-6">
-          <div className="flex flex-col gap-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <div className="flex items-center justify-between px-6 py-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== "undefined" && window.history.length > 1) {
-                    window.history.back();
-                  } else {
-                    navigate({ to: "/courier/new-jobs" });
-                  }
-                }}
-                aria-label="חזרה"
-                className="size-10 grid place-items-center rounded-full text-text-strong active:bg-muted transition-colors"
-              >
-                <ChevronRight className="size-5" />
-              </button>
-              <h1 className="text-xl font-bold text-text-strong text-center">{title}</h1>
-              <div className="size-10" aria-hidden />
-            </div>
-
-            <div className="px-6 pb-4">
-              <PastJobs />
-            </div>
-          </div>
-        </div>
-      </div>
-    </CourierShell>
-  );
-}
 

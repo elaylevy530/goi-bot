@@ -153,7 +153,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   const incomingSeenRef = useRef(new Set<string>());
 
   // App-like back button: hidden on primary sidebar destinations.
-  const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/wallet", "/courier/profile", "/courier"];
+  const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/performance", "/courier/profile", "/courier"];
   const isPersonalArea = path === "/courier/profile";
   const showBack = !PRIMARY_PATHS.includes(path);
   const goBack = () => {

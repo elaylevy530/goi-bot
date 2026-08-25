@@ -2,7 +2,6 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { termsFor } from "@/lib/courier-kind";
@@ -14,22 +13,14 @@ import {
   nestListOpenBroadcastJobs,
 } from "@/lib/nest-jobs";
 import {
-  Bell,
-  Gift,
-  Headphones,
-  History,
   Inbox,
   LogOut,
   Menu,
   MessageSquare,
   Navigation,
-  Settings,
-  Star,
-  Trash2,
+  TrendingUp,
   User,
-  Wallet,
   X,
-  ShieldCheck,
 } from "lucide-react";
 
 function useDrawerCourier() {
@@ -157,106 +148,40 @@ function CourierSideDrawer() {
     navigate({ to: "/auth", replace: true });
   };
 
-  const handleToggleAvailability = async () => {
-    const { nestUpdateMyCourier } = await import("@/lib/nest-accounts");
-    try {
-      await nestUpdateMyCourier({ accepting_jobs: !accepting });
-      qc.invalidateQueries({ queryKey: ["my-courier-me"] });
-    } catch (error) {
-      console.error("Failed to toggle availability:", error);
-    }
-  };
-
   const items = [
     {
       key: "new-jobs",
-      label: t.kind === "mover" ? "עבודה זמינה" : "עבודה זמינה",
+      label: t.kind === "mover" ? "הובלות פנויות" : "משלוחים פנויים",
       to: "/courier/new-jobs",
       icon: Inbox,
       badge: (counts?.pendingOffers ?? 0),
     },
     {
       key: "active",
-      label: t.kind === "mover" ? "משלוחים פעילים" : "משלוחים פעילים",
+      label: "פעילים",
       to: "/courier/active",
       icon: Navigation,
       badge: counts?.activeJobs ?? 0,
     },
     {
-      key: "history",
-      label: "ההיסטוריות משלוחים",
-      to: "/courier/history",
-      icon: History,
-      badge: 0,
-    },
-    {
-      key: "wallet",
-      label: "רווחים",
-      to: "/courier/wallet",
-      icon: Wallet,
-      badge: 0,
-    },
-    {
-      key: "profitability",
-      label: "שכר והרווחיה",
-      to: "/courier/wallet",
-      icon: Gift,
-      badge: 0,
-    },
-    {
-      key: "ratings",
-      label: "דירוגים וביצועים",
-      to: "/courier/ratings",
-      icon: Star,
-      badge: 0,
-    },
-    {
-      key: "work-area",
-      label: "אזור עבודה ותמיכה",
-      to: "/courier/profile",
-      icon: ShieldCheck,
-      badge: 0,
-    },
-    {
-      key: "notifications",
-      label: "הודעות ועדכונים",
-      to: "/courier/notifications",
-      icon: Bell,
+      key: "performance",
+      label: "ביצועים",
+      to: "/courier/performance",
+      icon: TrendingUp,
       badge: 0,
     },
     {
       key: "messages",
-      label: "צ'אט",
+      label: "צאט",
       to: "/courier/messages",
       icon: MessageSquare,
       badge: 0,
     },
     {
-      key: "support",
-      label: "עזרה ותמיכה",
-      to: "/courier/profile",
-      icon: Headphones,
-      badge: 0,
-    },
-    {
       key: "profile",
-      label: "הפרופיל שלי",
+      label: "אזור אישי",
       to: "/courier/profile",
       icon: User,
-      badge: 0,
-    },
-    {
-      key: "bank-details",
-      label: "פרטי חשבון בנק",
-      to: "/courier/profile/bank",
-      icon: Trash2,
-      badge: 0,
-    },
-    {
-      key: "settings",
-      label: "הגדרות חשבון",
-      to: "/courier/settings",
-      icon: Settings,
       badge: 0,
     },
   ] as const;
@@ -297,20 +222,6 @@ function CourierSideDrawer() {
                 />
               </div>
             </div>
-          </div>
-
-          <div className="border-b border-border px-5 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-text-strong">
-                <span>זמין לקבלת עבודה</span>
-              </div>
-              <Switch
-                checked={accepting}
-                onCheckedChange={handleToggleAvailability}
-                disabled={!approved}
-              />
-            </div>
-            <p className="text-xs text-text-muted mt-2">{t.panel} קטגוריות</p>
           </div>
 
           <nav className="flex-1 overflow-y-auto overscroll-y-contain px-3 py-3 space-y-1" aria-label="תפריט צד">

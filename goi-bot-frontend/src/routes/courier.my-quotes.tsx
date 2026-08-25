@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Quotes list removed from nav for both kinds — soft-redirect to history.
+// Quotes list removed from nav for both kinds — soft-redirect to performance.
 export const Route = createFileRoute("/courier/my-quotes")({
-  beforeLoad: () => { throw redirect({ to: "/courier/history" }); },
+  beforeLoad: () => { throw redirect({ to: "/courier/performance" }); },
 });
