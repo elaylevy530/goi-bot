@@ -1,4 +1,0 @@
-ALTER TABLE public.courier_location_pings 
-  ALTER COLUMN lat TYPE NUMERIC(10,7),
-  ALTER COLUMN lng TYPE NUMERIC(10,7),
-  ALTER COLUMN accuracy_m TYPE NUMERIC(10,2);

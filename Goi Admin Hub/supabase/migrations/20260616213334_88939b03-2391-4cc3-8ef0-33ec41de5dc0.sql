@@ -1,1 +1,0 @@
-ALTER TYPE public.courier_status ADD VALUE IF NOT EXISTS 'לא פעיל';

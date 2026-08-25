@@ -1,1 +1,0 @@
-ALTER TABLE public.couriers ALTER COLUMN max_distance TYPE text[] USING ARRAY[max_distance];

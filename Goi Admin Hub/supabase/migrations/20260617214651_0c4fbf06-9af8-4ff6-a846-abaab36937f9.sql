@@ -1,2 +1,0 @@
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS business_niche TEXT NOT NULL DEFAULT 'manual_dispatch' CHECK (business_niche IN ('manual_dispatch','restaurant','online_store'));
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS niche_details JSONB NOT NULL DEFAULT '{}'::jsonb;
