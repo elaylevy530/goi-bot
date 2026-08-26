@@ -97,6 +97,7 @@ import { Route as CourierPerformanceRouteImport } from './routes/courier.perform
 import { Route as CourierProfileRouteImport } from './routes/courier.profile'
 import { Route as CourierRatingsRouteImport } from './routes/courier.ratings'
 import { Route as CourierSettingsRouteImport } from './routes/courier.settings'
+import { Route as CourierShareRouteImport } from './routes/courier.share'
 import { Route as CourierWalletRouteImport } from './routes/courier.wallet'
 import { Route as CustomerAccountRouteImport } from './routes/customer.account'
 import { Route as CustomerActivityRouteImport } from './routes/customer.activity'
@@ -583,6 +584,11 @@ const CourierSettingsRoute = CourierSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => CourierRoute,
 } as any)
+const CourierShareRoute = CourierShareRouteImport.update({
+  id: '/share',
+  path: '/share',
+  getParentRoute: () => CourierRoute,
+} as any)
 const CourierWalletRoute = CourierWalletRouteImport.update({
   id: '/wallet',
   path: '/wallet',
@@ -851,6 +857,7 @@ export interface FileRoutesByFullPath {
   '/courier/profile': typeof CourierProfileRouteWithChildren
   '/courier/ratings': typeof CourierRatingsRoute
   '/courier/settings': typeof CourierSettingsRoute
+  '/courier/share': typeof CourierShareRoute
   '/courier/wallet': typeof CourierWalletRoute
   '/customer/account': typeof CustomerAccountRoute
   '/customer/activity': typeof CustomerActivityRoute
@@ -973,6 +980,7 @@ export interface FileRoutesByTo {
   '/courier/performance': typeof CourierPerformanceRoute
   '/courier/ratings': typeof CourierRatingsRoute
   '/courier/settings': typeof CourierSettingsRoute
+  '/courier/share': typeof CourierShareRoute
   '/courier/wallet': typeof CourierWalletRoute
   '/customer/account': typeof CustomerAccountRoute
   '/customer/activity': typeof CustomerActivityRoute
@@ -1099,6 +1107,7 @@ export interface FileRoutesById {
   '/courier/profile': typeof CourierProfileRouteWithChildren
   '/courier/ratings': typeof CourierRatingsRoute
   '/courier/settings': typeof CourierSettingsRoute
+  '/courier/share': typeof CourierShareRoute
   '/courier/wallet': typeof CourierWalletRoute
   '/customer/account': typeof CustomerAccountRoute
   '/customer/activity': typeof CustomerActivityRoute
@@ -1225,6 +1234,7 @@ export interface FileRouteTypes {
     | '/courier/profile'
     | '/courier/ratings'
     | '/courier/settings'
+    | '/courier/share'
     | '/courier/wallet'
     | '/customer/account'
     | '/customer/activity'
@@ -1347,6 +1357,7 @@ export interface FileRouteTypes {
     | '/courier/performance'
     | '/courier/ratings'
     | '/courier/settings'
+    | '/courier/share'
     | '/courier/wallet'
     | '/customer/account'
     | '/customer/activity'
@@ -1472,6 +1483,7 @@ export interface FileRouteTypes {
     | '/courier/profile'
     | '/courier/ratings'
     | '/courier/settings'
+    | '/courier/share'
     | '/courier/wallet'
     | '/customer/account'
     | '/customer/activity'
@@ -2169,6 +2181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CourierSettingsRouteImport
       parentRoute: typeof CourierRoute
     }
+    '/courier/share': {
+      id: '/courier/share'
+      path: '/share'
+      fullPath: '/courier/share'
+      preLoaderRoute: typeof CourierShareRouteImport
+      parentRoute: typeof CourierRoute
+    }
     '/courier/wallet': {
       id: '/courier/wallet'
       path: '/wallet'
@@ -2593,6 +2612,7 @@ interface CourierRouteChildren {
   CourierProfileRoute: typeof CourierProfileRouteWithChildren
   CourierRatingsRoute: typeof CourierRatingsRoute
   CourierSettingsRoute: typeof CourierSettingsRoute
+  CourierShareRoute: typeof CourierShareRoute
   CourierWalletRoute: typeof CourierWalletRoute
   CourierMissionJobIdRoute: typeof CourierMissionJobIdRoute
   CourierMultiStopIdRoute: typeof CourierMultiStopIdRoute
@@ -2612,6 +2632,7 @@ const CourierRouteChildren: CourierRouteChildren = {
   CourierProfileRoute: CourierProfileRouteWithChildren,
   CourierRatingsRoute: CourierRatingsRoute,
   CourierSettingsRoute: CourierSettingsRoute,
+  CourierShareRoute: CourierShareRoute,
   CourierWalletRoute: CourierWalletRoute,
   CourierMissionJobIdRoute: CourierMissionJobIdRoute,
   CourierMultiStopIdRoute: CourierMultiStopIdRoute,

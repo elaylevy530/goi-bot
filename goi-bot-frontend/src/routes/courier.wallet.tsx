@@ -1,658 +1,433 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import {
+  Bike,
+  Building2,
+  CalendarDays,
+  Check,
+  Clock,
+  Heart,
+  Info,
+  Lock,
+  Sparkles,
+  Wallet,
+} from "lucide-react";
+import { toast } from "sonner";
+import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  nestListMyCourierOutcomes, nestListWithdrawals, nestListActiveBonuses,
-} from "@/lib/nest-domain";
-import {
-  Wallet as WalletIcon, Send, ArrowUpRight, TrendingUp,
-  Sparkles, Building2, Smartphone, Wallet,
-  Route as RouteIcon, Coins, ChevronLeft, Gift, Calendar as CalendarIcon,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListWithdrawals } from "@/lib/nest-domain";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/courier/wallet")({
   head: () => ({ meta: [{ title: "הארנק שלי — Goi" }] }),
   component: WalletPage,
 });
 
-type Period = "day" | "week" | "month" | "custom";
+const MIN_WITHDRAWAL = 26;
+
+type OutcomeRow = {
+  id?: string;
+  delivered_at?: string | null;
+  was_cancelled?: boolean | null;
+  tip_amount?: number | null;
+  jobs?: { payment?: number | null; job_number?: string | number | null } | null;
+};
+
+type WithdrawalRow = {
+  id?: string;
+  amount?: number | string | null;
+  status?: string | null;
+  created_at?: string | null;
+  payment_method?: string | null;
+  bank_account?: string | null;
+};
+
+function money(n: number) {
+  return new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+function whenLabel(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((startToday.getTime() - startThat.getTime()) / 86_400_000);
+  const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  if (diff === 0) return `${time} היום`;
+  if (diff === 1) return `אתמול ${time}`;
+  return d.toLocaleDateString("he-IL");
+}
+
+function maskAccount(raw?: string | null) {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (digits.length < 4) return "לא חובר חשבון";
+  return `${digits.slice(0, 4)} **** ${digits.slice(-4)}`;
+}
+
+function displayStatus(status?: string | null) {
+  if (status === "שולמה") return { label: "הועבר לבנק", tone: "done" as const };
+  if (status === "אושרה") return { label: "אושר", tone: "done" as const };
+  if (status === "נדחתה") return { label: "נדחתה", tone: "bad" as const };
+  return { label: "ממתין לאישור", tone: "wait" as const };
+}
+
+function nextEligibleDate(from: Date) {
+  const d = new Date(from);
+  d.setDate(d.getDate() + 7);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 function WalletPage() {
   const { data: me } = useMyCourier();
-
-  // Period filter for "my deliveries" report
-  const [period, setPeriod] = useState<Period>("day");
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const [customFrom, setCustomFrom] = useState<string>(toDateInput(today));
-  const [customTo, setCustomTo] = useState<string>(toDateInput(today));
-  const [selectedOutcome, setSelectedOutcome] = useState<any | null>(null);
-
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const qc = useQueryClient();
+  const [showAll, setShowAll] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [amount, setAmount] = useState("");
 
   const { data: rows = [] } = useQuery({
     queryKey: ["wallet", me?.id],
     enabled: !!me?.id,
     refetchInterval: 30_000,
-    queryFn: () => nestListMyCourierOutcomes(),
+    queryFn: () => nestListMyCourierOutcomes() as Promise<OutcomeRow[]>,
   });
 
   const { data: withdrawals = [] } = useQuery({
     queryKey: ["wallet-withdrawals", me?.id],
     enabled: !!me?.id,
     refetchInterval: 30_000,
-    queryFn: () => nestListWithdrawals(),
+    queryFn: () => nestListWithdrawals() as Promise<WithdrawalRow[]>,
   });
 
   const { data: bonuses = [] } = useQuery({
     queryKey: ["wallet-bonuses"],
     queryFn: () => nestListActiveBonuses(),
     staleTime: 30_000,
-    refetchInterval: 60_000,
   });
 
-  const sumBetween = (start: string, end?: string) => rows
-    .filter((o) => o.delivered_at && !o.was_cancelled && o.delivered_at >= start && (!end || o.delivered_at <= end))
-    .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-
-  const earnedToday = sumBetween(todayStart.toISOString());
-  const earnedMonth = sumBetween(monthStart);
-  const earnedWeek = sumBetween(weekStart);
-  const earnedLastMonth = sumBetween(lastMonthStart, lastMonthEnd);
-  const monthDelta = earnedLastMonth > 0 ? ((earnedMonth - earnedLastMonth) / earnedLastMonth) * 100 : 0;
-
-  const totalEarned = rows
+  const earned = rows
     .filter((o) => o.delivered_at && !o.was_cancelled)
     .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-  const totalTips = rows
-    .filter((o) => o.delivered_at && !o.was_cancelled)
-    .reduce((s, o) => s + Number(o.tip_amount ?? 0), 0);
-  const kmOf = (o: any) => Number(o?.jobs?.total_distance_km ?? o?.jobs?.distance_km ?? o?.jobs?.estimated_distance_km ?? 0);
-  const totalKm = rows
-    .filter((o) => o.delivered_at && !o.was_cancelled)
-    .reduce((s, o) => s + kmOf(o), 0);
-  const kmToday = rows
-    .filter((o) => o.delivered_at && !o.was_cancelled && o.delivered_at >= todayStart.toISOString())
-    .reduce((s, o) => s + kmOf(o), 0);
-  const todayRows = rows.filter((o) => o.delivered_at && !o.was_cancelled && o.delivered_at >= todayStart.toISOString());
-  const jobsToday = todayRows.length;
-  const tipsToday = todayRows.reduce((s, o) => s + Number(o.tip_amount ?? 0), 0);
-  const avgPerDelivery = jobsToday > 0 ? earnedToday / jobsToday : 0;
-  const hoursOnlineToday =
-    jobsToday === 0 ? 0 : Math.max(1, Math.min(12, Math.round((Date.now() - todayStart.getTime()) / 3_600_000)));
-  const pricePerKm = totalKm > 0 ? totalEarned / totalKm : 0;
+  const paidOut = withdrawals.filter((w) => w.status === "שולמה").reduce((s, w) => s + Number(w.amount ?? 0), 0);
+  const pending = withdrawals.filter((w) => w.status !== "נדחתה" && w.status !== "שולמה");
+  const reserved = pending.reduce((s, w) => s + Number(w.amount ?? 0), 0);
+  const available = Math.max(0, earned - paidOut - reserved);
+  const latestPending = pending
+    .slice()
+    .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0];
 
-  const hourlyToday = useMemo(() => {
-    const buckets = Array.from({ length: 12 }, (_, i) => ({ hour: 8 + i, value: 0 }));
-    for (const o of todayRows as any[]) {
-      if (!o.delivered_at) continue;
-      const h = new Date(o.delivered_at).getHours();
-      const idx = buckets.findIndex((b) => b.hour === h);
-      if (idx >= 0) {
-        buckets[idx].value += Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0);
+  const lastRequest = withdrawals
+    .slice()
+    .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0];
+  const nextDate = lastRequest?.created_at
+    ? nextEligibleDate(new Date(lastRequest.created_at))
+    : new Date();
+  const daysLeft = lastRequest?.created_at
+    ? Math.max(0, Math.ceil((nextDate.getTime() - Date.now()) / 86_400_000))
+    : 0;
+  const canRequestNow = !latestPending && available >= MIN_WITHDRAWAL && daysLeft === 0;
+
+  const bank = me as {
+    bank_name?: string | null;
+    bank_branch?: string | null;
+    bank_account?: string | null;
+    id?: string;
+  } | null;
+  const hasBank = !!(bank?.bank_name && bank?.bank_account);
+
+  const tx = useMemo(() => {
+    const items: {
+      id: string;
+      kind: "job" | "tip" | "bonus" | "withdraw";
+      title: string;
+      at: string;
+      amount: number;
+      status?: string | null;
+    }[] = [];
+    for (const o of rows.filter((r) => r.delivered_at && !r.was_cancelled)) {
+      const pay = Number(o.jobs?.payment ?? 0);
+      const tip = Number(o.tip_amount ?? 0);
+      const no = o.jobs?.job_number ? `#${o.jobs.job_number}` : "";
+      if (pay) {
+        items.push({ id: `job-${o.id}`, kind: "job", title: `רווח ממשלוח ${no}`.trim(), at: o.delivered_at!, amount: pay, status: "שולמה" });
+      }
+      if (tip) {
+        items.push({ id: `tip-${o.id}`, kind: "tip", title: `טיפ ${no}`.trim(), at: o.delivered_at!, amount: tip, status: "אושרה" });
       }
     }
-    return buckets;
-  }, [rows]);
-  const maxHourly = Math.max(1, ...hourlyToday.map((b) => b.value));
-
-  const paidOut = (withdrawals as any[])
-    .filter((w: any) => w.status === "שולמה")
-    .reduce((s: number, w: any) => s + Number(w.amount), 0);
-  const reservedWithdrawals = (withdrawals as any[])
-    .filter((w: any) => w.status !== "נדחתה" && w.status !== "שולמה")
-    .reduce((s: number, w: any) => s + Number(w.amount), 0);
-  const balance = Math.max(0, totalEarned - paidOut);
-  const availableToWithdraw = Math.max(0, balance - reservedWithdrawals);
-
-  // 7-day chart
-  const weeklyBars = useMemo(() => {
-    const days: { label: string; value: number; date: string }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-      const next = new Date(d); next.setDate(next.getDate() + 1);
-      const sum = rows
-        .filter((o) => o.delivered_at && !o.was_cancelled && new Date(o.delivered_at) >= d && new Date(o.delivered_at) < next)
-        .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-      days.push({
-        label: ["א", "ב", "ג", "ד", "ה", "ו", "ש"][d.getDay()],
-        value: sum,
-        date: d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }),
+    for (const b of bonuses as { id?: string; title?: string; amount?: number; created_at?: string; ends_at?: string }[]) {
+      items.push({
+        id: `bonus-${b.id}`,
+        kind: "bonus",
+        title: b.title || "בונוס",
+        at: b.created_at || b.ends_at || new Date().toISOString(),
+        amount: Number(b.amount ?? 0),
+        status: "ממתינה",
       });
     }
-    return days;
-  }, [rows]);
-  const maxBar = Math.max(1, ...weeklyBars.map((b) => b.value));
-  const weekAvg = earnedWeek / 7;
+    for (const w of withdrawals) {
+      items.push({
+        id: `wd-${w.id}`,
+        kind: "withdraw",
+        title: w.status === "שולמה"
+          ? `משיכה לבנק (הועבר לחשבון ${maskAccount(w.bank_account || bank?.bank_account)})`
+          : `בקשת משיכה (הוגשה בתאריך: ${w.created_at ? new Date(w.created_at).toLocaleDateString("he-IL") : ""})`,
+        at: w.created_at || "",
+        amount: -Number(w.amount ?? 0),
+        status: w.status,
+      });
+    }
+    return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  }, [rows, bonuses, withdrawals, bank?.bank_account]);
 
-  const statusBadge = (s: string) => {
-    const map: Record<string, string> = {
-      "ממתינה": "bg-amber-500/15 text-amber-700 border-amber-500/30",
-      "אושרה": "bg-sky-500/15 text-sky-700 border-sky-500/30",
-      "שולמה": "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
-      "נדחתה": "bg-rose-500/15 text-rose-700 border-rose-500/30",
-    };
-    return <Badge variant="outline" className={`${map[s] ?? ""} rounded-full font-medium text-[10px]`}>{s}</Badge>;
-  };
+  const visibleTx = showAll ? tx : tx.slice(0, 5);
 
-  const fmt = (n: number) => new Intl.NumberFormat("he-IL", { maximumFractionDigits: 0 }).format(n);
-  const fmt1 = (n: number) => new Intl.NumberFormat("he-IL", { maximumFractionDigits: 1 }).format(n);
+  const create = useMutation({
+    mutationFn: async () => {
+      const n = Number(amount);
+      if (!me?.id) throw new Error("לא מחובר");
+      if (!hasBank) throw new Error("יש לחבר חשבון בנק באזור האישי");
+      if (!Number.isFinite(n) || n < MIN_WITHDRAWAL) throw new Error(`הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`);
+      if (n > available) throw new Error("הסכום גבוה מהיתרה הזמינה");
+      await nestCreateWithdrawal({
+        courier_id: me.id,
+        amount: n,
+        payment_method: "bank",
+        bank_name: bank?.bank_name,
+        bank_branch: bank?.bank_branch,
+        bank_account: bank?.bank_account,
+        account_owner: (me as { bank_account_owner?: string; full_name?: string }).bank_account_owner || me.full_name,
+      });
+    },
+    onSuccess: () => {
+      toast.success("בקשת המשיכה נשלחה");
+      setWithdrawOpen(false);
+      setAmount("");
+      qc.invalidateQueries({ queryKey: ["wallet-withdrawals"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
-    <CourierShell title="הארנק שלי" subtitle="רווחים יומיים">
-      <div className="-mx-1 sm:mx-0 space-y-4" dir="rtl">
-        {/* ============ DAILY EARNINGS HERO (Figma 44:276) ============ */}
-        <div className="relative overflow-hidden rounded-[1.75rem] bg-primary text-primary-foreground shadow-fab">
-          <div className="absolute -top-20 -left-10 size-56 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-24 -right-8 size-64 rounded-full bg-black/10 blur-3xl" />
-          <div className="relative p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3 mb-5">
-              <div className="text-right min-w-0">
-                <p className="text-[13px] text-primary-foreground/80">הרווחים שלי היום</p>
-                <div className="mt-1 flex items-baseline justify-start gap-1.5">
-                  <span className="text-4xl font-black tracking-tight tabular-nums">₪{fmt(earnedToday)}</span>
+    <CourierShell fullBleed>
+      <div dir="rtl" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-bg">
+        <header className="shrink-0 border-b border-border bg-surface/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-lg">
+          <div className="flex items-center justify-between gap-3">
+            <CourierMenuButton className="size-11 border-0 shadow-card" />
+            <h1 className="min-w-0 flex-1 text-center text-lg font-extrabold text-text-strong">הארנק שלי</h1>
+            <div className="size-11 shrink-0" aria-hidden />
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
+          <div className="mx-auto flex max-w-lg flex-col gap-4">
+            <section className="overflow-hidden rounded-card bg-primary-deep p-4 text-primary-foreground shadow-card-strong">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 text-right">
+                  <p className="text-sm text-primary-foreground/80">יתרה זמינה למשיכה</p>
+                  <p className="mt-1 text-3xl font-black tabular-nums">₪ {money(available)}</p>
+                  <p className="mt-2 text-xs text-primary-foreground/70">סכום זה כולל את כל הרווחים והטיפים שלך</p>
                 </div>
-                <p className="mt-1 text-[11px] text-primary-foreground/75">
-                  יתרה למשיכה: ₪{fmt(availableToWithdraw)}
-                  {reservedWithdrawals > 0 ? ` · בתהליך ₪${fmt(reservedWithdrawals)}` : ""}
-                </p>
-              </div>
-              <div className="size-11 rounded-full bg-white/15 grid place-items-center shrink-0">
-                <WalletIcon className="size-5" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <HeroChip label="משלוחים" value={String(jobsToday)} />
-              <HeroChip label="שעות פעילות" value={String(hoursOnlineToday)} />
-              <HeroChip label="ממוצע למשלוח" value={`₪${fmt(avgPerDelivery)}`} />
-              <HeroChip label="טיפים" value={`₪${fmt(tipsToday)}`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Hourly today chart */}
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-text-strong">הכנסות לפי שעה</h3>
-            <span className="text-[11px] text-text-subtle">ק״מ היום {fmt1(kmToday)}</span>
-          </div>
-          <div className="flex items-end justify-between h-24 gap-1" dir="ltr">
-            {hourlyToday.map((b) => {
-              const h = (b.value / maxHourly) * 100;
-              return (
-                <div key={b.hour} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full h-20 flex items-end">
-                    <div
-                      className="w-full rounded-t-md bg-primary/80"
-                      style={{ height: `${Math.max(h, b.value > 0 ? 10 : 3)}%` }}
-                      title={`${b.hour}:00 · ₪${fmt(b.value)}`}
-                    />
-                  </div>
-                  <span className="text-[9px] text-text-muted tabular-nums">{b.hour}</span>
+                <div className="grid size-14 shrink-0 place-items-center rounded-card bg-primary-foreground/10">
+                  <Wallet className="size-7" aria-hidden />
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWithdrawOpen(true)}
+                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-primary active:bg-primary-soft"
+              >
+                <Building2 className="size-4" aria-hidden />
+                בקשת משיכה
+              </button>
+            </section>
 
-        {/* Recent deliveries today */}
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">
-          <h3 className="text-sm font-bold text-text-strong mb-3 text-right">משלוחים מהיום</h3>
-          {todayRows.length === 0 ? (
-            <p className="py-6 text-center text-xs text-text-subtle">עדיין אין משלוחים היום</p>
-          ) : (
-            <ul className="space-y-2">
-              {todayRows.slice(0, 8).map((o: any) => (
-                <li key={o.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
-                  <span className="text-sm font-extrabold text-primary tabular-nums">
-                    ₪{fmt(Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0))}
-                  </span>
-                  <div className="min-w-0 text-right">
-                    <p className="text-sm font-bold text-text-strong truncate">
-                      {o.jobs?.customer_name || o.jobs?.job_type || "משלוח"}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-bold text-text-strong">בקשת משיכה ממתינה</p>
+                  {latestPending && (
+                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-[10px] font-bold text-warning-text">ממתין לאישור</span>
+                  )}
+                </div>
+                {latestPending ? (
+                  <>
+                    <p className="mt-2 text-xl font-black tabular-nums text-text-strong">₪ {money(Number(latestPending.amount ?? 0))}</p>
+                    <p className="mt-1 text-[11px] text-text-muted">
+                      הוגשה בתאריך: {latestPending.created_at ? new Date(latestPending.created_at).toLocaleDateString("he-IL") : "—"}
                     </p>
-                    <p className="text-[11px] text-text-subtle truncate">
-                      {o.delivered_at
-                        ? new Date(o.delivered_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
-                        : ""}
-                      {o.jobs?.job_number ? ` · #${o.jobs.job_number}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* ============ QUICK KPI CARDS ============ */}
-        <div className="grid grid-cols-2 gap-3">
-          <KpiCard icon={<Coins className="size-4" />} label="הרווחת היום" value={`₪${fmt(earnedToday)}`} sub={`${jobsToday} משלוחים`} />
-          <KpiCard icon={<RouteIcon className="size-4" />} label="ק״מ היום" value={fmt1(kmToday)} sub={`ממוצע ₪${fmt1(pricePerKm)}/ק״מ`} />
-        </div>
-
-        {/* ============ ADMIN BONUSES ============ */}
-        <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="size-8 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                <Gift className="size-4" />
-              </div>
-              <div className="text-end">
-                <div className="text-sm font-bold">בונוסים פעילים</div>
-                <div className="text-[11px] text-muted-foreground">מבצעים יומיים מההנהלה</div>
-              </div>
-            </div>
-          </div>
-          {bonuses.length === 0 ? (
-            <div className="py-4 text-center text-xs text-muted-foreground">אין בונוסים פעילים כרגע</div>
-          ) : (
-            <ul className="space-y-2">
-              {bonuses.map((b: any) => (
-                <li key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40 border border-border/40">
-                  <div className="min-w-0 text-end flex-1">
-                    <div className="text-sm font-bold truncate">{b.title}</div>
-                    {b.description && <div className="text-[11px] text-muted-foreground truncate">{b.description}</div>}
-                  </div>
-                  <div className="shrink-0 text-end">
-                    <div className="text-base font-black text-primary tabular-nums">+₪{fmt(Number(b.amount))}</div>
-                    {b.ends_at && <div className="text-[10px] text-muted-foreground">עד {formatDateHe(new Date(b.ends_at))}</div>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* ============ WEEKLY CHART ============ */}
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 border border-white/5 p-5 text-white shadow-xl">
-          <div className="flex justify-between items-start mb-5">
-            <div>
-              <h3 className="font-bold text-base">הכנסות השבוע</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">ממוצע יומי ₪{fmt(weekAvg)}</p>
-            </div>
-            <div className="text-end">
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider">7 ימים</div>
-              <div className="text-xl font-black tabular-nums">₪{fmt(earnedWeek)}</div>
-            </div>
-          </div>
-
-          <div className="flex items-end justify-between h-28 gap-2 mb-2" dir="ltr">
-            {weeklyBars.map((b, i) => {
-              const h = (b.value / maxBar) * 100;
-              const isToday = i === weeklyBars.length - 1;
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group">
-                  <div className="w-full h-24 flex items-end relative">
-                    {b.value > 0 && isToday && (
-                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-emerald-300 whitespace-nowrap">
-                        ₪{fmt(b.value)}
-                      </div>
-                    )}
-                    <div
-                      className={`w-full rounded-t-lg transition-all duration-500 ${
-                        isToday
-                          ? "bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-[0_0_15px_rgba(53,173,41,0.5)]"
-                          : "bg-white/10 group-hover:bg-emerald-500/40"
-                      }`}
-                      style={{ height: `${Math.max(h, b.value > 0 ? 8 : 3)}%` }}
-                      title={`${b.date}: ₪${fmt(b.value)}`}
-                    />
-                  </div>
-                  <div className={`text-[10px] ${isToday ? "font-bold text-emerald-300" : "text-slate-500"}`}>{b.label}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ============ SUMMARY STATS ============ */}
-        <div className="grid grid-cols-3 gap-2.5">
-          <StatTile icon={<TrendingUp className="size-4" />} label="החודש" value={`₪${fmt(earnedMonth)}`} trend={earnedLastMonth > 0 ? monthDelta : undefined} />
-          <StatTile icon={<Sparkles className="size-4" />} label="טיפים" value={`₪${fmt(totalTips)}`} />
-          <StatTile icon={<RouteIcon className="size-4" />} label="ק״מ סה״כ" value={fmt1(totalKm)} />
-        </div>
-
-        {/* ============ MY REPORT (by period) ============ */}
-        {(() => {
-          const startEnd = (() => {
-            const start = new Date(); start.setHours(0, 0, 0, 0);
-            const end = new Date(); end.setHours(23, 59, 59, 999);
-            if (period === "day") return { start, end };
-            if (period === "week") { start.setDate(start.getDate() - 6); return { start, end }; }
-            if (period === "month") { start.setDate(1); return { start, end }; }
-            const s = new Date(customFrom); s.setHours(0, 0, 0, 0);
-            const e = new Date(customTo); e.setHours(23, 59, 59, 999);
-            return { start: s, end: e };
-          })();
-          const inRange = rows.filter((o) => o.delivered_at && !o.was_cancelled
-            && new Date(o.delivered_at) >= startEnd.start && new Date(o.delivered_at) <= startEnd.end);
-          const repEarn = inRange.reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-          const repKm = inRange.reduce((s, o) => s + kmOf(o), 0);
-          const repJobs = inRange.length;
-          const repPerKm = repKm > 0 ? repEarn / repKm : 0;
-          return (
-            <div className="rounded-3xl bg-card border border-border p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="size-8 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                    <CalendarIcon className="size-4" />
-                  </div>
-                  <div className="text-end">
-                    <div className="text-sm font-bold">הדוח שלי</div>
-                    <div className="text-[11px] text-muted-foreground">סכומים, משלוחים וק״מ לפי תקופה</div>
-                  </div>
-                </div>
-              </div>
-
-              <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)} dir="rtl">
-                <TabsList className="grid grid-cols-4 w-full mb-3 h-9">
-                  <TabsTrigger value="day" className="text-xs">יומי</TabsTrigger>
-                  <TabsTrigger value="week" className="text-xs">שבועי</TabsTrigger>
-                  <TabsTrigger value="month" className="text-xs">חודשי</TabsTrigger>
-                  <TabsTrigger value="custom" className="text-xs">מותאם</TabsTrigger>
-                </TabsList>
-                <TabsContent value="custom" className="mb-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-[11px] text-end block mb-1">מתאריך</Label>
-                      <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} dir="ltr" />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-end block mb-1">עד תאריך</Label>
-                      <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} dir="ltr" />
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <MiniStat label="הכנסה" value={`₪${fmt(repEarn)}`} />
-                <MiniStat label="משלוחים" value={String(repJobs)} />
-                <MiniStat label="ק״מ" value={fmt1(repKm)} />
-                <MiniStat label="ממוצע ₪/ק״מ" value={`₪${fmt1(repPerKm)}`} />
-              </div>
-
-              <div className="mt-3 text-[10px] text-muted-foreground text-end">
-                {startEnd.start.toLocaleDateString("he-IL")} – {startEnd.end.toLocaleDateString("he-IL")}
-              </div>
-
-              {/* Deliveries list */}
-              <div className="mt-4 border-t border-border/60 pt-3">
-                <div className="text-xs font-bold text-end mb-2 text-muted-foreground">משלוחים בתקופה ({inRange.length})</div>
-                {inRange.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-muted-foreground">לא בוצעו משלוחים בתקופה זו</div>
+                    <WithdrawSteps status={latestPending.status} />
+                  </>
                 ) : (
-                  <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                    {inRange.map((o: any) => {
-                      const j = o.jobs ?? {};
-                      const payTotal = Number(j.payment ?? 0) + Number(o.tip_amount ?? 0);
-                      const km = kmOf(o);
-                      return (
-                        <li key={o.id}>
-                          <button
-                            onClick={() => setSelectedOutcome(o)}
-                            className="w-full text-end p-3 rounded-2xl bg-muted/40 border border-border/40 hover:bg-muted/60 active:scale-[0.99] transition flex items-center justify-between gap-3"
-                          >
-                            <div className="shrink-0 text-end">
-                              <div className="text-sm font-black tabular-nums">₪{fmt(payTotal)}</div>
-                              <div className="text-[10px] text-muted-foreground">{fmt1(km)} ק״מ</div>
-                            </div>
-                            <div className="min-w-0 flex-1 text-end">
-                              <div className="text-[13px] font-bold truncate">
-                                {[j.pickup_area, j.dropoff_area].filter(Boolean).join(" ← ") || j.dropoff_address || "משלוח"}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground truncate">
-                                {j.job_number ? `#${j.job_number} · ` : ""}
-                                {o.delivered_at ? new Date(o.delivered_at).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}
-                              </div>
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <p className="mt-6 text-sm text-text-muted">אין בקשה ממתינה</p>
+                )}
+              </div>
+
+              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+                <p className="text-xs font-bold text-text-strong">
+                  {canRequestNow ? "אפשר להגיש משיכה עכשיו" : "אפשר להגיש משיכה הבאה"}
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <CalendarDays className="size-4 text-primary" aria-hidden />
+                  <p className="text-lg font-black tabular-nums text-text-strong">
+                    {canRequestNow ? "היום" : nextDate.toLocaleDateString("he-IL")}
+                  </p>
+                </div>
+                {!canRequestNow && (
+                  <span className="mt-2 inline-flex rounded-pill bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-success-text">
+                    עוד {daysLeft} ימים
+                  </span>
                 )}
               </div>
             </div>
-          );
-        })()}
 
-        {/* ============ JOB DETAILS DIALOG ============ */}
-        <Dialog open={!!selectedOutcome} onOpenChange={(o) => !o && setSelectedOutcome(null)}>
-          <DialogContent dir="rtl" className="max-w-md max-h-[85vh] overflow-y-auto">
-            {selectedOutcome && (() => {
-              const j = selectedOutcome.jobs ?? {};
-              const payTotal = Number(j.payment ?? 0) + Number(selectedOutcome.tip_amount ?? 0);
-              const km = kmOf(selectedOutcome);
-              const tHe = (iso?: string | null) =>
-                iso ? new Date(iso).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
-              const timeline: { label: string; at?: string | null }[] = [
-                { label: "אושר", at: j.accepted_at },
-                { label: "בדרך לאיסוף", at: j.heading_to_pickup_at },
-                { label: "הגעה לאיסוף", at: j.arrived_at_pickup_at },
-                { label: "נאסף", at: j.picked_up_at ?? selectedOutcome.picked_up_at },
-                { label: "בדרך למסירה", at: j.heading_to_dropoff_at },
-                { label: "הגעה למסירה", at: j.arrived_at_dropoff_at },
-                { label: "נמסר", at: j.delivered_at ?? selectedOutcome.delivered_at },
-              ];
-              return (
-                <>
-                  <DialogHeader>
-                    <DialogTitle className="text-end">
-                      פרטי משלוח {j.job_number ? `#${j.job_number}` : ""}
-                    </DialogTitle>
-                    <DialogDescription className="text-end">
-                      {selectedOutcome.delivered_at ? new Date(selectedOutcome.delivered_at).toLocaleDateString("he-IL", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }) : ""}
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="space-y-4">
-                    {/* Summary */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <MiniStat label="תשלום" value={`₪${fmt(payTotal)}`} />
-                      <MiniStat label="טיפ" value={`₪${fmt(Number(selectedOutcome.tip_amount ?? 0))}`} />
-                      <MiniStat label="ק״מ" value={fmt1(km)} />
-                    </div>
-
-                    {/* Pickup */}
-                    <div className="rounded-2xl border border-border/60 p-3 text-end">
-                      <div className="text-[10px] text-muted-foreground font-bold mb-1">איסוף</div>
-                      <div className="text-sm font-bold">{j.pickup_address || "—"}</div>
-                      {j.pickup_area && <div className="text-[11px] text-muted-foreground">{j.pickup_area}</div>}
-                      {(j.pickup_contact_name || j.pickup_contact_phone) && (
-                        <div className="text-[11px] mt-1.5">
-                          {j.pickup_contact_name}{j.pickup_contact_phone ? ` · ${j.pickup_contact_phone}` : ""}
-                        </div>
-                      )}
-                      {j.pickup_notes && <div className="text-[11px] text-muted-foreground mt-1 italic">"{j.pickup_notes}"</div>}
-                    </div>
-
-                    {/* Dropoff */}
-                    <div className="rounded-2xl border border-border/60 p-3 text-end">
-                      <div className="text-[10px] text-muted-foreground font-bold mb-1">מסירה</div>
-                      <div className="text-sm font-bold">{j.dropoff_address || "—"}</div>
-                      {j.dropoff_area && <div className="text-[11px] text-muted-foreground">{j.dropoff_area}</div>}
-                      {(j.recipient_name || j.recipient_phone) && (
-                        <div className="text-[11px] mt-1.5">
-                          {j.recipient_name}{j.recipient_phone ? ` · ${j.recipient_phone}` : ""}
-                        </div>
-                      )}
-                      {j.dropoff_notes && <div className="text-[11px] text-muted-foreground mt-1 italic">"{j.dropoff_notes}"</div>}
-                    </div>
-
-                    {/* Package info */}
-                    {(j.package_type || j.package_size || j.number_of_packages || j.item_category || j.fragile) && (
-                      <div className="rounded-2xl border border-border/60 p-3 text-end">
-                        <div className="text-[10px] text-muted-foreground font-bold mb-1">פרטי החבילה</div>
-                        <div className="flex flex-wrap gap-1.5 justify-end">
-                          {j.item_category && <Badge variant="outline" className="text-[10px]">{j.item_category}</Badge>}
-                          {j.package_type && <Badge variant="outline" className="text-[10px]">{j.package_type}</Badge>}
-                          {j.package_size && <Badge variant="outline" className="text-[10px]">{j.package_size}</Badge>}
-                          {j.number_of_packages > 1 && <Badge variant="outline" className="text-[10px]">{j.number_of_packages} חבילות</Badge>}
-                          {j.fragile && <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-500/40">שביר</Badge>}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Timeline */}
-                    <div className="rounded-2xl border border-border/60 p-3">
-                      <div className="text-[10px] text-muted-foreground font-bold mb-2 text-end">ציר זמן</div>
-                      <ol className="space-y-1.5">
-                        {timeline.map((t, i) => (
-                          <li key={i} className="flex items-center justify-between text-[12px]">
-                            <span className={`tabular-nums ${t.at ? "text-foreground" : "text-muted-foreground/60"}`}>{tHe(t.at)}</span>
-                            <span className={`font-medium ${t.at ? "text-foreground" : "text-muted-foreground/60"}`}>{t.label}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setSelectedOutcome(null)}>סגור</Button>
-                  </DialogFooter>
-                </>
-              );
-            })()}
-          </DialogContent>
-        </Dialog>
-
-
-
-        <div className="rounded-3xl bg-card border border-border p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="size-8 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                <ArrowUpRight className="size-4" />
+            <Link
+              to="/courier/profile/bank"
+              className="flex min-h-12 items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card"
+            >
+              <div className="grid size-9 place-items-center rounded-pill bg-primary-soft text-primary">
+                <Building2 className="size-4" aria-hidden />
               </div>
-              <div className="text-end">
-                <div className="text-sm font-bold">היסטוריית משיכות</div>
-                <div className="text-[11px] text-muted-foreground">{withdrawals.length} בקשות</div>
+              <div className="min-w-0 flex-1 text-right">
+                <p className="text-sm font-bold text-text-strong">{hasBank ? "חשבון בנק מחובר" : "חבר חשבון בנק"}</p>
+                <p className="truncate text-xs text-text-muted">
+                  {hasBank
+                    ? `${bank?.bank_name} | סניף ${bank?.bank_branch || "—"} | ${maskAccount(bank?.bank_account)}`
+                    : "נדרש כדי להגיש בקשת משיכה"}
+                </p>
               </div>
+            </Link>
+
+            <div className="flex min-h-12 items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
+              <div className="grid size-9 place-items-center rounded-pill bg-primary-soft text-primary">
+                <Wallet className="size-4" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1 text-right">
+                <p className="text-sm font-bold text-text-strong">סכום מינימלי למשיכה</p>
+              </div>
+              <p className="text-sm font-extrabold tabular-nums text-text-strong">₪ {money(MIN_WITHDRAWAL)}</p>
+            </div>
+
+            <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-sm text-text">
+              <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+              <p>כל רווח ממשלוח, טיפ או בונוס נכנס אוטומטית לארנק שלך.</p>
+            </div>
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-extrabold text-text-strong">תנועות אחרונות</h2>
+                {tx.length > 5 && (
+                  <button type="button" onClick={() => setShowAll((v) => !v)} className="min-h-11 text-sm font-bold text-primary">
+                    {showAll ? "הצג פחות" : "הצג את כל התנועות"}
+                  </button>
+                )}
+              </div>
+              {visibleTx.length === 0 ? (
+                <p className="rounded-card border border-border bg-surface py-10 text-center text-sm text-text-muted">אין תנועות עדיין</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {visibleTx.map((item) => {
+                    const st = displayStatus(item.status);
+                    const Icon = item.kind === "tip" ? Heart : item.kind === "bonus" ? Sparkles : item.kind === "withdraw" ? Building2 : Bike;
+                    return (
+                      <li key={item.id} className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
+                        <div className="grid size-10 shrink-0 place-items-center rounded-pill bg-primary-soft text-primary">
+                          <Icon className="size-4" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1 text-right">
+                          <p className="truncate text-sm font-bold text-text-strong">{item.title}</p>
+                          <p className="text-[11px] text-text-muted">{whenLabel(item.at)}</p>
+                        </div>
+                        <div className="shrink-0 text-left">
+                          <p className={cn("text-sm font-extrabold tabular-nums", item.amount < 0 ? "text-text-strong" : "text-primary")}>
+                            {item.amount < 0 ? `- ₪ ${money(Math.abs(item.amount))}` : `₪ ${money(item.amount)}`}
+                          </p>
+                          <span className={cn(
+                            "mt-1 inline-flex rounded-pill px-2 py-0.5 text-[10px] font-bold",
+                            st.tone === "wait" ? "bg-warning-bg text-warning-text" : st.tone === "bad" ? "bg-danger-bg text-danger-text" : "bg-success-bg text-success-text",
+                          )}>
+                            {st.label}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-xs text-text-subtle">
+              <Lock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+              <p>בקשות שאושרו עד השעה 10:00 בימי עסקים יועברו לחשבון הבנק שלך באותו היום.</p>
             </div>
           </div>
-
-          {withdrawals.length === 0 ? (
-            <EmptyState icon={<Send className="size-10" />} text="עדיין לא הוגשו בקשות משיכה" />
-          ) : (
-            <ul className="space-y-2.5">
-              {(withdrawals as any[]).map((w) => (
-                <li key={w.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-2xl border border-border/40">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      {w.payment_method === "bit" ? <Smartphone className="size-5" /> : <Building2 className="size-5" />}
-                    </div>
-                    <div className="min-w-0 text-end">
-                      <div className="text-sm font-bold">{w.payment_method === "bit" ? "ביט" : "העברה בנקאית"}</div>
-                      <div className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" })}</div>
-                    </div>
-                  </div>
-                  <div className="text-end space-y-1 shrink-0">
-                    <div className="font-black tabular-nums flex items-center gap-1 justify-end">
-                      <ArrowUpRight className="size-3.5 text-muted-foreground" />
-                      ₪{fmt(Number(w.amount))}
-                    </div>
-                    {statusBadge(w.status)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* payout schedule note */}
-        <div className="flex items-center gap-2 px-1 pb-2 text-[11px] text-muted-foreground">
-          <Wallet className="size-3.5" />
-          <span>המשיכות מאושרות ומוצאות לתשלום בימי עסקים תוך 1-2 ימים</span>
-          <ChevronLeft className="size-3.5 mr-auto" />
         </div>
       </div>
+
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-right">בקשת משיכה</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-text-subtle">יתרה זמינה: ₪ {money(available)}</p>
+            <div>
+              <Label className="text-right">סכום למשיכה</Label>
+              <Input
+                type="number"
+                min={MIN_WITHDRAWAL}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-1 min-h-11"
+                dir="ltr"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              disabled={create.isPending}
+              onClick={() => create.mutate()}
+              className="flex min-h-12 w-full items-center justify-center rounded-pill bg-primary text-sm font-extrabold text-primary-foreground disabled:opacity-60"
+            >
+              שלח בקשה
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CourierShell>
   );
 }
 
-function HeroChip({ label, value }: { label: string; value: string }) {
+function WithdrawSteps({ status }: { status?: string | null }) {
+  const steps = [
+    { key: "ממתינה", label: "ממתין לאישור" },
+    { key: "אושרה", label: "אושר" },
+    { key: "שולמה", label: "הועבר לבנק" },
+  ];
+  const idx = status === "שולמה" ? 2 : status === "אושרה" ? 1 : 0;
   return (
-    <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 px-3 py-2">
-      <div className="text-[10px] text-white/75">{label}</div>
-      <div className="text-sm font-black tabular-nums">{value}</div>
-    </div>
+    <ol className="mt-3 flex items-center justify-between gap-1">
+      {steps.map((step, i) => {
+        const done = i < idx;
+        const current = i === idx;
+        return (
+          <li key={step.key} className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+            <span className={cn(
+              "grid size-5 place-items-center rounded-full",
+              done ? "bg-primary text-primary-foreground" : current ? "bg-warning-bg text-warning-text" : "bg-muted text-text-muted",
+            )}>
+              {done ? <Check className="size-3" /> : current ? <Clock className="size-3" /> : <span className="size-1.5 rounded-full bg-current" />}
+            </span>
+            <span className={cn("text-[9px] font-bold leading-tight", current ? "text-warning-text" : "text-text-muted")}>{step.label}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
-}
-
-function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <div className="size-8 rounded-xl flex items-center justify-center border bg-primary/10 text-primary border-primary/20">{icon}</div>
-      </div>
-      <div className="text-end">
-        <div className="text-[11px] text-muted-foreground font-medium">{label}</div>
-        <div className="text-xl font-black tabular-nums leading-tight">{value}</div>
-        {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
-function StatTile({ icon, label, value, trend }: { icon: React.ReactNode; label: string; value: string; trend?: number }) {
-  return (
-    <div className="rounded-2xl bg-card border border-border p-3 shadow-sm">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
-        {trend !== undefined && (
-          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${trend >= 0 ? "bg-emerald-500/15 text-emerald-700" : "bg-rose-500/15 text-rose-600"}`}>
-            {trend >= 0 ? "↑" : "↓"} {Math.abs(trend).toFixed(0)}%
-          </span>
-        )}
-      </div>
-      <div className="text-end">
-        <div className="text-[10px] text-muted-foreground">{label}</div>
-        <div className="text-sm font-extrabold tabular-nums">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-muted/50 border border-border/40 p-2 text-end">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="text-sm font-extrabold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="py-10 text-center text-muted-foreground">
-      <div className="flex justify-center mb-2 opacity-50">{icon}</div>
-      <div className="text-sm">{text}</div>
-    </div>
-  );
-}
-
-function toDateInput(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatDateHe(d: Date) {
-  return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }

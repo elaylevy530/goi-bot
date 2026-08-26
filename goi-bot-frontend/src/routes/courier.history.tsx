@@ -5,16 +5,16 @@ import { useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { JobDetailsSheet } from "@/components/courier/JobDetailsSheet";
 import {
   nestListCourierActiveJobs, nestCourierUpdateProgress, nestListJobStatusLogs,
 } from "@/lib/nest-jobs";
-import { jobBusinessPhone, resolveCourierBusinessConversation } from "@/lib/nest-chat";
+import { resolveCourierBusinessConversation } from "@/lib/nest-chat";
 import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import {
-  CheckCircle2, ChevronDown, Clock, Filter, History as HistoryIcon,
-  Info, MapPin, MessageCircle, Navigation, Package, Phone, Star, Truck, XCircle,
+  Banknote, CalendarDays, Check, CheckCircle2, ChevronDown, Clock, Copy, CreditCard,
+  Filter, History as HistoryIcon, Info, MapPin, MessageCircle, Navigation, Package,
+  Phone, Send, Star, Truck, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -70,6 +70,23 @@ function todayYmd() {
 function isScheduledActiveJob(job: { job_date?: string | null }) {
   const date = job.job_date ? String(job.job_date).slice(0, 10) : "";
   return !!date && date > todayYmd();
+}
+
+function isCashPayment(job: {
+  cod?: boolean | null;
+  cash_on_delivery?: boolean | null;
+  collect_cash?: boolean | null;
+}) {
+  return !!(job.cod || job.cash_on_delivery || job.collect_cash);
+}
+
+function jobDistanceKm(job: {
+  total_distance_km?: number | null;
+  distance_km?: number | null;
+  estimated_distance_km?: number | null;
+}) {
+  const n = Number(job.total_distance_km ?? job.distance_km ?? job.estimated_distance_km ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // ============ ActiveJobs (Today / Scheduled + compact expandable cards) ============
@@ -142,8 +159,6 @@ export function ActiveJobs() {
   });
 
 
-  const openNav = (addr?: string | null) => openWaze(addr);
-
   const todayJobs = useMemo(() => jobs.filter((j) => !isScheduledActiveJob(j)), [jobs]);
   const scheduledJobs = useMemo(() => jobs.filter((j) => isScheduledActiveJob(j)), [jobs]);
   const visible = tab === "today" ? todayJobs : scheduledJobs;
@@ -162,15 +177,9 @@ export function ActiveJobs() {
     }
   };
 
-  const callBusiness = (j: any) => {
-    const p = jobBusinessPhone(j);
-    if (p) window.location.href = `tel:${p}`;
-    else toast.error("אין מספר עסק");
-  };
-
-  const tabs: { key: ActiveTab; label: string; count: number }[] = [
-    { key: "today", label: "היום", count: todayJobs.length },
-    { key: "scheduled", label: "מתוזמנות", count: scheduledJobs.length },
+  const tabs: { key: ActiveTab; label: string; count: number; icon: typeof Send }[] = [
+    { key: "today", label: "להיום", count: todayJobs.length, icon: Send },
+    { key: "scheduled", label: "מתוזמנות", count: scheduledJobs.length, icon: CalendarDays },
   ];
 
   const filtered = useMemo(() => {
@@ -180,25 +189,27 @@ export function ActiveJobs() {
 
   return (
     <div className="space-y-3">
-      <div className="flex w-full border-b border-border">
-        {tabs.map((tabItem) => (
-          <button
-            key={tabItem.key}
-            type="button"
-            onClick={() => setTab(tabItem.key)}
-            className={cn(
-              "relative flex-1 min-h-11 px-2 text-sm text-center transition-colors",
-              tab === tabItem.key
-                ? "font-extrabold text-primary"
-                : "font-semibold text-text-subtle",
-            )}
-          >
-            {tabItem.label}
-            {tab === tabItem.key && (
-              <span className="absolute inset-x-6 bottom-0 h-0.5 rounded-pill bg-primary" />
-            )}
-          </button>
-        ))}
+      <div className="grid grid-cols-2 gap-2">
+        {tabs.map((tabItem) => {
+          const Icon = tabItem.icon;
+          const active = tab === tabItem.key;
+          return (
+            <button
+              key={tabItem.key}
+              type="button"
+              onClick={() => setTab(tabItem.key)}
+              className={cn(
+                "flex min-h-12 items-center justify-center gap-2 rounded-pill border text-sm transition-colors",
+                active
+                  ? "border-primary bg-surface font-extrabold text-primary"
+                  : "border-border bg-muted font-semibold text-text-subtle",
+              )}
+            >
+              <Icon className="size-4" aria-hidden />
+              {tabItem.label} {tabItem.count}
+            </button>
+          );
+        })}
       </div>
 
       <label className="sr-only" htmlFor="active-status-filter">סינון לפי סטטוס</label>
@@ -218,13 +229,6 @@ export function ActiveJobs() {
         <ChevronDown className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" aria-hidden />
       </div>
 
-      {jobs.length > 0 && (
-        <div className="flex items-end justify-between px-1">
-          <div className="text-sm text-text-subtle">{jobs.length} משלוחים בביצוע</div>
-          <div className="rounded-pill bg-primary-soft px-3 py-1 text-xs font-bold text-success-text">משמרת פעילה</div>
-        </div>
-      )}
-
       {filtered.length === 0 && (
         <ActiveEmptyState
           hasJobsInTab={visible.length > 0}
@@ -235,172 +239,166 @@ export function ActiveJobs() {
       {filtered.map((j) => {
         const step = (lastSteps as Record<string, string>)[j.id];
         const stage = stageOf(j, step);
-        const sIdx = stageIndex(stage);
         const outcome = Array.isArray((j as any).job_outcomes) ? (j as any).job_outcomes[0] : (j as any).job_outcomes;
         const pickedUp = !!outcome?.picked_up_at;
-        const delivered = !!outcome?.delivered_at;
-        const deadline = (j as any).delivery_deadline as string | null;
         const primary = getPrimaryAction(stage, pickedUp);
-        const st = STAGE_STYLES[stage];
-
-        const dropoffExtra = [
-          j.dropoff_building && `בניין ${j.dropoff_building}`,
-          j.dropoff_entrance && `כניסה ${j.dropoff_entrance}`,
-          j.dropoff_floor && `קומה ${j.dropoff_floor}`,
-          j.dropoff_apartment && `דירה ${j.dropoff_apartment}`,
-        ].filter(Boolean).join(" · ");
+        const cash = isCashPayment(j);
+        const km = jobDistanceKm(j as any);
+        const jobNo = j.job_number ? `#${j.job_number}` : "";
+        const stepperIdx = stage === "assigned" ? 0 : stage === "to_pickup" ? 1 : stage === "picked_up" ? 2 : 3;
 
         return (
-          <Card
+          <article
             key={j.id}
-            className="relative rounded-2xl overflow-hidden p-0 gap-0 border border-black/15 bg-white shadow-[0_4px_16px_-6px_rgba(15,23,42,0.12)]"
+            className="rounded-card border border-border bg-surface p-3 shadow-card-strong"
           >
-            {/* Brand header — system green with business logo */}
-            <div className="relative px-3.5 pt-3 pb-3 text-white bg-gradient-to-l from-[#0b3b2e] via-[#12604a] to-[#1c8a5b]">
-              {/* subtle top sheen */}
-              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent" />
-
-
-
-              <div className="relative flex items-center justify-between mb-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-bold bg-white/15 text-white ring-1 ring-inset ring-white/25 backdrop-blur">
-                  <span className="size-1.5 rounded-full bg-white animate-pulse" />
-                  {STAGES[sIdx].label}
-                </span>
-                <span className="text-[10.5px] font-mono text-white/70">#{j.job_number}</span>
+            <div className="flex items-start gap-3">
+              <BusinessLogo
+                path={(j as any).customer_logo_path}
+                name={j.customer_name}
+                size={44}
+                className="ring-2 ring-primary/20"
+              />
+              <div className="min-w-0 flex-1 text-right">
+                <h3 className="truncate text-sm font-extrabold text-text-strong">{j.customer_name ?? "משלוח"}</h3>
+                <p className="mt-0.5 truncate text-xs text-text-subtle">
+                  לקוח: {j.recipient_name || "—"}
+                </p>
+                {jobNo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(String(j.job_number)).then(
+                        () => toast.success("מספר המשלוח הועתק"),
+                        () => toast.error("לא הצלחנו להעתיק"),
+                      );
+                    }}
+                    className="mt-1 inline-flex min-h-8 items-center gap-1 font-mono text-[11px] text-text-muted"
+                  >
+                    {jobNo}
+                    <Copy className="size-3" aria-hidden />
+                  </button>
+                )}
               </div>
+              <div className="shrink-0 rounded-card bg-primary-soft px-3 py-2 text-center">
+                <p className="text-lg font-black tabular-nums leading-none text-primary">₪{Number(j.payment ?? 0).toFixed(0)}</p>
+                <p className="mt-1 max-w-[4.5rem] text-[10px] font-semibold leading-tight text-success-text">תגמול עבור המשלוח</p>
+              </div>
+            </div>
 
-              <div className="relative flex items-start justify-between gap-2.5">
-                <div className="min-w-0 text-end flex-1">
-                  <h3 className="font-bold text-[15px] text-white truncate leading-tight">{j.customer_name ?? "משלוח"}</h3>
-                  {j.recipient_name && <p className="text-white/75 text-[11.5px] truncate mt-0.5">נמען: {j.recipient_name}</p>}
-                  <div className="mt-1.5 inline-flex items-baseline gap-1.5">
-                    <span className="text-white font-extrabold text-[18px] leading-none tracking-tight">{Number(j.payment).toFixed(0)}</span>
-                    <span className="text-white/80 text-[11px] font-semibold">₪</span>
-                    {deadline && (
-                      <span className="text-white/85 text-[10.5px] font-medium flex items-center gap-1 mr-2">
-                        <Clock className="size-2.5" /> עד {deadline.slice(0, 5)}
-                      </span>
-                    )}
+            <div className="mt-3 rounded-card border border-border px-3 py-3">
+              <div className="relative pr-1">
+                <div className="absolute right-[7px] top-3 bottom-3 border-r border-dashed border-border-strong" aria-hidden />
+                <div className="relative flex items-start gap-3">
+                  <span className="z-10 mt-1 size-3.5 shrink-0 rounded-full bg-primary ring-4 ring-primary-soft" />
+                  <div className="min-w-0 flex-1 text-right">
+                    <p className="text-[10px] font-bold text-text-muted">איסוף</p>
+                    <p className="truncate text-sm font-semibold text-text-strong">{j.pickup_address ?? j.pickup_area ?? "—"}</p>
+                    <span className={cn(
+                      "mt-1.5 inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[10px] font-bold",
+                      cash ? "bg-warning-bg text-warning-text" : "bg-danger-bg text-danger-text",
+                    )}>
+                      {cash ? <Banknote className="size-3" /> : <CreditCard className="size-3" />}
+                      {cash ? "מזומן באיסוף" : "שולם באשראי"}
+                    </span>
                   </div>
                 </div>
-                <BusinessLogo
-                  path={(j as any).customer_logo_path}
-                  name={j.customer_name}
-                  size={44}
-                  className="ring-2 ring-white/40 border-white/70"
-                />
-              </div>
-            </div>
-
-
-            <div className="px-3.5 pt-3 pb-3 space-y-2.5 bg-white">
-
-
-
-
-              {/* Timeline (compact) */}
-              <div className="relative pr-2">
-                <div className="absolute top-1.5 right-[6px] bottom-1.5 w-px bg-slate-200" />
-                <TimelineStop
-                  label="איסוף"
-                  address={j.pickup_address ?? j.pickup_area}
-                  extras={j.pickup_notes}
-                  done={pickedUp || delivered}
-                  current={sIdx === 0}
-                />
-                <TimelineStop
-                  label="מסירה"
-                  address={j.dropoff_address ?? j.dropoff_area}
-                  extras={dropoffExtra || j.dropoff_notes || null}
-                  done={delivered}
-                  current={sIdx >= 1}
-                  last
-                />
-              </div>
-
-              {/* Contact row */}
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <button className="w-full flex items-center justify-center gap-2 text-slate-600 text-[12px] font-medium py-2 hover:text-slate-800 transition-colors">
-                    <ChevronDown className="size-4" />
-                    יצירת קשר ופרטים
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <SoftBtn
-                      icon={MessageCircle}
-                      label="צ׳אט עסק"
-                      tint="green"
-                      onClick={() => { void openBusinessChat(j); }}
-                    />
-                    <SoftBtn
-                      icon={Phone}
-                      label="התקשר לעסק"
-                      tint="blue"
-                      onClick={() => callBusiness(j)}
-                    />
-                    <SoftBtn
-                      icon={Phone}
-                      label="התקשר ללקוח"
-                      tint="blue"
-                      onClick={() => {
-                        const p = j.recipient_phone;
-                        if (p) window.location.href = `tel:${p}`;
-                        else toast.error("אין מספר לקוח");
-                      }}
-                    />
-                    <SoftBtn icon={Info} label="פרטים" tint="slate" onClick={() => setContactJob(j)} />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {!pickedUp && !delivered && (
-                <button
-                  type="button"
-                  onClick={() => openNav(j.pickup_address ?? j.pickup_area)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl min-h-14 font-bold text-[15px] text-white bg-gradient-to-l from-emerald-600 to-emerald-500 shadow-[0_4px_14px_-2px_rgba(5,150,105,0.5)] active:scale-[0.99] transition-all"
-                >
-                  <Navigation className="size-5" strokeWidth={2.5} />
-                  התחל ניווט לאיסוף
-                </button>
-              )}
-              {pickedUp && !delivered && (
-                <button
-                  type="button"
-                  onClick={() => openNav(j.dropoff_address ?? j.dropoff_area)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl min-h-14 font-bold text-[15px] text-white bg-gradient-to-l from-blue-600 to-blue-500 shadow-[0_4px_14px_-2px_rgba(37,99,235,0.5)] active:scale-[0.99] transition-all"
-                >
-                  <Navigation className="size-5" strokeWidth={2.5} />
-                  התחל ניווט למסירה
-                </button>
-              )}
-
-              {/* Primary action — status update button */}
-              {primary && (
-                <button
-                  onClick={() => setStep.mutate({ job_id: j.id, step: primary.step })}
-                  disabled={setStep.isPending}
-                  className={cn(
-                    "group relative w-full overflow-hidden rounded-xl min-h-14 font-bold text-[15px] text-white",
-                    primary.btn,
-                    "transition-all active:scale-[0.99] disabled:opacity-60",
-                    primary.shadow,
-                  )}
-
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    <primary.icon className="size-5" strokeWidth={2.5} />
-                    <span className="tracking-tight">{primary.label}</span>
+                <div className="relative mt-3 flex items-start gap-3">
+                  <span className="z-10 mt-0.5 grid size-3.5 shrink-0 place-items-center text-text-muted">
+                    <MapPin className="size-3.5" />
                   </span>
-                </button>
-              )}
-
-
-
+                  <div className="min-w-0 flex-1 text-right">
+                    <p className="text-[10px] font-bold text-text-muted">מסירה</p>
+                    <p className="truncate text-sm font-semibold text-text-strong">{j.dropoff_address ?? j.dropoff_area ?? "—"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </Card>
+
+            <ol className="relative mt-3 grid grid-cols-3 gap-1">
+              <span className="pointer-events-none absolute top-4 right-[16%] left-[16%] border-t border-dashed border-border-strong" aria-hidden />
+              {[
+                { label: "יצאתי לאיסוף", icon: Send },
+                { label: "אספתי", icon: Package },
+                { label: "נמסר", icon: Check },
+              ].map((item, i) => {
+                const done = i < stepperIdx;
+                const current = i === stepperIdx;
+                const Icon = item.icon;
+                return (
+                  <li key={item.label} className="relative z-10 flex flex-col items-center gap-1 text-center">
+                    <span className={cn(
+                      "grid size-8 place-items-center rounded-full",
+                      done || current ? "bg-primary text-primary-foreground" : "bg-muted text-text-muted",
+                    )}>
+                      <Icon className="size-3.5" />
+                    </span>
+                    <span className={cn("text-[10px] font-bold", current ? "text-primary" : "text-text-muted")}>{item.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            <div className="mt-3 grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-2">
+              <div className="flex items-center justify-center gap-2 px-2">
+                <Banknote className="size-4 text-primary" aria-hidden />
+                <div className="text-right">
+                  <p className="text-xs font-extrabold text-text-strong">{cash ? "מזומן ללקוח" : "שולם באשראי"}</p>
+                  <p className="text-[10px] text-text-muted">אופן תשלום</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-2 px-2">
+                <MapPin className="size-4 text-primary" aria-hidden />
+                <div className="text-right">
+                  <p className="text-xs font-extrabold tabular-nums text-text-strong">{km != null ? `${km.toFixed(1)} ק״מ` : "—"}</p>
+                  <p className="text-[10px] text-text-muted">מרחק כולל</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => { void openBusinessChat(j); }}
+                className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-card border border-border bg-surface text-[11px] font-bold text-primary"
+              >
+                <MessageCircle className="size-4" />
+                צ׳אט עסק
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = j.recipient_phone;
+                  if (p) window.location.href = `tel:${p}`;
+                  else toast.error("אין מספר לקוח");
+                }}
+                className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-card border border-border bg-surface text-[11px] font-bold text-text-strong"
+              >
+                <Phone className="size-4" />
+                חייג ללקוח
+              </button>
+              <button
+                type="button"
+                onClick={() => setContactJob(j)}
+                className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-card border border-border bg-surface text-[11px] font-bold text-text-strong"
+              >
+                <Info className="size-4" />
+                פרטים
+              </button>
+            </div>
+
+            {primary && (
+              <button
+                type="button"
+                onClick={() => setStep.mutate({ job_id: j.id, step: primary.step })}
+                disabled={setStep.isPending}
+                className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-card bg-primary text-[15px] font-extrabold text-primary-foreground shadow-card-strong active:opacity-90 disabled:opacity-60"
+              >
+                <primary.icon className="size-5" strokeWidth={2.5} />
+                {primary.label}
+              </button>
+            )}
+          </article>
         );
       })}
 
@@ -672,29 +670,11 @@ function QuickBtn({ icon: Icon, label, onClick, tint }: { icon: any; label: stri
 function getPrimaryAction(stage: Stage, _pickedUp: boolean) {
   switch (stage) {
     case "assigned":
-      return {
-        label: "יצאתי לאיסוף",
-        step: "בדרך לאיסוף",
-        icon: Navigation,
-        btn: "bg-sky-600 hover:bg-sky-700 active:bg-sky-700",
-        shadow: "shadow-[0_2px_10px_-2px_rgba(2,132,199,0.45)]",
-      };
+      return { label: "יצאתי לאיסוף", step: "בדרך לאיסוף", icon: Send };
     case "to_pickup":
-      return {
-        label: "אספתי",
-        step: "אספתי",
-        icon: Package,
-        btn: "bg-orange-500 hover:bg-orange-600 active:bg-orange-600",
-        shadow: "shadow-[0_2px_10px_-2px_rgba(249,115,22,0.45)]",
-      };
+      return { label: "אספתי", step: "אספתי", icon: Package };
     case "picked_up":
-      return {
-        label: "נמסר ללקוח",
-        step: "נמסר",
-        icon: CheckCircle2,
-        btn: "bg-teal-600 hover:bg-teal-700 active:bg-teal-700",
-        shadow: "shadow-[0_2px_10px_-2px_rgba(13,148,136,0.45)]",
-      };
+      return { label: "נמסר", step: "נמסר", icon: Check };
     case "delivered":
       return null;
   }

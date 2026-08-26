@@ -24,6 +24,7 @@ import {
   Wallet as WalletIcon,
   TrendingUp,
   Star,
+  Share2,
   KeyRound,
   Loader2,
   Building2,
@@ -43,6 +44,7 @@ function buildMenu(t: CourierTerms) {
     { to: "/courier/performance", label: "ביצועים", sub: `הכנסות והיסטוריית ${t.jobPlural}`, icon: TrendingUp },
     { to: "/courier/ratings", label: "דירוגים וביצועים", sub: "ציון לקוחות ומדדי שירות", icon: Star },
     { to: "/courier/wallet", label: "ארנק ומשיכות", sub: "יתרה, תשלומים ומשיכות", icon: WalletIcon },
+    { to: "/courier/share", label: "שתף והרוויח", sub: "הפנה שליחים ועסקים והרווח", icon: Share2 },
   ];
 }
 
