@@ -1,7 +1,8 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useMyCourier } from "@/components/CourierShell";
+import { CourierShell, useMyCourier } from "@/components/CourierShell";
+import { useCourierTerms } from "@/lib/courier-kind";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,21 @@ import { openWaze } from "@/lib/waze";
 
 
 export const Route = createFileRoute("/courier/history")({
-  beforeLoad: () => {
-    throw redirect({ to: "/courier/performance" });
-  },
+  head: () => ({ meta: [{ title: "היסטוריות משלוחים — Goi" }] }),
+  component: HistoryPage,
 });
+
+function HistoryPage() {
+  const t = useCourierTerms();
+  return (
+    <CourierShell
+      title={t.kind === "mover" ? "היסטוריית הובלות" : "היסטוריות משלוחים"}
+      subtitle={`כל ${t.jobPlural} שביצעת`}
+    >
+      <PastJobs />
+    </CourierShell>
+  );
+}
 
 // ============ pipeline definition ============
 type Stage = "assigned" | "to_pickup" | "picked_up" | "delivered";

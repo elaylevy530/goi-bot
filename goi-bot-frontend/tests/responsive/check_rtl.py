@@ -26,6 +26,7 @@ ROUTES = [
     "/courier/jobs",
     "/courier/active",
     "/courier/performance",
+    "/courier/history",
     "/courier/wallet",
     "/courier/share",
     "/courier/ratings",

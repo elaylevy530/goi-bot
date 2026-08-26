@@ -2,10 +2,12 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { termsFor } from "@/lib/courier-kind";
 import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
+import { nestListMyCourierNotifications } from "@/lib/nest-domain";
 import {
   nestCourierActiveJobCount,
   nestListCourierDeclines,
@@ -13,15 +15,20 @@ import {
   nestListOpenBroadcastJobs,
 } from "@/lib/nest-jobs";
 import {
+  Bell,
+  Gift,
+  History,
   Inbox,
   LogOut,
   Menu,
   MessageSquare,
   Navigation,
-  TrendingUp,
-  User,
+  ShieldCheck,
+  Star,
+  Wallet,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function useDrawerCourier() {
   return useQuery({
@@ -43,11 +50,12 @@ function useDrawerNavCounts(courier?: { id?: string } | null) {
     refetchInterval: 15_000,
     staleTime: 5_000,
     queryFn: async () => {
-      const [pendingOffers, openJobs, activeJobs, declinedRows] = await Promise.all([
+      const [pendingOffers, openJobs, activeJobs, declinedRows, notifications] = await Promise.all([
         nestListCourierOffers("pending"),
         nestListOpenBroadcastJobs(),
         nestCourierActiveJobCount(),
         nestListCourierDeclines(),
+        nestListMyCourierNotifications().catch(() => []),
       ]);
       const declined = new Set(declinedRows.map((r) => r.job_id));
       const unique = new Set<string>();
@@ -61,9 +69,11 @@ function useDrawerNavCounts(courier?: { id?: string } | null) {
         if (declined.has(j.id)) continue;
         if (isOpenBroadcastJobForCourier(j, courier)) unique.add(j.id);
       }
+      const unreadNotifications = (notifications as { read_at?: string | null }[]).filter((n) => !n.read_at).length;
       return {
         pendingOffers: unique.size,
         activeJobs,
+        unreadNotifications,
       };
     },
   });
@@ -115,6 +125,16 @@ function NavBadge({ value }: { value: number }) {
   );
 }
 
+type NavItem = {
+  key: string;
+  label: string;
+  to: string;
+  icon: typeof Inbox;
+  badge?: number;
+  featured?: boolean;
+  match?: (path: string) => boolean;
+};
+
 function CourierSideDrawer() {
   const { open, setOpen, closeMenu } = useCourierMenu();
   const { data: me } = useDrawerCourier();
@@ -148,43 +168,78 @@ function CourierSideDrawer() {
     navigate({ to: "/auth", replace: true });
   };
 
-  const items = [
+  const handleToggleAvailability = async () => {
+    const { nestUpdateMyCourier } = await import("@/lib/nest-accounts");
+    try {
+      await nestUpdateMyCourier({ accepting_jobs: !accepting });
+      await qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+    } catch (error) {
+      console.error("Failed to toggle availability:", error);
+    }
+  };
+
+  const items: NavItem[] = [
     {
       key: "new-jobs",
-      label: t.kind === "mover" ? "הובלות פנויות" : "משלוחים פנויים",
+      label: "עבודה זמינה",
       to: "/courier/new-jobs",
       icon: Inbox,
-      badge: (counts?.pendingOffers ?? 0),
+      badge: counts?.pendingOffers ?? 0,
+      match: (p) => p === "/courier/new-jobs" || p === "/courier" || p === "/courier/dashboard",
     },
     {
       key: "active",
-      label: "פעילים",
+      label: t.activeJobs,
       to: "/courier/active",
       icon: Navigation,
       badge: counts?.activeJobs ?? 0,
     },
     {
-      key: "performance",
-      label: "ביצועים",
-      to: "/courier/performance",
-      icon: TrendingUp,
-      badge: 0,
+      key: "history",
+      label: t.kind === "mover" ? "היסטוריית הובלות" : "היסטוריות משלוחים",
+      to: "/courier/history",
+      icon: History,
+    },
+    {
+      key: "wallet",
+      label: "רווחים",
+      to: "/courier/wallet",
+      icon: Wallet,
+    },
+    {
+      key: "share",
+      label: "שתף והרוויח",
+      to: "/courier/share",
+      icon: Gift,
+    },
+    {
+      key: "ratings",
+      label: "דירוגים וביצועים",
+      to: "/courier/ratings",
+      icon: Star,
+    },
+    {
+      key: "work-area",
+      label: "אזור עבודה ותמיכה",
+      to: "/courier/profile/edit",
+      icon: ShieldCheck,
+      featured: true,
+      match: (p) => p === "/courier/profile/edit",
+    },
+    {
+      key: "notifications",
+      label: "הודעות ועדכונים",
+      to: "/courier/notifications",
+      icon: Bell,
+      badge: counts?.unreadNotifications ?? 0,
     },
     {
       key: "messages",
-      label: "צאט",
+      label: "צ׳אט",
       to: "/courier/messages",
       icon: MessageSquare,
-      badge: 0,
     },
-    {
-      key: "profile",
-      label: "אזור אישי",
-      to: "/courier/profile",
-      icon: User,
-      badge: 0,
-    },
-  ] as const;
+  ];
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -224,36 +279,70 @@ function CourierSideDrawer() {
             </div>
           </div>
 
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <Switch
+                checked={accepting}
+                onCheckedChange={() => void handleToggleAvailability()}
+                disabled={!approved}
+                aria-label="זמין לקבלת עבודה"
+                className="shrink-0 data-[state=checked]:bg-primary"
+              />
+              <div className="min-w-0 flex-1 text-right">
+                <p className="text-sm font-semibold text-text-strong">זמין לקבלת עבודה</p>
+                <p className="text-xs text-text-muted mt-0.5">{t.panel}</p>
+              </div>
+            </div>
+          </div>
+
           <nav className="flex-1 overflow-y-auto overscroll-y-contain px-3 py-3 space-y-1" aria-label="תפריט צד">
             {items.map((item) => {
               const Icon = item.icon;
-              const active =
-                item.to === "/courier/profile"
-                  ? path.startsWith("/courier/profile")
-                  : path === item.to ||
-                    (item.to === "/courier/new-jobs" &&
-                      (path === "/courier" || path === "/courier/dashboard"));
+              const active = item.match ? item.match(path) : path === item.to;
+              const badge = item.badge ?? 0;
+
+              if (item.featured) {
+                return (
+                  <Link
+                    key={item.key}
+                    to={item.to}
+                    onClick={closeMenu}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-pill text-sm font-extrabold transition-colors",
+                      active
+                        ? "bg-primary-deep text-primary-foreground shadow-card-strong"
+                        : "bg-primary text-primary-foreground shadow-fab active:opacity-90",
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" strokeWidth={2.5} />
+                    <span className="flex-1 text-right truncate">{item.label}</span>
+                  </Link>
+                );
+              }
+
               return (
                 <Link
                   key={item.key}
                   to={item.to}
                   onClick={closeMenu}
                   aria-current={active ? "page" : undefined}
-                  className={`flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold transition-colors ${
+                  className={cn(
+                    "flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold transition-colors",
                     active
                       ? "bg-primary text-primary-foreground shadow-fab"
-                      : "text-text-strong hover:bg-muted active:bg-muted"
-                  }`}
+                      : "text-text-strong hover:bg-muted active:bg-muted",
+                  )}
                 >
                   <Icon className="size-4 shrink-0" strokeWidth={active ? 2.5 : 2} />
                   <span className="flex-1 text-right truncate">{item.label}</span>
-                  {item.badge > 0 && (
+                  {badge > 0 && (
                     active ? (
                       <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary-foreground/20 text-primary-foreground text-[10px] font-extrabold">
-                        {item.badge > 99 ? "99+" : item.badge}
+                        {badge > 99 ? "99+" : badge}
                       </span>
                     ) : (
-                      <NavBadge value={item.badge} />
+                      <NavBadge value={badge} />
                     )
                   )}
                 </Link>
