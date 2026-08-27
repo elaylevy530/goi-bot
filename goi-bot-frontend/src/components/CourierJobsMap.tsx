@@ -31,6 +31,7 @@ declare global {
 export type MapJob = {
   id: string;
   job_number?: string | number | null;
+  order_number?: string | number | null;
   customer_id?: string | null;
   customer_name?: string | null;
   customer_logo_path?: string | null;

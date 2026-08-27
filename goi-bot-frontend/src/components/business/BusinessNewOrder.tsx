@@ -82,6 +82,8 @@ type Props = {
   onDropoffEntry: (v: string) => void;
   dropoffNotes: string;
   onDropoffNotes: (v: string) => void;
+  orderNumber: string;
+  onOrderNumber: (v: string) => void;
   suggestedPrice: number | null;
   offeredPrice: string;
   onOfferedPrice: (v: string) => void;
@@ -337,6 +339,15 @@ function DetailsStep(props: Props) {
       <section className="space-y-4 lg:col-span-2">
         <h2 className="text-base font-bold text-text-strong">פרטי חבילה ומועד</h2>
         <div className="grid gap-4 sm:grid-cols-2">
+          <BizField label="מספר הזמנה" hint="מספר אצלכם בעסק — יכול לחזור על עצמו">
+            <input
+              className={bizControlClass()}
+              value={props.orderNumber}
+              onChange={(e) => props.onOrderNumber(e.target.value)}
+              placeholder="לדוגמה: 1042"
+              dir="ltr"
+            />
+          </BizField>
           <BizField label="סוג חבילה">
             <select className={bizControlClass()} value={props.deliveryType} onChange={(e) => props.onDeliveryType(e.target.value)}>
               {props.deliveryTypes.map((t) => (
@@ -440,6 +451,12 @@ function SummaryStep(props: Props & { distanceLabel: string; durationLabel: stri
           <dd className="text-text-strong">{props.deliveryType || "—"}</dd>
           <dt className="text-text-muted">חבילה</dt>
         </div>
+        {props.orderNumber.trim() ? (
+          <div className="flex justify-between gap-4">
+            <dd className="text-text-strong" dir="ltr">{props.orderNumber.trim()}</dd>
+            <dt className="text-text-muted">מספר הזמנה</dt>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-4">
           <dd className="text-text-strong">{TIMING_LABELS[props.timing].label}</dd>
           <dt className="text-text-muted">מועד</dt>

@@ -88,6 +88,7 @@ function NewDeliveryPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [orderNumber, setOrderNumber] = useState("");
   const [packageWeight, setPackageWeight] = useState("");
   const [packageContents, setPackageContents] = useState("");
   const [pickupContactName, setPickupContactName] = useState("");
@@ -374,6 +375,7 @@ function NewDeliveryPage() {
         estimated_distance_km: distanceKm ? Number(distanceKm.toFixed(1)) : null,
         description: [`קטגוריה: ${category.label}`, deliveryType, validExtraStops.length ? `${validExtraStops.length + 1} יעדים` : null].filter(Boolean).join(" · "),
         invoice_required: (me as { invoice_required?: boolean }).invoice_required ?? false,
+        order_number: orderNumber.trim() || null,
         status: asDraftRef.current ? "טיוטה" : "נשלחה לשליחים",
       };
 
@@ -480,6 +482,8 @@ function NewDeliveryPage() {
         onDropoffEntry={setDropoffEntry}
         dropoffNotes={notes}
         onDropoffNotes={setNotes}
+        orderNumber={orderNumber}
+        onOrderNumber={setOrderNumber}
         suggestedPrice={suggestedPrice}
         offeredPrice={offeredPrice}
         onOfferedPrice={(v) => { setOfferedPrice(v); clearFieldError("offeredPrice"); }}

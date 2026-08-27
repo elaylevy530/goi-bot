@@ -8,6 +8,7 @@ import { getNestAccessToken } from "@/lib/nest-auth";
 export type NestJob = Record<string, unknown> & {
   id: string;
   job_number: string;
+  order_number?: string | null;
   status: string;
   job_type?: string;
   pricing_type?: string;

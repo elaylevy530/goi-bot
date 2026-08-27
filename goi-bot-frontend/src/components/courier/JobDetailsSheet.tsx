@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 type JobDetails = {
   job_number?: string | number | null;
+  order_number?: string | number | null;
   customer_name?: string | null;
   pickup_address?: string | null;
   pickup_area?: string | null;
@@ -87,7 +88,9 @@ export function JobDetailsSheet({
           </DrawerClose>
           <DrawerTitle className="text-lg font-extrabold text-text-strong">פרטי משלוח</DrawerTitle>
           <DrawerDescription className="font-mono text-xs text-text-muted">
-            {job.job_number ? `#${job.job_number}` : ""}
+            {job.order_number
+              ? `#${String(job.order_number).replace(/^#/, "")}`
+              : ""}
           </DrawerDescription>
         </DrawerHeader>
 

@@ -47,7 +47,10 @@ export function CourierOfferCard({
   const businessName = job.customer_name?.trim() || "לקוח פרטי";
   const isQuote = job.__kind === "quote";
   const payLabel = job.requires_cash ? "מזומן" : "אשראי";
-  const jobNumber = job.job_number ? `#${String(job.job_number).replace(/^#/, "")}` : null;
+  const displayOrderNumber = String(job.order_number ?? "").trim();
+  const jobNumber = displayOrderNumber
+    ? `#${displayOrderNumber.replace(/^#/, "")}`
+    : null;
   const packages = Number(job.number_of_packages ?? 0) || 1;
   const tripKm = route?.distanceKm ?? null;
   const tripMin = route?.durationMin ?? null;
