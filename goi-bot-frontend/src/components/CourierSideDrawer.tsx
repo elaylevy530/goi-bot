@@ -23,6 +23,7 @@ import {
   Menu,
   MessageSquare,
   Navigation,
+  Settings,
   Star,
   TrendingUp,
   Wallet,
@@ -239,6 +240,12 @@ function CourierSideDrawer() {
       label: "צ׳אט",
       to: "/courier/messages",
       icon: MessageSquare,
+    },
+    {
+      key: "account-settings",
+      label: "הגדרות חשבון",
+      to: "/courier/account-settings",
+      icon: Settings,
     },
   ];
 
