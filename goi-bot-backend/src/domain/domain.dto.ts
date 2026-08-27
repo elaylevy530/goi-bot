@@ -63,6 +63,7 @@ export class WithdrawalDto {
   @IsOptional() @IsString() account_owner?: string;
   @IsOptional() @IsString() bit_phone?: string;
   @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsString() receipt_url?: string;
 }
 
 export class BonusDto {
@@ -90,7 +91,7 @@ export class SupportTicketDto {
 }
 
 export class UpdateWithdrawalDto {
-  @IsString() status!: string;
+  @IsOptional() @IsString() status?: string;
   @IsOptional() @IsString() reason?: string;
   @IsOptional() @IsString() reference_number?: string;
   @IsOptional() @IsString() receipt_url?: string;

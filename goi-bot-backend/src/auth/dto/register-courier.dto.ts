@@ -128,4 +128,15 @@ export class RegisterCourierDto {
   @IsString()
   @MaxLength(80)
   id_photo_back_mime?: string | null;
+
+  /** Courier id or referral code from /join?ref=… */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  referred_by?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  referral_code?: string | null;
 }

@@ -335,9 +335,27 @@ export class DomainService {
     return this.withdrawals.save(withdrawal);
   }
 
-  async updateWithdrawal(id: string, adminUserId: string, body: Mutable) {
+  async updateWithdrawal(id: string, actorUserId: string, body: Mutable, roles: AppRole[] = []) {
     const row = await this.withdrawals.findOne({ where: { id } });
     if (!row) throw new NotFoundException("Withdrawal not found");
+    const isAdmin = roles.includes("admin") || roles.includes("manager");
+    if (!isAdmin) {
+      const previewId = previewCourierId();
+      const courier = previewId
+        ? await this.couriers.findOne({ where: { id: previewId }, select: ["id"] })
+        : await this.couriers.findOne({ where: { user_id: actorUserId }, select: ["id"] });
+      if (!courier || row.courier_id !== courier.id) {
+        throw new ForbiddenException("Withdrawal not found");
+      }
+      if (row.status === "שולמה" || row.status === "נדחתה") {
+        throw new BadRequestException("Cannot attach invoice to this withdrawal");
+      }
+      if (body.receipt_url == null) {
+        throw new BadRequestException("receipt_url is required");
+      }
+      row.receipt_url = String(body.receipt_url);
+      return this.withdrawals.save(row);
+    }
     const status = String(body.status || "").trim();
     const allowed = ["ממתינה", "אושרה", "שולמה", "נדחתה"];
     if (!allowed.includes(status)) {
@@ -345,24 +363,24 @@ export class DomainService {
     }
     row.status = status;
     if (status === "אושרה") {
-      row.approved_by = adminUserId;
+      row.approved_by = actorUserId;
       row.approved_at = new Date();
       row.rejection_reason = null;
     }
     if (status === "נדחתה") {
       row.rejection_reason = (body.reason as string | undefined) ?? null;
-      row.approved_by = adminUserId;
+      row.approved_by = actorUserId;
       row.approved_at = new Date();
     }
     if (status === "שולמה") {
       row.paid_at = new Date();
       if (!row.approved_at) {
-        row.approved_by = adminUserId;
+        row.approved_by = actorUserId;
         row.approved_at = new Date();
       }
       if (body.reference_number != null) row.reference_number = String(body.reference_number);
-      if (body.receipt_url != null) row.receipt_url = String(body.receipt_url);
     }
+    if (body.receipt_url != null) row.receipt_url = String(body.receipt_url);
     return this.withdrawals.save(row);
   }
 

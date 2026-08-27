@@ -156,13 +156,13 @@ export class AccountDomainController {
 
   @Patch("withdrawals/:id")
   @UseGuards(RolesGuard)
-  @Roles("admin", "manager")
+  @Roles("admin", "manager", "courier")
   updateWithdrawal(
     @CurrentUser() auth: AuthUserContext,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() body: UpdateWithdrawalDto,
   ) {
-    return this.domain.updateWithdrawal(id, auth.userId, data(body));
+    return this.domain.updateWithdrawal(id, auth.userId, data(body), auth.roles);
   }
 
   @Get("bonuses")

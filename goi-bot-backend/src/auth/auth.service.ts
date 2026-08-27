@@ -617,6 +617,7 @@ export class AuthService {
       idPhotoBackUrl = uploaded.path;
     }
 
+    const referralLead = dto.referred_by?.trim() || dto.referral_code?.trim();
     const courier = await this.couriers.save(
       this.couriers.create({
         full_name: dto.full_name.trim(),
@@ -628,7 +629,7 @@ export class AuthService {
         preferred_job_types: extraJobDetails,
         availability: [],
         courier_status: "ממתין לאישור",
-        lead_source: "טופס /join",
+        lead_source: referralLead ? `referral:${referralLead}` : "טופס /join",
         id_number: dto.id_number || null,
         id_photo_url: idPhotoUrl,
         id_photo_back_url: idPhotoBackUrl,
