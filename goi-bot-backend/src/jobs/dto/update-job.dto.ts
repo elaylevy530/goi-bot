@@ -3,6 +3,11 @@ import { IsBoolean, IsNumber, IsOptional, IsString, MaxLength } from "class-vali
 export class UpdateJobDto {
   @IsOptional()
   @IsString()
+  @MaxLength(64)
+  order_number?: string | null;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(32)
   status?: string;
 

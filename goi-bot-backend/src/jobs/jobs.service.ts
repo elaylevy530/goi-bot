@@ -426,6 +426,7 @@ export class JobsService {
     return this.jobs.save(
       this.jobs.create({
         job_number: jobNumber,
+        order_number: dto.order_number?.trim() || null,
         short_code: shortCode,
         recipient_tracking_token: generateTrackingToken(),
         // Prefer Hebrew open/draft statuses. English `pending` is legacy — dispatch
@@ -489,6 +490,9 @@ export class JobsService {
       }
     }
     Object.assign(job, dto);
+    if (dto.order_number !== undefined) {
+      job.order_number = dto.order_number?.trim() || null;
+    }
     if (dto.per_job_amount != null) {
       job.per_job_amount = String(dto.per_job_amount);
     }

@@ -25,6 +25,11 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
+  order_number?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
   status?: string;
 
   @IsOptional()

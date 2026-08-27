@@ -16,6 +16,10 @@ export class Job {
   @Column({ type: "varchar", length: 64 })
   job_number!: string;
 
+  /** Business-entered order ref. Not unique — the same number can repeat. */
+  @Column({ type: "varchar", length: 64, nullable: true })
+  order_number!: string | null;
+
   /** Short public link code for /g/$code (WhatsApp mover leads). */
   @Index({ unique: true })
   @Column({ type: "varchar", length: 16, nullable: true })
