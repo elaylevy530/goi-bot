@@ -115,12 +115,14 @@ type Props = {
   /** Extra classes for the floating zoom/layers cluster (e.g. to clear an overlay). */
   controlsClassName?: string;
   leftExtra?: ReactNode;
+  /** Rendered under the zoom +/− cluster (same left column). */
+  belowControls?: ReactNode;
   rightExtra?: ReactNode;
   emptyState?: ReactNode;
   onActiveChange?: (job: MapJob | null) => void;
 };
 
-export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, rightExtra, emptyState, onActiveChange }: Props) {
+export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, belowControls, rightExtra, emptyState, onActiveChange }: Props) {
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -601,6 +603,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
               <Minus className="size-4" />
             </button>
           </div>
+          {belowControls}
         </div>
 
         {rightExtra && (

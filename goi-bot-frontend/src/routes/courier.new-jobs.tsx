@@ -364,16 +364,6 @@ function NewJobsPage() {
             <div className="relative flex items-center justify-center">
               <CourierMenuButton className="absolute start-0 size-11 shadow-card border-0 shrink-0" />
               <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
-              {showingOffer && (
-                <button
-                  type="button"
-                  onClick={() => activeOffer && handleDecline(activeOffer)}
-                  disabled={!activeOffer || claim.isPending || respond.isPending}
-                  className="absolute end-0 size-11 rounded-full bg-surface shadow-card text-sm font-extrabold text-destructive disabled:opacity-50 active:scale-95"
-                >
-                  דלג
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -393,6 +383,18 @@ function NewJobsPage() {
               onActiveChange={setActiveOffer}
               claiming={claim.isPending || respond.isPending}
               controlsClassName="top-[5.5rem]"
+              belowControls={
+                showingOffer ? (
+                  <button
+                    type="button"
+                    onClick={() => activeOffer && handleDecline(activeOffer)}
+                    disabled={!activeOffer || claim.isPending || respond.isPending}
+                    className="size-10 rounded-full bg-surface shadow-card border border-border text-xs font-extrabold text-destructive disabled:opacity-50 active:scale-95"
+                  >
+                    דלג
+                  </button>
+                ) : undefined
+              }
               leftExtra={
                 showingOffer ? undefined : (
                   <Link

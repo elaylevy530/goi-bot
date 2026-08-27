@@ -34,31 +34,6 @@ function formatKm(km: number) {
   return `${km < 10 ? km.toFixed(1) : Math.round(km)} ק״מ`;
 }
 
-function formatClock(value?: string | null) {
-  if (!value) return null;
-  const asDate = new Date(value);
-  if (!Number.isNaN(asDate.getTime()) && /[T-]/.test(value)) {
-    return asDate.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-  }
-  const sliced = String(value).slice(0, 5);
-  return /^\d{1,2}:\d{2}$/.test(sliced) ? sliced : null;
-}
-
-function clockFromNow(minutes: number) {
-  const d = new Date(Date.now() + minutes * 60_000);
-  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-}
-
-function snapshotOf(job: MapJob): Record<string, unknown> {
-  const raw = job.__raw ?? {};
-  return (
-    (job as { pricing_snapshot?: Record<string, unknown> }).pricing_snapshot
-    ?? raw.pricing_snapshot
-    ?? raw.job?.pricing_snapshot
-    ?? {}
-  );
-}
-
 export function CourierOfferCard({
   job,
   distToPickupKm,
@@ -73,23 +48,9 @@ export function CourierOfferCard({
   const isQuote = job.__kind === "quote";
   const payLabel = job.requires_cash ? "מזומן" : "אשראי";
   const jobNumber = job.job_number ? `#${String(job.job_number).replace(/^#/, "")}` : null;
-  const snap = snapshotOf(job);
-  const deadlineRaw =
-    job.delivery_deadline
-    ?? (typeof snap.delivery_deadline === "string" ? snap.delivery_deadline : null);
-  const deadlineClock = formatClock(deadlineRaw);
-  const scheduledClock = formatClock(job.job_time);
   const packages = Number(job.number_of_packages ?? 0) || 1;
   const tripKm = route?.distanceKm ?? null;
   const tripMin = route?.durationMin ?? null;
-  const pickupEta =
-    scheduledClock
-    ?? (distToPickupKm != null
-      ? clockFromNow(Math.max(8, Math.round(distToPickupKm * 4)))
-      : clockFromNow(12));
-  const dropoffEta =
-    deadlineClock
-    ?? (tripMin != null ? clockFromNow(tripMin + 8) : clockFromNow(35));
   const pickup = addressLine(job.pickup_address, job.pickup_area);
   const dropoff = addressLine(job.dropoff_address, job.dropoff_area);
 
@@ -136,8 +97,8 @@ export function CourierOfferCard({
               </span>
             </div>
             <div className="min-w-0 flex-1 space-y-1.5">
-              <StopRow address={pickup} chip={`להגיע עד ${pickupEta}`} />
-              <StopRow address={dropoff} chip={`למסור עד ${dropoffEta}`} />
+              <p className="min-w-0 truncate text-xs font-bold text-text-strong">{pickup}</p>
+              <p className="min-w-0 truncate text-xs font-bold text-text-strong">{dropoff}</p>
             </div>
           </div>
 
@@ -181,17 +142,6 @@ export function CourierOfferCard({
           )}
         </div>
       </article>
-    </div>
-  );
-}
-
-function StopRow({ address, chip }: { address: string; chip: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <p className="min-w-0 truncate text-xs font-bold text-text-strong">{address}</p>
-      <span className="shrink-0 rounded-pill bg-success-bg px-2 py-0.5 text-[10px] font-bold text-success-text">
-        {chip}
-      </span>
     </div>
   );
 }
