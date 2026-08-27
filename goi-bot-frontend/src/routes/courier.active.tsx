@@ -25,8 +25,8 @@ function ActivePage() {
   const subtitle = n <= 0
     ? t.activeJobsSub
     : n === 1
-      ? (t.kind === "mover" ? "1 הובלה פעילה כרגע" : "1 משלוח פעיל כרגע")
-      : (t.kind === "mover" ? `${n} הובלות פעילות כרגע` : `${n} משלוחים פעילים כרגע`);
+      ? "1 משלוח פעיל כרגע"
+      : `${n} משלוחים פעילים כרגע`;
   const refresh = useCallback(async () => {
     await Promise.all([
       qc.refetchQueries({ queryKey: ["active-jobs"] }),

@@ -57,7 +57,7 @@ const MOVER_TERMS: CourierTerms = {
   theJob: "ההובלה",
   availableJobs: "הובלות פנויות",
   availableJobsSub: "הובלות שמחכות לך באזור",
-  activeJobs: "הובלות פעילות",
+  activeJobs: "משלוחים פעילים",
   activeJobsSub: "ההובלות שלך בזמן אמת",
   myJobs: "ביצועים",
   myJobsSub: "הכנסות והיסטוריית הובלות",

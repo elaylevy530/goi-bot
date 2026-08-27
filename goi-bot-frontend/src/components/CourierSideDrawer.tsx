@@ -7,7 +7,7 @@ import { CourierAvatar } from "@/components/CourierAvatar";
 import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { termsFor } from "@/lib/courier-kind";
 import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
-import { nestListMyCourierNotifications } from "@/lib/nest-domain";
+import { nestListMyCourierNotifications, nestMyNotificationUnreadCount } from "@/lib/nest-domain";
 import {
   nestCourierActiveJobCount,
   nestListCourierDeclines,
@@ -17,7 +17,6 @@ import {
 import {
   Bell,
   Gift,
-  History,
   Inbox,
   LogOut,
   Menu,
@@ -26,6 +25,7 @@ import {
   Settings,
   ShieldCheck,
   Star,
+  TrendingUp,
   Wallet,
   X,
 } from "lucide-react";
@@ -197,9 +197,10 @@ function CourierSideDrawer() {
     },
     {
       key: "history",
-      label: t.kind === "mover" ? "היסטוריית הובלות" : "היסטוריות משלוחים",
-      to: "/courier/history",
-      icon: History,
+      label: t.myJobs,
+      to: "/courier/performance",
+      icon: TrendingUp,
+      match: (p) => p === "/courier/performance" || p === "/courier/history",
     },
     {
       key: "wallet",
@@ -387,5 +388,31 @@ export function CourierMenuButton({ className = "" }: { className?: string }) {
     >
       <Menu className="size-[18px]" strokeWidth={2} aria-hidden />
     </button>
+  );
+}
+
+/** Header bell — opens courier notifications, with an unread dot. */
+export function CourierBellButton({ className = "" }: { className?: string }) {
+  const { data: unread = 0 } = useQuery({
+    queryKey: ["courier-notification-unread"],
+    queryFn: nestMyNotificationUnreadCount,
+    refetchInterval: 15_000,
+    staleTime: 5_000,
+  });
+  const hasUnread = Number(unread) > 0;
+  return (
+    <Link
+      to="/courier/notifications"
+      aria-label={hasUnread ? "התראות חדשות" : "התראות"}
+      className={`relative size-[38px] min-h-11 min-w-11 grid place-items-center rounded-full bg-surface border border-border text-text-strong active:bg-muted transition-colors shrink-0 ${className}`}
+    >
+      <Bell className="size-[18px]" strokeWidth={2} aria-hidden />
+      {hasUnread && (
+        <span
+          className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-surface"
+          aria-hidden
+        />
+      )}
+    </Link>
   );
 }

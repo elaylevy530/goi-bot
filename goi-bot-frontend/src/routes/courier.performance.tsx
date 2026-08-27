@@ -14,7 +14,7 @@ import {
   UtensilsCrossed,
   Wallet,
 } from "lucide-react";
-import { CourierMenuButton } from "@/components/CourierSideDrawer";
+import { CourierBellButton, CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Input } from "@/components/ui/input";
@@ -274,7 +274,7 @@ function PerformancePage() {
           <div className="flex items-center justify-between gap-3">
             <CourierMenuButton className="size-11 border-0 shadow-card" />
             <h1 className="min-w-0 flex-1 text-center text-lg font-extrabold text-text-strong">ביצועים</h1>
-            <div className="size-11 shrink-0" aria-hidden />
+            <CourierBellButton className="size-11 border-0 shadow-card" />
           </div>
         </header>
 
@@ -294,8 +294,8 @@ function PerformancePage() {
                     className={cn(
                       "min-h-11 shrink-0 rounded-pill border px-4 text-sm font-bold transition-colors",
                       active
-                        ? "border-primary bg-primary-soft text-primary"
-                        : "border-border bg-surface text-text-subtle",
+                        ? "border-primary bg-surface text-primary"
+                        : "border-transparent bg-muted text-text-strong",
                     )}
                   >
                     {tab.label}
@@ -331,29 +331,39 @@ function PerformancePage() {
 
             <section className="rounded-card border border-border bg-surface p-4 shadow-card">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 text-right">
-                  <p className="text-base font-extrabold text-text-strong">{range.summary}</p>
-                  <p className="mt-1 text-sm text-text-subtle">{formatLongDate(range.end)}</p>
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-pill bg-primary-soft text-primary">
+                    <CalendarDays className="size-5" aria-hidden />
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className="text-base font-extrabold text-text-strong">{range.summary}</p>
+                    <p className="mt-1 text-sm text-text-subtle">{formatLongDate(range.end)}</p>
+                  </div>
                 </div>
-                <div className="grid size-10 shrink-0 place-items-center rounded-pill bg-primary-soft text-primary">
-                  <CalendarDays className="size-5" aria-hidden />
+                <div className="flex max-w-[48%] shrink flex-col items-end gap-2 pt-0.5 text-left">
+                  {updatedAt && (
+                    <p className="flex items-center gap-1.5 text-xs text-text-muted">
+                      <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+                      <span>עודכן לאחרונה: {updatedAt}</span>
+                    </p>
+                  )}
+                  {showDelta && (
+                    <p className="flex items-start gap-1.5 text-sm font-semibold leading-snug text-primary">
+                      <TrendingUp
+                        className={cn(
+                          "mt-0.5 size-4 shrink-0",
+                          delta < 0 && "rotate-180 text-destructive",
+                        )}
+                        aria-hidden
+                      />
+                      <span>
+                        {comparisonCopy(period)} {delta >= 0 ? "+" : ""}
+                        {fmt(delta, 0)}%
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
-              {updatedAt && (
-                <p className="mt-3 flex items-center justify-end gap-1.5 text-xs text-text-muted">
-                  <span>עודכן לאחרונה: {updatedAt}</span>
-                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
-                </p>
-              )}
-              {showDelta && (
-                <p className="mt-2 flex items-center justify-end gap-1.5 text-sm font-semibold text-primary">
-                  <span>
-                    {comparisonCopy(period)} {delta >= 0 ? "+" : ""}
-                    {fmt(delta, 0)}%
-                  </span>
-                  <TrendingUp className={cn("size-4", delta < 0 && "rotate-180 text-destructive")} aria-hidden />
-                </p>
-              )}
             </section>
 
             <div className="grid grid-cols-3 gap-2">
@@ -388,7 +398,7 @@ function PerformancePage() {
 
             <section className="rounded-card border border-border bg-surface p-4 shadow-card">
               <h2 className="mb-3 text-right text-sm font-extrabold text-text-strong">הכנסה לאורך התקופה</h2>
-              <div dir="ltr" className="h-44">
+              <div dir="ltr" className="h-48">
                 <ChartContainer config={chartConfig} className="h-full w-full">
                   <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <defs>
@@ -433,7 +443,7 @@ function PerformancePage() {
 
             <section className="space-y-3">
               <h2 className="text-right text-sm font-extrabold text-text-strong">
-                {showAll ? `כל ה${t.jobPlural}` : `${t.jobPlural} אחרונים`}
+                {t.jobPlural} אחרונים
               </h2>
               {isLoading ? (
                 <p className="py-10 text-center text-sm text-text-muted">טוען…</p>
@@ -443,7 +453,7 @@ function PerformancePage() {
                   אין {t.jobPlural} בטווח הזה
                 </div>
               ) : (
-                <ul className="flex flex-col gap-2">
+                <ul className="divide-y divide-border rounded-card border border-border bg-surface px-3 shadow-card">
                   {visibleJobs.map((o) => (
                     <DeliveryRow
                       key={String(o.id ?? o.jobs?.id ?? o.delivered_at)}
@@ -460,8 +470,8 @@ function PerformancePage() {
               onClick={() => setShowAll((v) => !v)}
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-pill border border-primary bg-surface text-sm font-bold text-primary active:bg-primary-soft"
             >
-              <ChevronLeft className={cn("size-4", showAll && "rotate-90")} aria-hidden />
               {showAll ? "הצג פחות" : `צפה בכל ה${t.jobPlural}`}
+              <ChevronLeft className={cn("size-4", showAll && "rotate-90")} aria-hidden />
             </button>
           </div>
         </div>
@@ -470,22 +480,26 @@ function PerformancePage() {
   );
 }
 
-function MetricCard({
-  icon,
-  value,
-  label,
-}: {
-  icon: ReactNode;
-  value: string;
-  label: string;
-}) {
+function MetricCard({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
   return (
     <div className="min-w-0 rounded-card border border-border bg-surface p-3 shadow-card">
-      <div className="mb-2 flex justify-end text-primary">{icon}</div>
-      <p className="text-right text-lg font-black tabular-nums leading-none text-text-strong sm:text-xl">{value}</p>
+      <div className="mb-2 flex justify-end">
+        <span className="grid size-8 place-items-center rounded-pill bg-primary-soft text-primary">
+          {icon}
+        </span>
+      </div>
+      <p className="text-right text-lg font-black tabular-nums leading-none text-text-strong sm:text-xl">
+        {value}
+      </p>
       <p className="mt-1 text-right text-[11px] font-medium text-text-subtle">{label}</p>
     </div>
   );
+}
+
+function formatRowWhen(d: Date) {
+  const date = d.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
+  const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  return `${date}, ${time}`;
 }
 
 function DeliveryRow({ row, jobWord }: { row: OutcomeRow; jobWord: string }) {
@@ -496,30 +510,36 @@ function DeliveryRow({ row, jobWord }: { row: OutcomeRow; jobWord: string }) {
   const jobNo = row.jobs?.job_number ? `#${row.jobs.job_number}` : "";
   const amount = payOf(row);
   const km = kmOf(row);
+  const time = when
+    ? when.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
+    : "—";
 
   return (
-    <li className="flex items-center gap-2 rounded-card border border-border bg-surface px-3 py-3 shadow-card sm:gap-3">
+    <li className="flex items-center gap-2 py-3 sm:gap-3">
       <div className="grid size-11 shrink-0 place-items-center rounded-pill bg-primary-soft text-primary">
         <CategoryIcon job={row.jobs} />
       </div>
       <div className="min-w-0 flex-1 text-right">
         <p className="truncate text-sm font-bold text-text-strong">{title}</p>
-        <p className="mt-0.5 text-xs text-text-muted">
-          {jobNo ? `${jobWord} ${jobNo}` : when ? formatLongDate(when) : jobWord}
+        <p className="mt-0.5 truncate text-xs text-text-muted">
+          {when ? formatRowWhen(when) : jobWord}
         </p>
       </div>
+      {jobNo && (
+        <p className="w-16 shrink-0 truncate text-center text-[11px] text-text-subtle sm:w-20">
+          {jobWord} {jobNo}
+        </p>
+      )}
       <div className="shrink-0 text-center">
         <span
           className={cn(
-            "inline-flex rounded-lg px-2 py-0.5 text-[11px] font-semibold",
-            cancelled ? "bg-danger-bg text-danger-text" : "bg-success-bg text-success-text",
+            "inline-flex rounded-pill px-2.5 py-0.5 text-[11px] font-bold",
+            cancelled ? "bg-danger-bg text-danger-text" : "bg-primary text-primary-foreground",
           )}
         >
           {cancelled ? "בוטל" : "הושלם"}
         </span>
-        <p className="mt-1 text-[11px] text-text-muted">
-          {when ? when.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : "—"}
-        </p>
+        <p className="mt-1 text-[11px] text-text-muted">{time}</p>
       </div>
       <div className="shrink-0 text-left">
         <p className="text-sm font-extrabold tabular-nums text-primary">₪ {fmt(amount, 1)}</p>
