@@ -26,6 +26,7 @@ import {
   Settings,
   Star,
   TrendingUp,
+  User,
   Wallet,
   X,
 } from "lucide-react";
@@ -240,6 +241,12 @@ function CourierSideDrawer() {
       label: "צ׳אט",
       to: "/courier/messages",
       icon: MessageSquare,
+    },
+    {
+      key: "my-profile",
+      label: "הפרופיל שלי",
+      to: "/courier/my-profile",
+      icon: User,
     },
     {
       key: "account-settings",
