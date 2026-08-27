@@ -23,6 +23,7 @@ import {
   Menu,
   MessageSquare,
   Navigation,
+  Settings,
   ShieldCheck,
   Star,
   Wallet,
@@ -238,6 +239,12 @@ function CourierSideDrawer() {
       label: "צ׳אט",
       to: "/courier/messages",
       icon: MessageSquare,
+    },
+    {
+      key: "settings",
+      label: "הגדרות כלליות",
+      to: "/courier/settings",
+      icon: Settings,
     },
   ];
 
