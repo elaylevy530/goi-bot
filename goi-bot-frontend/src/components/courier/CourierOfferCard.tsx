@@ -70,7 +70,7 @@ export function CourierOfferCard({
                 {distToPickupKm != null && (
                   <span className="inline-flex items-center gap-0.5 rounded-pill bg-muted px-1.5 py-px text-[10px] font-bold text-text-subtle">
                     <MapPin className="size-2.5 text-primary" aria-hidden />
-                    {formatKm(distToPickupKm)} ממך
+                    {formatKm(distToPickupKm)} מסלול
                   </span>
                 )}
               </div>
@@ -89,20 +89,17 @@ export function CourierOfferCard({
         </header>
 
         <div className="space-y-2.5 px-3 pb-3 pt-2">
-          <div className="flex gap-2">
-            <div className="flex flex-col items-center pt-0.5" aria-hidden>
-              <span className="grid size-6 place-items-center rounded-full bg-success-bg text-primary">
-                <ShoppingBag className="size-3.5" />
-              </span>
-              <span className="my-0.5 w-px flex-1 min-h-3 border-e border-dashed border-primary/50" />
-              <span className="grid size-6 place-items-center rounded-full bg-success-bg text-primary">
-                <Home className="size-3.5" />
-              </span>
-            </div>
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <p className="min-w-0 truncate text-xs font-bold text-text-strong">{pickup}</p>
-              <p className="min-w-0 truncate text-xs font-bold text-text-strong">{dropoff}</p>
-            </div>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2">
+            <span className="grid size-6 place-items-center rounded-full bg-success-bg text-primary" aria-hidden>
+              <ShoppingBag className="size-3.5" />
+            </span>
+            <p className="min-w-0 truncate text-xs font-bold leading-6 text-text-strong">{pickup}</p>
+            <span className="mx-auto my-0.5 h-3 w-px border-e border-dashed border-primary/50" aria-hidden />
+            <span aria-hidden />
+            <span className="grid size-6 place-items-center rounded-full bg-success-bg text-primary" aria-hidden>
+              <Home className="size-3.5" />
+            </span>
+            <p className="min-w-0 truncate text-xs font-bold leading-6 text-text-strong">{dropoff}</p>
           </div>
 
           <div className="grid grid-cols-4 gap-1 border-y border-border py-1.5 text-center">

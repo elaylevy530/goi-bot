@@ -133,7 +133,6 @@ type NavItem = {
   to: string;
   icon: typeof Inbox;
   badge?: number;
-  featured?: boolean;
   match?: (path: string) => boolean;
 };
 
@@ -226,7 +225,6 @@ function CourierSideDrawer() {
       label: "אזור עבודה ותמיכה",
       to: "/courier/availability",
       icon: MapPin,
-      featured: true,
       match: (p) => p === "/courier/availability",
     },
     {
@@ -315,26 +313,6 @@ function CourierSideDrawer() {
               const Icon = item.icon;
               const active = item.match ? item.match(path) : path === item.to;
               const badge = item.badge ?? 0;
-
-              if (item.featured) {
-                return (
-                  <Link
-                    key={item.key}
-                    to={item.to}
-                    onClick={closeMenu}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-pill text-sm font-extrabold transition-colors",
-                      active
-                        ? "bg-primary-deep text-primary-foreground shadow-card-strong"
-                        : "bg-primary text-primary-foreground shadow-fab active:opacity-90",
-                    )}
-                  >
-                    <Icon className="size-4 shrink-0" strokeWidth={2.5} />
-                    <span className="flex-1 text-right truncate">{item.label}</span>
-                  </Link>
-                );
-              }
 
               return (
                 <Link
