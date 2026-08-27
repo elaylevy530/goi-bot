@@ -7,11 +7,13 @@ import {
   CalendarDays,
   Check,
   Clock,
+  FileText,
   Heart,
   Info,
-  Lock,
   Sparkles,
+  Upload,
   Wallet,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
@@ -19,7 +21,8 @@ import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListWithdrawals } from "@/lib/nest-domain";
+import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListWithdrawals, nestUpdateWithdrawal } from "@/lib/nest-domain";
+import { nestUploadFile } from "@/lib/nest-files";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/courier/wallet")({
@@ -27,7 +30,7 @@ export const Route = createFileRoute("/courier/wallet")({
   component: WalletPage,
 });
 
-const MIN_WITHDRAWAL = 26;
+const MIN_WITHDRAWAL = 400;
 
 type OutcomeRow = {
   id?: string;
@@ -44,6 +47,7 @@ type WithdrawalRow = {
   created_at?: string | null;
   payment_method?: string | null;
   bank_account?: string | null;
+  receipt_url?: string | null;
 };
 
 function money(n: number) {
@@ -89,6 +93,9 @@ function WalletPage() {
   const [showAll, setShowAll] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [invoiceTargetId, setInvoiceTargetId] = useState<string | null>(null);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["wallet", me?.id],
@@ -139,6 +146,9 @@ function WalletPage() {
     id?: string;
   } | null;
   const hasBank = !!(bank?.bank_name && bank?.bank_account);
+  const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
+  const invoiceWithdrawalId = invoiceTargetId || latestPending?.id || null;
+  const invoiceAlreadyAttached = !!latestPending?.receipt_url;
 
   const tx = useMemo(() => {
     const items: {
@@ -194,7 +204,7 @@ function WalletPage() {
       if (!hasBank) throw new Error("יש לחבר חשבון בנק באזור האישי");
       if (!Number.isFinite(n) || n < MIN_WITHDRAWAL) throw new Error(`הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`);
       if (n > available) throw new Error("הסכום גבוה מהיתרה הזמינה");
-      await nestCreateWithdrawal({
+      return nestCreateWithdrawal({
         courier_id: me.id,
         amount: n,
         payment_method: "bank",
@@ -202,12 +212,31 @@ function WalletPage() {
         bank_branch: bank?.bank_branch,
         bank_account: bank?.bank_account,
         account_owner: (me as { bank_account_owner?: string; full_name?: string }).bank_account_owner || me.full_name,
-      });
+      }) as Promise<WithdrawalRow>;
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
       toast.success("בקשת המשיכה נשלחה");
       setWithdrawOpen(false);
       setAmount("");
+      qc.invalidateQueries({ queryKey: ["wallet-withdrawals"] });
+      if (needsInvoice) {
+        setInvoiceTargetId(created?.id ?? null);
+        setInvoiceFile(null);
+        setInvoiceOpen(true);
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const uploadInvoice = useMutation({
+    mutationFn: async ({ withdrawalId, file }: { withdrawalId: string; file: File }) => {
+      const uploaded = await nestUploadFile("courier-ids", file);
+      await nestUpdateWithdrawal(withdrawalId, { receipt_url: uploaded.path });
+    },
+    onSuccess: () => {
+      toast.success("החשבונית הועלתה");
+      setInvoiceFile(null);
+      setInvoiceOpen(false);
       qc.invalidateQueries({ queryKey: ["wallet-withdrawals"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -262,6 +291,12 @@ function WalletPage() {
                       הוגשה בתאריך: {latestPending.created_at ? new Date(latestPending.created_at).toLocaleDateString("he-IL") : "—"}
                     </p>
                     <WithdrawSteps status={latestPending.status} />
+                    {needsInvoice && invoiceAlreadyAttached && (
+                      <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-success-text">
+                        <FileText className="size-3.5" aria-hidden />
+                        חשבונית צורפה
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p className="mt-6 text-sm text-text-muted">אין בקשה ממתינה</p>
@@ -285,6 +320,25 @@ function WalletPage() {
                 )}
               </div>
             </div>
+
+            {needsInvoice && latestPending && !invoiceAlreadyAttached && (
+              <section className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-card">
+                <div>
+                  <p className="text-sm font-bold text-text-strong">העלאת חשבונית</p>
+                  <p className="mt-1 text-xs text-text-muted">יש לצרף חשבונית לבקשת המשיכה הממתינה.</p>
+                </div>
+                <InvoiceUploadField
+                  file={invoiceFile}
+                  onFile={setInvoiceFile}
+                  onClear={() => setInvoiceFile(null)}
+                  onSubmit={() => {
+                    if (!latestPending.id || !invoiceFile) return;
+                    uploadInvoice.mutate({ withdrawalId: latestPending.id, file: invoiceFile });
+                  }}
+                  pending={uploadInvoice.isPending}
+                />
+              </section>
+            )}
 
             <Link
               to="/courier/profile/bank"
@@ -360,11 +414,6 @@ function WalletPage() {
                 </ul>
               )}
             </section>
-
-            <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-xs text-text-subtle">
-              <Lock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <p>בקשות שאושרו עד השעה 10:00 בימי עסקים יועברו לחשבון הבנק שלך באותו היום.</p>
-            </div>
           </div>
         </div>
       </div>
@@ -400,7 +449,86 @@ function WalletPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={invoiceOpen}
+        onOpenChange={(open) => {
+          setInvoiceOpen(open);
+          if (!open) setInvoiceFile(null);
+        }}
+      >
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-right">העלאת חשבונית</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-text-subtle">יש לצרף חשבונית לבקשת המשיכה.</p>
+            <InvoiceUploadField
+              file={invoiceFile}
+              onFile={setInvoiceFile}
+              onClear={() => setInvoiceFile(null)}
+              onSubmit={() => {
+                if (!invoiceWithdrawalId || !invoiceFile) return;
+                uploadInvoice.mutate({ withdrawalId: invoiceWithdrawalId, file: invoiceFile });
+              }}
+              pending={uploadInvoice.isPending}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </CourierShell>
+  );
+}
+
+function InvoiceUploadField({
+  file,
+  onFile,
+  onClear,
+  onSubmit,
+  pending,
+}: {
+  file: File | null;
+  onFile: (file: File | null) => void;
+  onClear: () => void;
+  onSubmit: () => void;
+  pending: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-card border border-dashed border-border bg-muted px-3 text-sm font-bold text-text-strong active:bg-border">
+        <Upload className="size-4 shrink-0 text-primary" aria-hidden />
+        <span className="min-w-0 truncate">{file?.name ?? "בחירת קובץ"}</span>
+        <input
+          key={file?.name ?? "empty"}
+          type="file"
+          accept="image/*,application/pdf"
+          className="sr-only"
+          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
+      {file && (
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onClear}
+            className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-text-muted"
+          >
+            <X className="size-3.5" aria-hidden />
+            נקה
+          </button>
+          <p className="min-w-0 truncate text-[11px] text-text-subtle">{file.name}</p>
+        </div>
+      )}
+      <button
+        type="button"
+        disabled={!file || pending}
+        onClick={onSubmit}
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-pill bg-primary text-sm font-extrabold text-primary-foreground disabled:opacity-60"
+      >
+        <FileText className="size-4" aria-hidden />
+        {pending ? "מעלה…" : "העלה חשבונית"}
+      </button>
+    </div>
   );
 }
 

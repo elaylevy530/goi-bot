@@ -19,11 +19,10 @@ import {
   Gift,
   Inbox,
   LogOut,
+  MapPin,
   Menu,
   MessageSquare,
   Navigation,
-  Settings,
-  ShieldCheck,
   Star,
   TrendingUp,
   Wallet,
@@ -204,7 +203,7 @@ function CourierSideDrawer() {
     },
     {
       key: "wallet",
-      label: "רווחים",
+      label: "ארנק",
       to: "/courier/wallet",
       icon: Wallet,
     },
@@ -223,10 +222,10 @@ function CourierSideDrawer() {
     {
       key: "work-area",
       label: "אזור עבודה ותמיכה",
-      to: "/courier/profile/edit",
-      icon: ShieldCheck,
+      to: "/courier/availability",
+      icon: MapPin,
       featured: true,
-      match: (p) => p === "/courier/profile/edit",
+      match: (p) => p === "/courier/availability",
     },
     {
       key: "notifications",
@@ -240,12 +239,6 @@ function CourierSideDrawer() {
       label: "צ׳אט",
       to: "/courier/messages",
       icon: MessageSquare,
-    },
-    {
-      key: "settings",
-      label: "הגדרות כלליות",
-      to: "/courier/settings",
-      icon: Settings,
     },
   ];
 

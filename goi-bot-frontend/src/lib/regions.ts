@@ -181,22 +181,39 @@ export const WORK_AREA_OPTIONS = [
   "אזור שרון",
   "אזור מרכז",
   "אזור דרום",
-  "אזור שפלה וירושלים",
+  "אזור שפלה",
+  "אזור ירושלים",
   "כל הארץ",
 ] as const;
 
-export type WorkAreaLabel = (typeof WORK_AREA_OPTIONS)[number];
+export const LEGACY_COMBINED_SHFELA_JERUSALEM = "אזור שפלה וירושלים";
+
+export type WorkAreaLabel =
+  | (typeof WORK_AREA_OPTIONS)[number]
+  | typeof LEGACY_COMBINED_SHFELA_JERUSALEM;
 
 export const NATIONWIDE_WORK_AREA: WorkAreaLabel = "כל הארץ";
 export const WORK_AREA_REQUIRED_ERROR = "יש לבחור לפחות אזור עבודה אחד";
+
+/** Visual order for the courier work-areas screen (RTL grid, right-to-left). */
+export const WORK_AREA_CARDS = [
+  { stored: "אזור מרכז", label: "מרכז", mapId: "center" },
+  { stored: "אזור שרון", label: "שרון", mapId: "sharon" },
+  { stored: "אזור צפון", label: "צפון", mapId: "north" },
+  { stored: "אזור דרום", label: "דרום", mapId: "south" },
+  { stored: "אזור שפלה", label: "שפלה", mapId: "shfela" },
+  { stored: "אזור ירושלים", label: "ירושלים", mapId: "jerusalem" },
+] as const;
+
+export type WorkAreaCardId = (typeof WORK_AREA_CARDS)[number]["mapId"];
 
 const ADMIN_REGION_TO_WORK_AREA: Record<Region, WorkAreaLabel | null> = {
   צפון: "אזור צפון",
   השרון: "אזור שרון",
   מרכז: "אזור מרכז",
   דרום: "אזור דרום",
-  שפלה: "אזור שפלה וירושלים",
-  "ירושלים והסביבה": "אזור שפלה וירושלים",
+  שפלה: "אזור שפלה",
+  "ירושלים והסביבה": "אזור ירושלים",
   אחר: null,
 };
 
@@ -205,12 +222,52 @@ const WORK_AREA_TO_ADMIN_REGIONS: Record<string, Region[]> = {
   "אזור שרון": ["השרון"],
   "אזור מרכז": ["מרכז"],
   "אזור דרום": ["דרום"],
-  "אזור שפלה וירושלים": ["שפלה", "ירושלים והסביבה"],
+  "אזור שפלה": ["שפלה"],
+  "אזור ירושלים": ["ירושלים והסביבה"],
+  [LEGACY_COMBINED_SHFELA_JERUSALEM]: ["שפלה", "ירושלים והסביבה"],
   [NATIONWIDE_WORK_AREA]: REGIONS.filter((r) => r !== "אחר"),
 };
 
+const ALL_WORK_AREA_LABELS: readonly string[] = [
+  ...WORK_AREA_OPTIONS,
+  LEGACY_COMBINED_SHFELA_JERUSALEM,
+];
+
 export function isWorkAreaLabel(value: string): value is WorkAreaLabel {
-  return (WORK_AREA_OPTIONS as readonly string[]).includes(value);
+  return ALL_WORK_AREA_LABELS.includes(value);
+}
+
+function coveringWorkAreas(area: string): string[] {
+  if (area === NATIONWIDE_WORK_AREA || area.includes(NATIONWIDE_WORK_AREA)) {
+    return [...WORK_AREA_OPTIONS];
+  }
+  if (area === LEGACY_COMBINED_SHFELA_JERUSALEM) {
+    return ["אזור שפלה", "אזור ירושלים", LEGACY_COMBINED_SHFELA_JERUSALEM];
+  }
+  return [area];
+}
+
+/** Maps stored / legacy work-area values onto the 6 visual region cards. */
+export function expandWorkAreasForCards(values: string[] | null | undefined): string[] {
+  const set = new Set<string>();
+  for (const raw of values ?? []) {
+    const v = raw.trim();
+    if (!v) continue;
+    if (v === NATIONWIDE_WORK_AREA || v.includes(NATIONWIDE_WORK_AREA)) {
+      for (const card of WORK_AREA_CARDS) set.add(card.stored);
+      continue;
+    }
+    if (v === LEGACY_COMBINED_SHFELA_JERUSALEM) {
+      set.add("אזור שפלה");
+      set.add("אזור ירושלים");
+      continue;
+    }
+    const match = WORK_AREA_CARDS.find(
+      (card) => card.stored === v || card.label === v || v === `אזור ${card.label}`,
+    );
+    if (match) set.add(match.stored);
+  }
+  return [...set];
 }
 
 export function workAreaOf(city: string | null | undefined): WorkAreaLabel | null {
@@ -245,10 +302,18 @@ export function splitWorkingAreas(values: string[] | null | undefined): {
 } {
   const selected: string[] = [];
   const legacy: string[] = [];
+  const pushUnique = (label: string) => {
+    if (!selected.includes(label)) selected.push(label);
+  };
   for (const raw of values ?? []) {
     const v = raw.trim();
     if (!v) continue;
-    if (isWorkAreaLabel(v)) selected.push(v);
+    if (v === LEGACY_COMBINED_SHFELA_JERUSALEM) {
+      pushUnique("אזור שפלה");
+      pushUnique("אזור ירושלים");
+      continue;
+    }
+    if (isWorkAreaLabel(v)) pushUnique(v);
     else legacy.push(v);
   }
   return { selected, legacy };
@@ -261,8 +326,9 @@ export function locationMatchesWorkAreas(location: string | null | undefined, ar
   if (!loc) return true;
   const locWorkArea = workAreaOf(loc);
   return areas.some((area) => {
+    const covered = coveringWorkAreas(area);
     if (area === loc || loc.includes(area) || area.includes(loc)) return true;
-    if (locWorkArea && area === locWorkArea) return true;
+    if (locWorkArea && (area === locWorkArea || covered.includes(locWorkArea))) return true;
     const areaWork = workAreaOf(area);
     return !!(locWorkArea && areaWork && locWorkArea === areaWork);
   });

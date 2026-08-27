@@ -21,5 +21,13 @@ export const Route = createFileRoute("/join")({
       { rel: "canonical", href: "https://goi-bot.lovable.app/join" },
     ],
   }),
-  component: JoinPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    ref: typeof s.ref === "string" && s.ref.trim() ? s.ref.trim() : undefined,
+  }),
+  component: JoinRoute,
 });
+
+function JoinRoute() {
+  const { ref } = Route.useSearch();
+  return <JoinPage referredBy={ref} />;
+}

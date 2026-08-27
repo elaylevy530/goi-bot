@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Coins,
   Copy,
-  Info,
   Share2,
   Store,
   Users,
@@ -51,10 +50,10 @@ type ReferralPayload = {
   };
 };
 
-function refCode(me?: { full_name?: string | null; whatsapp_phone?: string | null; id?: string } | null) {
-  const name = (me?.full_name || "").replace(/[^A-Za-zא-ת0-9]/g, "").slice(0, 8).toUpperCase();
-  const tail = (me?.whatsapp_phone || me?.id || "").replace(/\D/g, "").slice(-3) || "123";
-  return `${name || "GOI"}${tail}`;
+function referralToken(me?: { id?: string; referral_code?: unknown } | null) {
+  const code = typeof me?.referral_code === "string" ? me.referral_code.trim() : "";
+  if (code) return code;
+  return me?.id?.trim() || "";
 }
 
 function money(n: number) {
@@ -76,9 +75,9 @@ function SharePage() {
   const [tab, setTab] = useState<"courier" | "business">("courier");
   const [showAll, setShowAll] = useState(false);
   const [moreOpen, setMoreOpen] = useState(true);
-  const code = refCode(me);
+  const token = referralToken(me);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://goi.co.il";
-  const link = `${origin}/join?ref=${encodeURIComponent(code)}`;
+  const link = token ? `${origin}/join?ref=${encodeURIComponent(token)}` : `${origin}/join`;
 
   const { data } = useQuery({
     queryKey: ["courier-referrals", me?.id],
@@ -257,14 +256,6 @@ function SharePage() {
                 </div>
               </section>
             )}
-
-            <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-sm text-text">
-              <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <div>
-                <p className="font-extrabold">איך זה עובד?</p>
-                <p className="mt-1 text-text-subtle">אתה מרוויח על כל שליח: עד 150 ₪ | על כל עסק: עד 300 ₪</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

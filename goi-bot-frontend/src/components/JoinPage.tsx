@@ -169,7 +169,7 @@ function IdPhotoPicker({
   );
 }
 
-export function JoinPage() {
+export function JoinPage({ referredBy }: { referredBy?: string }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -251,6 +251,9 @@ export function JoinPage() {
         consent_whatsapp: consent,
         password: password || null,
         courier_kind: kind ?? "courier",
+        ...(referredBy
+          ? { referred_by: referredBy, referral_code: referredBy }
+          : {}),
       });
     },
     onSuccess: async (res) => {

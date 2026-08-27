@@ -19,6 +19,7 @@ import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { cn } from "@/lib/utils";
@@ -280,29 +281,27 @@ function PerformancePage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
           <div className="mx-auto flex max-w-lg flex-col gap-4">
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {tabs.map((tab) => {
-                const active = period === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => {
-                      setPeriod(tab.key);
-                      setShowAll(false);
-                    }}
-                    className={cn(
-                      "min-h-11 shrink-0 rounded-pill border px-4 text-sm font-bold transition-colors",
-                      active
-                        ? "border-primary bg-surface text-primary"
-                        : "border-transparent bg-muted text-text-strong",
-                    )}
-                  >
+            <Select
+              value={period}
+              onValueChange={(value) => {
+                setPeriod(value as Period);
+                setShowAll(false);
+              }}
+            >
+              <SelectTrigger
+                aria-label="בחירת תקופה"
+                className="min-h-11 w-full rounded-card border-border bg-surface text-sm font-bold text-text-strong shadow-card"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent dir="rtl" className="text-right">
+                {tabs.map((tab) => (
+                  <SelectItem key={tab.key} value={tab.key} className="text-right font-bold">
                     {tab.label}
-                  </button>
-                );
-              })}
-            </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {period === "custom" && (
               <div className="grid grid-cols-2 gap-3 rounded-card border border-border bg-surface p-4 shadow-card">
