@@ -138,6 +138,9 @@ export class AccountsService implements OnModuleInit {
       `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS invoice_name varchar(255)`,
     );
     await this.dataSource.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_revoked_at timestamptz`,
+    );
+    await this.dataSource.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS IDX_couriers_referral_code ON couriers (referral_code)`,
     );
     await this.dataSource.query(
@@ -350,6 +353,10 @@ export class AccountsService implements OnModuleInit {
     if (linkedUserId) {
       await this.dataSource.query(
         `DELETE FROM user_roles WHERE user_id = $1 AND role = 'courier'`,
+        [linkedUserId],
+      );
+      await this.dataSource.query(
+        `UPDATE users SET auth_revoked_at = now() WHERE id = $1`,
         [linkedUserId],
       );
     }

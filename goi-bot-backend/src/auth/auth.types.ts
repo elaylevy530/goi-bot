@@ -16,6 +16,8 @@ export type JwtPreviewClaim = {
 export type JwtPayload = {
   sub: string;
   email: string;
+  /** Seconds since epoch — set by `@nestjs/jwt` on sign. */
+  iat?: number;
   preview?: JwtPreviewClaim;
 };
 

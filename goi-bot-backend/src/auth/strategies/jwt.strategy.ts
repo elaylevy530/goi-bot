@@ -30,6 +30,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException("Unauthorized: Invalid token");
     }
 
+    if (!payload.preview) {
+      await this.authService.assertTokenNotRevoked(payload.sub, payload.iat);
+    }
+
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) ?? "";
     const realRoles = await this.authService.loadRoles(payload.sub);
 

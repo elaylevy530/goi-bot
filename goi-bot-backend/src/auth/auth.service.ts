@@ -185,6 +185,11 @@ export class AuthService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    const roles = await this.loadRoles(user.id);
+    if (roles.length === 0) {
+      throw new UnauthorizedException("החשבון נסגר");
+    }
+
     return this.issueSession(user);
   }
 
@@ -876,6 +881,25 @@ export class AuthService {
   /** Public helper for Accounts/WhatsApp modules. */
   async createUserWithPassword(email: string, password: string): Promise<User> {
     return this.createUser(email, password);
+  }
+
+  /**
+   * Reject a JWT minted before `users.auth_revoked_at`.
+   * Preview tokens skip this — closing a courier must not log out the admin.
+   */
+  async assertTokenNotRevoked(userId: string, iat?: number): Promise<void> {
+    const user = await this.users.findOne({
+      where: { id: userId },
+      select: ["id", "auth_revoked_at"],
+    });
+    if (!user) {
+      throw new UnauthorizedException("Unauthorized: Invalid token");
+    }
+    if (!user.auth_revoked_at) return;
+    const issuedAtMs = iat == null ? 0 : iat * 1000;
+    if (issuedAtMs < user.auth_revoked_at.getTime()) {
+      throw new UnauthorizedException("Unauthorized: Invalid token");
+    }
   }
 
   async loadRoles(userId: string): Promise<AppRole[]> {
