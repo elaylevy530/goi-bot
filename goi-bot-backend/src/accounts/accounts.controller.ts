@@ -43,6 +43,12 @@ export class AccountsController {
     return this.accounts.getMyCourier(auth.userId);
   }
 
+  @Get("couriers/me/referrals")
+  @UseGuards(JwtAuthGuard)
+  myCourierReferrals(@CurrentUser() auth: AuthUserContext) {
+    return this.accounts.getMyReferrals(auth.userId);
+  }
+
   @Patch("couriers/me")
   @UseGuards(JwtAuthGuard)
   updateMyCourier(

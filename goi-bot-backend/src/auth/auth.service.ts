@@ -12,6 +12,11 @@ import * as bcrypt from "bcrypt";
 import { createHash, randomInt } from "crypto";
 import { IsNull, MoreThan, Repository } from "typeorm";
 import { Courier } from "../accounts/entities/courier.entity";
+import {
+  allocateReferralCode,
+  ensureCourierReferralCode,
+  findCourierByReferralToken,
+} from "../accounts/referral-code";
 import { CourierPasswordReset } from "../accounts/entities/courier-password-reset.entity";
 import { Customer } from "../accounts/entities/customer.entity";
 import { User } from "../accounts/entities/user.entity";
@@ -218,8 +223,11 @@ export class AuthService {
 
   async getMyCourier(userId: string): Promise<Courier | null> {
     const id = previewCourierId();
-    if (id) return this.couriers.findOne({ where: { id } });
-    return this.couriers.findOne({ where: { user_id: userId } });
+    const courier = id
+      ? await this.couriers.findOne({ where: { id } })
+      : await this.couriers.findOne({ where: { user_id: userId } });
+    if (!courier) return null;
+    return ensureCourierReferralCode(this.couriers, courier);
   }
 
   async updateMyCustomerName(userId: string, fullName: string) {
@@ -530,6 +538,9 @@ export class AuthService {
     courier.user_id = userId;
     courier.last_temp_password = tempPassword;
     courier.password_set_at = new Date();
+    if (!courier.referral_code) {
+      courier.referral_code = await allocateReferralCode(this.couriers);
+    }
     await this.couriers.save(courier);
     await this.ensureRole(userId, "courier");
 
@@ -617,7 +628,10 @@ export class AuthService {
       idPhotoBackUrl = uploaded.path;
     }
 
-    const referralLead = dto.referred_by?.trim() || dto.referral_code?.trim();
+    const referralLead = dto.referred_by?.trim() || dto.referral_code?.trim() || "";
+    const referrer = referralLead
+      ? await findCourierByReferralToken(this.couriers, referralLead)
+      : null;
     const courier = await this.couriers.save(
       this.couriers.create({
         full_name: dto.full_name.trim(),
@@ -630,6 +644,8 @@ export class AuthService {
         availability: [],
         courier_status: "ממתין לאישור",
         lead_source: referralLead ? `referral:${referralLead}` : "טופס /join",
+        referral_code: await allocateReferralCode(this.couriers),
+        referred_by_courier_id: referrer?.id ?? null,
         id_number: dto.id_number || null,
         id_photo_url: idPhotoUrl,
         id_photo_back_url: idPhotoBackUrl,

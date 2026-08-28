@@ -133,6 +133,14 @@ export class Courier {
   @Column({ type: "varchar", length: 128, nullable: true })
   lead_source!: string | null;
 
+  @Index({ unique: true })
+  @Column({ type: "varchar", length: 16, nullable: true })
+  referral_code!: string | null;
+
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  referred_by_courier_id!: string | null;
+
   @Column({ type: "varchar", length: 64, nullable: true })
   id_number!: string | null;
 

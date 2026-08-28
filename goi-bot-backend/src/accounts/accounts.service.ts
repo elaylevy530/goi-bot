@@ -3,9 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
+import {
+  allocateReferralCode,
+  ensureCourierReferralCode,
+} from "./referral-code";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import { normalizePhone } from "../auth/phone.util";
 import { Job } from "../jobs/entities/job.entity";
@@ -24,8 +29,33 @@ export type SenderClassification =
   | { kind: "business"; id: string; user_id: string | null }
   | { kind: "unknown"; phone: string };
 
+export type CourierReferralRow = {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  vehicle_type: string | null;
+  status: string;
+  created_at: Date;
+  jobs_completed: number;
+  your_profit: number;
+  kind: "courier" | "business";
+};
+
+export type CourierReferralsPayload = {
+  couriers: CourierReferralRow[];
+  businesses: CourierReferralRow[];
+  totals: {
+    couriers_registered: number;
+    couriers_active: number;
+    businesses_registered: number;
+    businesses_active: number;
+    profit: number;
+    pending: number;
+  };
+};
+
 @Injectable()
-export class AccountsService {
+export class AccountsService implements OnModuleInit {
   constructor(
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
@@ -72,6 +102,31 @@ export class AccountsService {
 
   // ---- Courier self-service ----
 
+  async onModuleInit() {
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS referral_code varchar(16)`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS referred_by_courier_id uuid`,
+    );
+    await this.dataSource.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS IDX_couriers_referral_code ON couriers (referral_code)`,
+    );
+    await this.dataSource.query(
+      `CREATE INDEX IF NOT EXISTS IDX_couriers_referred_by_courier_id ON couriers (referred_by_courier_id)`,
+    );
+
+    const missing = await this.couriers.find({
+      where: { referral_code: IsNull() },
+      select: ["id"],
+    });
+    for (const row of missing) {
+      await this.couriers.update(row.id, {
+        referral_code: await allocateReferralCode(this.couriers),
+      });
+    }
+  }
+
   async getMyCourier(userId: string): Promise<Courier> {
     const previewId = previewCourierId();
     const courier = previewId
@@ -80,7 +135,77 @@ export class AccountsService {
     if (!courier) {
       throw new NotFoundException("Courier profile not found");
     }
-    return courier;
+    return ensureCourierReferralCode(this.couriers, courier);
+  }
+
+  async getMyReferrals(userId: string): Promise<CourierReferralsPayload> {
+    const me = await this.getMyCourier(userId);
+    const leadSources = new Set<string>([`referral:${me.id}`]);
+    if (me.referral_code) {
+      leadSources.add(`referral:${me.referral_code}`);
+      leadSources.add(`referral:${me.referral_code.toLowerCase()}`);
+    }
+
+    const referred = await this.couriers.find({
+      where: [
+        { referred_by_courier_id: me.id },
+        { lead_source: In([...leadSources]) },
+      ],
+      order: { created_at: "DESC" },
+    });
+
+    const seen = new Set<string>();
+    const unique = referred.filter((c) => {
+      if (c.id === me.id || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+
+    const jobsByCourier = await this.completedJobsByCourier(unique.map((c) => c.id));
+    const couriers: CourierReferralRow[] = unique.map((c) => ({
+      id: c.id,
+      full_name: c.full_name,
+      avatar_url: c.avatar_url,
+      vehicle_type: c.vehicle_type,
+      status: c.courier_status,
+      created_at: c.created_at,
+      jobs_completed: jobsByCourier.get(c.id) ?? 0,
+      your_profit: 0,
+      kind: "courier",
+    }));
+
+    const couriersActive = couriers.filter((c) => c.status === "פעיל").length;
+    return {
+      couriers,
+      businesses: [],
+      totals: {
+        couriers_registered: couriers.length,
+        couriers_active: couriersActive,
+        businesses_registered: 0,
+        businesses_active: 0,
+        profit: 0,
+        pending: 0,
+      },
+    };
+  }
+
+  private async completedJobsByCourier(ids: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (ids.length === 0) return map;
+    const rows = await this.dataSource
+      .createQueryBuilder()
+      .select("o.courier_id", "courier_id")
+      .addSelect("COUNT(*)::int", "n")
+      .from("job_outcomes", "o")
+      .where("o.courier_id IN (:...ids)", { ids })
+      .andWhere("o.delivered_at IS NOT NULL")
+      .andWhere("o.was_cancelled = false")
+      .groupBy("o.courier_id")
+      .getRawMany<{ courier_id: string; n: string | number }>();
+    for (const row of rows) {
+      map.set(row.courier_id, Number(row.n) || 0);
+    }
+    return map;
   }
 
   async updateMyCourier(userId: string, dto: UpdateCourierSelfDto): Promise<Courier> {
@@ -170,6 +295,7 @@ export class AccountsService {
         notes: dto.notes ?? null,
         courier_kind: dto.courier_kind === "mover" ? "mover" : "courier",
         accepting_jobs: false,
+        referral_code: await allocateReferralCode(this.couriers),
       }),
     );
   }
