@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { nestUpdateMyCourier } from "@/lib/nest-accounts";
+import {
+  nestListMyCourierDocuments,
+  nestUpdateMyCourier,
+  nestUpdateMyCourierDocument,
+} from "@/lib/nest-accounts";
 import { nestUploadFile } from "@/lib/nest-files";
 import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
 import { splitWorkingAreas, WORK_AREA_REQUIRED_ERROR } from "@/lib/regions";
 import { useCourierAvatarUrl } from "@/hooks/useCourierAvatarUrl";
-import { courierInitials } from "@/lib/courier-session";
-import { Loader2, Save, Camera, User, Bike, FileText, ChevronRight } from "lucide-react";
+import { COURIER_DOCUMENT_TYPES, courierInitials } from "@/lib/courier-session";
+import { Loader2, Save, Camera, User, Bike, FileText, ChevronRight, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/courier/profile/edit")({
@@ -41,15 +45,28 @@ function EditProfilePage() {
   const [legacyAreas, setLegacyAreas] = useState<string[]>([]);
   const [areasError, setAreasError] = useState<string | null>(null);
   const [vehicle, setVehicle] = useState("");
+  const [vehicleLabel, setVehicleLabel] = useState("");
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [vehicleYear, setVehicleYear] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [invoiceName, setInvoiceName] = useState("");
   const [jobTypes, setJobTypes] = useState("");
   const [experience, setExperience] = useState("");
   const [notes, setNotes] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [idFile, setIdFile] = useState<File | null>(null);
+  const [docFiles, setDocFiles] = useState<Record<string, File | null>>({});
+  const [docExpiry, setDocExpiry] = useState<Record<string, string>>({});
 
   const avatarPath = (me as { avatar_url?: string | null } | undefined)?.avatar_url;
   const { data: signedAvatarUrl } = useCourierAvatarUrl(me?.id, avatarPath);
+  const { data: documents = [] } = useQuery({
+    queryKey: ["my-courier-documents", me?.id],
+    enabled: !!me?.id,
+    queryFn: nestListMyCourierDocuments,
+  });
 
   useEffect(() => {
     if (!me) return;
@@ -61,6 +78,12 @@ function EditProfilePage() {
       base_city?: string | null;
       working_areas?: string[] | null;
       vehicle_type?: string | null;
+      vehicle_label?: string | null;
+      vehicle_plate?: string | null;
+      vehicle_year?: number | null;
+      business_type?: string | null;
+      tax_id?: string | null;
+      invoice_name?: string | null;
       job_types?: string[] | null;
       courier_experience_duration?: string | null;
       notes?: string | null;
@@ -75,10 +98,27 @@ function EditProfilePage() {
     setLegacyAreas(areas.legacy);
     setAreasError(null);
     setVehicle(row.vehicle_type ?? "");
+    setVehicleLabel(row.vehicle_label ?? "");
+    setVehiclePlate(row.vehicle_plate ?? "");
+    setVehicleYear(row.vehicle_year != null ? String(row.vehicle_year) : "");
+    setBusinessType(row.business_type ?? "");
+    setTaxId(row.tax_id ?? "");
+    setInvoiceName(row.invoice_name ?? "");
     setJobTypes((row.job_types ?? []).join(", "));
     setExperience(row.courier_experience_duration ?? "");
     setNotes(row.notes ?? "");
   }, [me]);
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const meta of COURIER_DOCUMENT_TYPES) {
+      const row = documents.find((doc) => doc.type === meta.type);
+      const raw = row?.expires_at ? String(row.expires_at) : "";
+      const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+      next[meta.type] = match?.[1] ?? "";
+    }
+    setDocExpiry(next);
+  }, [documents]);
 
   const onPickAvatar = (f: File | null) => {
     setAvatarFile(f);
@@ -104,6 +144,17 @@ function EditProfilePage() {
         setAreasError(WORK_AREA_REQUIRED_ERROR);
         throw new Error(WORK_AREA_REQUIRED_ERROR);
       }
+      const yearTrim = vehicleYear.trim();
+      let yearValue: number | null = null;
+      if (yearTrim) {
+        const parsed = Number(yearTrim);
+        const maxYear = new Date().getFullYear() + 1;
+        if (!Number.isInteger(parsed) || parsed < 1980 || parsed > maxYear) {
+          throw new Error(`שנת ייצור חייבת להיות בין 1980 ל-${maxYear}`);
+        }
+        yearValue = parsed;
+      }
+
       const payload: Record<string, unknown> = {
         full_name: fullName,
         email: email || null,
@@ -111,6 +162,12 @@ function EditProfilePage() {
         base_city: baseCity || null,
         working_areas: workingAreas.length > 0 ? workingAreas : legacyAreas,
         vehicle_type: vehicle || null,
+        vehicle_label: vehicleLabel.trim() || null,
+        vehicle_plate: vehiclePlate.trim() || null,
+        vehicle_year: yearValue,
+        business_type: businessType || null,
+        tax_id: taxId.trim() || null,
+        invoice_name: invoiceName.trim() || null,
         job_types: jobTypes.split(",").map((s) => s.trim()).filter(Boolean),
         courier_experience_duration: experience.trim().slice(0, 60) || null,
         notes: notes || null,
@@ -122,14 +179,32 @@ function EditProfilePage() {
       }
 
       await nestUpdateMyCourier(payload);
+
+      for (const meta of COURIER_DOCUMENT_TYPES) {
+        const file = docFiles[meta.type];
+        const expiry = (docExpiry[meta.type] ?? "").trim();
+        const existing = documents.find((doc) => doc.type === meta.type);
+        const existingExpiry = String(existing?.expires_at ?? "").slice(0, 10);
+        const expiryChanged = expiry !== (existingExpiry.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? "");
+        if (!file && !expiryChanged) continue;
+        const body: { file_url?: string | null; expires_at?: string | null } = {};
+        if (file) {
+          const uploaded = await nestUploadFile("courier-documents", file);
+          body.file_url = uploaded.path;
+        }
+        if (expiryChanged) body.expires_at = expiry || null;
+        await nestUpdateMyCourierDocument(meta.type, body);
+      }
     },
     onSuccess: () => {
       toast.success("הפרופיל עודכן ✓");
       setAvatarFile(null);
       setAvatarPreview(null);
       setIdFile(null);
+      setDocFiles({});
       qc.invalidateQueries({ queryKey: ["my-courier-me"] });
       qc.invalidateQueries({ queryKey: ["courier-avatar-signed"] });
+      qc.invalidateQueries({ queryKey: ["my-courier-documents"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -238,9 +313,32 @@ function EditProfilePage() {
               )}
             </div>
             <div><Label className="text-end block mb-1">כלי עבודה</Label><Input value={vehicle} onChange={(e) => setVehicle(e.target.value)} className="text-end" placeholder="קטנוע / רכב / אופניים חשמליים" /></div>
+            <div><Label className="text-end block mb-1">דגם / תווית רכב</Label><Input value={vehicleLabel} onChange={(e) => setVehicleLabel(e.target.value)} className="text-end" placeholder="לדוגמה: סקודה אוקטביה" /></div>
+            <div><Label className="text-end block mb-1">מספר רישוי</Label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} className="text-end" dir="ltr" /></div>
+            <div><Label className="text-end block mb-1">שנת ייצור</Label><Input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} className="text-end" dir="ltr" inputMode="numeric" /></div>
             <div><Label className="text-end block mb-1">סוגי עבודות</Label><Input value={jobTypes} onChange={(e) => setJobTypes(e.target.value)} className="text-end" placeholder="אוכל, חבילות, מסמכים" /></div>
             <div><Label className="text-end block mb-1">ניסיון</Label><Input value={experience} onChange={(e) => setExperience(e.target.value)} className="text-end" placeholder="לדוגמה: שנתיים" maxLength={60} /></div>
             <div><Label className="text-end block mb-1">הערות</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="text-end" rows={2} /></div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <CardContent className="p-5 space-y-3">
+            <SectionTitle icon={Shield} title="פרטי עוסק" />
+            <div>
+              <Label className="text-end block mb-1">סוג עוסק</Label>
+              <select
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-end"
+              >
+                <option value="">לא נבחר</option>
+                <option value="עוסק פטור">עוסק פטור</option>
+                <option value="עוסק מורשה">עוסק מורשה</option>
+              </select>
+            </div>
+            <div><Label className="text-end block mb-1">מספר עוסק / ח.פ.</Label><Input value={taxId} onChange={(e) => setTaxId(e.target.value)} className="text-end" dir="ltr" /></div>
+            <div><Label className="text-end block mb-1">שם לחשבונית</Label><Input value={invoiceName} onChange={(e) => setInvoiceName(e.target.value)} className="text-end" /></div>
           </CardContent>
         </Card>
 
@@ -259,6 +357,41 @@ function EditProfilePage() {
                 <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setIdFile(e.target.files?.[0] ?? null)} />
               </label>
             </div>
+            {COURIER_DOCUMENT_TYPES.map((meta) => {
+              const existing = documents.find((doc) => doc.type === meta.type);
+              return (
+                <div key={meta.type} className="space-y-2 rounded-xl border border-slate-100 p-3">
+                  <Label className="text-end block">{meta.label}</Label>
+                  <label className="flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl p-3 cursor-pointer hover:border-[#35AD29]">
+                    <Camera className="size-4" />
+                    <span className="text-sm">
+                      {docFiles[meta.type]?.name
+                        ?? (existing?.file_url ? "קובץ קיים — ניתן להחליף" : "העלה תמונה / PDF")}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      onChange={(e) =>
+                        setDocFiles((prev) => ({ ...prev, [meta.type]: e.target.files?.[0] ?? null }))
+                      }
+                    />
+                  </label>
+                  <div>
+                    <Label className="text-end block mb-1 text-xs text-slate-500">תוקף</Label>
+                    <Input
+                      type="date"
+                      value={docExpiry[meta.type] ?? ""}
+                      onChange={(e) =>
+                        setDocExpiry((prev) => ({ ...prev, [meta.type]: e.target.value }))
+                      }
+                      className="text-end"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 

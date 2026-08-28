@@ -88,6 +88,42 @@ export function nestUpdateMyCourier(body: Record<string, unknown>) {
   });
 }
 
+export type NestCourierDocument = {
+  id?: string | null;
+  courier_id: string;
+  type: string;
+  file_url: string | null;
+  expires_at: string | Date | null;
+  verified?: boolean;
+};
+
+export function nestListMyCourierDocuments() {
+  return apiFetch<NestCourierDocument[]>("/api/accounts/couriers/me/documents", {
+    accessToken: token(),
+  });
+}
+
+export function nestUpdateMyCourierDocument(
+  type: string,
+  body: { file_url?: string | null; expires_at?: string | null },
+) {
+  return apiFetch<NestCourierDocument>(
+    `/api/accounts/couriers/me/documents/${encodeURIComponent(type)}`,
+    {
+      method: "PATCH",
+      accessToken: token(),
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function nestCloseMyCourier() {
+  return apiFetch<{ ok: true }>("/api/accounts/couriers/me/close", {
+    method: "POST",
+    accessToken: token(),
+  });
+}
+
 export function nestListCustomers(params?: { status?: string; limit?: number }) {
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);

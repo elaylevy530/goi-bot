@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,13 +20,20 @@ import {
   ChevronLeft,
   Pen,
   Loader2,
+  Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { useCourierAvatarUrl } from "@/hooks/useCourierAvatarUrl";
 import { useMyCourierLiveStats } from "@/hooks/useMyCourierLiveStats";
 import {
+  nestListMyCourierDocuments,
+  type NestCourierDocument,
+} from "@/lib/nest-accounts";
+import { nestSignedFileUrlResolved } from "@/lib/nest-files";
+import {
   type CourierSelfRow,
+  COURIER_DOCUMENT_TYPES,
   courierActiveStatus,
   courierInitials,
   displayOrDash,
@@ -43,6 +51,11 @@ function MyProfilePage() {
   const me = meRaw as CourierSelfRow | null | undefined;
   const { data: avatarUrl } = useCourierAvatarUrl(me?.id, me?.avatar_url);
   const stats = useMyCourierLiveStats(me?.id);
+  const { data: documents = [] } = useQuery({
+    queryKey: ["my-courier-documents", me?.id],
+    enabled: !!me?.id,
+    queryFn: nestListMyCourierDocuments,
+  });
   const status = courierActiveStatus(me, terms.worker);
   const workAreas = formatCourierWorkAreas(me);
   const verified = me?.bank_details_verified === true;
@@ -204,6 +217,9 @@ function MyProfilePage() {
             <DetailRow icon={Phone} label="טלפון" value={displayOrDash(me.whatsapp_phone)} />
             <DetailRow icon={Mail} label="אימייל" value={displayOrDash(me.email)} />
             <DetailRow icon={User} label="שם מלא" value={displayOrDash(me.full_name)} />
+            {me.courier_number?.trim() ? (
+              <DetailRow icon={Hash} label="מספר שליח" value={me.courier_number.trim()} />
+            ) : null}
           </Card>
         </div>
 
@@ -222,24 +238,7 @@ function MyProfilePage() {
             </Link>
           </div>
           <Card className="p-4">
-            {me.vehicle_type || me.vehicle_label ? (
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div>
-                  <div className="text-xs text-slate-500 mb-1">סוג רכב</div>
-                  <div className="text-sm font-bold text-slate-900">
-                    {displayOrDash(me.vehicle_type)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 mb-1">רכב</div>
-                  <div className="text-sm font-bold text-slate-900">
-                    {displayOrDash(me.vehicle_label)}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <EmptyHint to="/courier/profile/edit" action="הוספת פרטי רכב" />
-            )}
+            <VehicleGrid me={me} />
           </Card>
         </div>
 
@@ -258,7 +257,7 @@ function MyProfilePage() {
             </Link>
           </div>
           <Card className="p-4">
-            <EmptyHint to="/courier/profile/edit" action="העלאת מסמכים בפרופיל" />
+            <DocumentsGrid documents={documents} />
           </Card>
         </div>
 
@@ -277,7 +276,7 @@ function MyProfilePage() {
             </Link>
           </div>
           <Card className="p-4">
-            <EmptyHint to="/courier/profile/edit" action="עריכת פרטים בפרופיל" />
+            <OsekBlock me={me} />
           </Card>
         </div>
 
@@ -347,6 +346,121 @@ function EmptyHint({
         {action}
         <ChevronLeft className="size-4" />
       </Link>
+    </div>
+  );
+}
+
+function VehicleGrid({ me }: { me: CourierSelfRow }) {
+  const cells = [
+    { label: "סוג רכב", value: me.vehicle_type },
+    { label: "רכב", value: me.vehicle_label },
+    { label: "מספר רישוי", value: me.vehicle_plate },
+    {
+      label: "שנת ייצור",
+      value: me.vehicle_year != null ? String(me.vehicle_year) : null,
+    },
+  ].filter((cell) => cell.value?.toString().trim());
+
+  if (cells.length === 0) {
+    return <EmptyHint to="/courier/profile/edit" action="הוספת פרטי רכב" />;
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-4 text-center">
+      {cells.map((cell) => (
+        <div key={cell.label}>
+          <div className="text-xs text-slate-500 mb-1">{cell.label}</div>
+          <div className="text-sm font-bold text-slate-900">{cell.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatDocExpiry(raw?: string | Date | null) {
+  if (!raw) return null;
+  const match = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("he-IL");
+}
+
+function DocumentsGrid({ documents }: { documents: NestCourierDocument[] }) {
+  const byType = new Map(documents.map((doc) => [doc.type, doc]));
+  const hasAny = documents.some((doc) => doc.file_url || doc.expires_at);
+  if (!hasAny) {
+    return <EmptyHint to="/courier/profile/edit" action="העלאת מסמכים בפרופיל" />;
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {COURIER_DOCUMENT_TYPES.map((meta) => {
+        const row = byType.get(meta.type);
+        const expiry = formatDocExpiry(row?.expires_at ?? null);
+        return (
+          <div
+            key={meta.type}
+            className="rounded-xl border border-slate-100 p-3 text-end space-y-1"
+          >
+            <div className="text-sm font-bold text-slate-900">{meta.label}</div>
+            {row?.file_url ? (
+              <DocumentFileLink path={row.file_url} />
+            ) : (
+              <div className="text-xs text-slate-500">טרם הועלה</div>
+            )}
+            {expiry ? (
+              <div className="text-xs text-slate-500">בתוקף עד {expiry}</div>
+            ) : null}
+            {row?.verified ? (
+              <div className="text-xs font-semibold text-green-700">מאומת</div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DocumentFileLink({ path }: { path: string }) {
+  const { data: url, isPending } = useQuery({
+    queryKey: ["courier-document-signed", path],
+    queryFn: () => nestSignedFileUrlResolved("courier-documents", path, 60 * 60),
+    staleTime: 1000 * 60 * 20,
+  });
+  if (isPending) return <div className="text-xs text-slate-500">הועלה</div>;
+  if (!url) return <div className="text-xs text-slate-500">הועלה</div>;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="text-green-600 text-xs font-semibold"
+    >
+      צפייה במסמך
+    </a>
+  );
+}
+
+function OsekBlock({ me }: { me: CourierSelfRow }) {
+  const rows = [
+    { label: "סוג עוסק", value: me.business_type },
+    { label: "מספר עוסק / ח.פ.", value: me.tax_id },
+    { label: "שם לחשבונית", value: me.invoice_name },
+  ].filter((row) => row.value?.trim());
+
+  if (rows.length === 0) {
+    return <EmptyHint to="/courier/profile/edit" action="עריכת פרטים בפרופיל" />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => (
+        <div key={row.label} className="text-end">
+          <div className="text-xs text-slate-500 mb-0.5">{row.label}</div>
+          <div className="text-sm font-semibold text-slate-900">{row.value}</div>
+        </div>
+      ))}
     </div>
   );
 }

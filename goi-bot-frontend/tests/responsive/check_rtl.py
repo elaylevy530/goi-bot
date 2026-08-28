@@ -31,7 +31,7 @@ ROUTES = [
     "/courier/share",
     "/courier/ratings",
     "/courier/profile",
-    "/courier/settings",
+    "/courier/account-settings",
 ]
 
 VIEWPORTS = [

@@ -76,6 +76,14 @@ export type NestCourierProfile = Record<string, unknown> & {
   courier_status?: string;
   courier_kind?: string | null;
   referral_code?: string | null;
+  courier_number?: string | null;
+  vehicle_type?: string | null;
+  vehicle_label?: string | null;
+  vehicle_plate?: string | null;
+  vehicle_year?: number | null;
+  business_type?: string | null;
+  tax_id?: string | null;
+  invoice_name?: string | null;
 };
 
 /** Normalize Israeli phone digits to 972… (shared with Nest). */

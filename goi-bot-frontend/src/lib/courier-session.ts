@@ -10,13 +10,28 @@ export type CourierSelfRow = {
   courier_status?: string | null;
   accepting_jobs?: boolean | null;
   is_paused?: boolean | null;
+  courier_number?: string | null;
   vehicle_type?: string | null;
   vehicle_label?: string | null;
+  vehicle_plate?: string | null;
+  vehicle_year?: number | null;
   working_areas?: string[] | null;
   base_city?: string | null;
   bank_details_verified?: boolean | null;
   invoice_status?: string | null;
+  business_type?: string | null;
+  tax_id?: string | null;
+  invoice_name?: string | null;
 };
+
+export const COURIER_DOCUMENT_TYPES = [
+  { type: "driver_license", label: "רישיון נהיגה" },
+  { type: "vehicle_license", label: "רישיון רכב" },
+  { type: "insurance", label: "ביטוח חובה" },
+  { type: "comprehensive_insurance", label: "ביטוח מקיף" },
+] as const;
+
+export type CourierDocumentType = (typeof COURIER_DOCUMENT_TYPES)[number]["type"];
 
 export function courierInitials(name?: string | null) {
   if (!name) return "ש";

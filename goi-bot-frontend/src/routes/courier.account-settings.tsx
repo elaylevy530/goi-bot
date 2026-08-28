@@ -22,10 +22,12 @@ import {
   Headphones,
   KeyRound,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { nestUpdatePassword } from "@/lib/nest-auth";
+import { nestUpdatePassword, isNestPreviewReadOnly } from "@/lib/nest-auth";
+import { nestCloseMyCourier } from "@/lib/nest-accounts";
 import { signOutCourierSession } from "@/lib/courier-session";
 import {
   disablePushForCourier,
@@ -63,6 +65,8 @@ function AccountSettingsPage() {
   const qc = useQueryClient();
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwd, setPwd] = useState("");
+  const [closeOpen, setCloseOpen] = useState(false);
+  const preview = isNestPreviewReadOnly();
 
   const changePwd = useMutation({
     mutationFn: async () => {
@@ -81,6 +85,17 @@ function AccountSettingsPage() {
     const to = await signOutCourierSession(qc);
     navigate({ to, replace: true });
   };
+
+  const closeAccount = useMutation({
+    mutationFn: nestCloseMyCourier,
+    onSuccess: async () => {
+      toast.success("החשבון נסגר");
+      setCloseOpen(false);
+      const to = await signOutCourierSession(qc);
+      navigate({ to, replace: true });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   if (isPending) {
     return (
@@ -219,6 +234,27 @@ function AccountSettingsPage() {
           </div>
         ))}
 
+        {!preview && (
+          <div className="bg-white rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setCloseOpen(true)}
+              className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-right"
+            >
+              <ChevronLeft className="size-5 text-slate-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-semibold text-red-600 mb-0.5">מחיקת חשבון</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  סגירת החשבון לצמיתות וניתוק מהמערכת
+                </p>
+              </div>
+              <div className="size-10 rounded-full flex items-center justify-center shrink-0 bg-red-50">
+                <Trash2 className="size-5 text-red-600" />
+              </div>
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col items-center justify-center gap-2 pt-4 pb-2">
           <div className="flex items-center gap-1">
             <span className="text-2xl font-bold text-slate-900">GO!</span>
@@ -261,6 +297,34 @@ function AccountSettingsPage() {
                 <KeyRound className="size-4" />
               )}
               עדכן סיסמה
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+        <DialogContent dir="rtl" className="text-right">
+          <DialogHeader>
+            <DialogTitle>מחיקת חשבון</DialogTitle>
+            <DialogDescription>
+              פעולה זו אינה הפיכה. החשבון ייסגר ותנותק מהמערכת. היסטוריית העבודות לא תימחק.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloseOpen(false)}>
+              ביטול
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => closeAccount.mutate()}
+              disabled={closeAccount.isPending}
+            >
+              {closeAccount.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              מחיקת חשבון
             </Button>
           </DialogFooter>
         </DialogContent>

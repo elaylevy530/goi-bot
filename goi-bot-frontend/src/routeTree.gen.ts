@@ -85,18 +85,19 @@ import { Route as BusinessSupportRouteImport } from './routes/business.support'
 import { Route as BusinessTeamRouteImport } from './routes/business.team'
 import { Route as BusinessWalletRouteImport } from './routes/business.wallet'
 import { Route as CourierAcceptedJobsRouteImport } from './routes/courier.accepted-jobs'
+import { Route as CourierAccountSettingsRouteImport } from './routes/courier.account-settings'
 import { Route as CourierActiveRouteImport } from './routes/courier.active'
 import { Route as CourierAvailabilityRouteImport } from './routes/courier.availability'
 import { Route as CourierDashboardRouteImport } from './routes/courier.dashboard'
 import { Route as CourierHistoryRouteImport } from './routes/courier.history'
 import { Route as CourierMessagesRouteImport } from './routes/courier.messages'
+import { Route as CourierMyProfileRouteImport } from './routes/courier.my-profile'
 import { Route as CourierMyQuotesRouteImport } from './routes/courier.my-quotes'
 import { Route as CourierNewJobsRouteImport } from './routes/courier.new-jobs'
 import { Route as CourierNotificationsRouteImport } from './routes/courier.notifications'
 import { Route as CourierPerformanceRouteImport } from './routes/courier.performance'
 import { Route as CourierProfileRouteImport } from './routes/courier.profile'
 import { Route as CourierRatingsRouteImport } from './routes/courier.ratings'
-import { Route as CourierSettingsRouteImport } from './routes/courier.settings'
 import { Route as CourierShareRouteImport } from './routes/courier.share'
 import { Route as CourierWalletRouteImport } from './routes/courier.wallet'
 import { Route as CustomerAccountRouteImport } from './routes/customer.account'
@@ -524,6 +525,11 @@ const CourierAcceptedJobsRoute = CourierAcceptedJobsRouteImport.update({
   path: '/accepted-jobs',
   getParentRoute: () => CourierRoute,
 } as any)
+const CourierAccountSettingsRoute = CourierAccountSettingsRouteImport.update({
+  id: '/account-settings',
+  path: '/account-settings',
+  getParentRoute: () => CourierRoute,
+} as any)
 const CourierActiveRoute = CourierActiveRouteImport.update({
   id: '/active',
   path: '/active',
@@ -547,6 +553,11 @@ const CourierHistoryRoute = CourierHistoryRouteImport.update({
 const CourierMessagesRoute = CourierMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
+  getParentRoute: () => CourierRoute,
+} as any)
+const CourierMyProfileRoute = CourierMyProfileRouteImport.update({
+  id: '/my-profile',
+  path: '/my-profile',
   getParentRoute: () => CourierRoute,
 } as any)
 const CourierMyQuotesRoute = CourierMyQuotesRouteImport.update({
@@ -577,11 +588,6 @@ const CourierProfileRoute = CourierProfileRouteImport.update({
 const CourierRatingsRoute = CourierRatingsRouteImport.update({
   id: '/ratings',
   path: '/ratings',
-  getParentRoute: () => CourierRoute,
-} as any)
-const CourierSettingsRoute = CourierSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => CourierRoute,
 } as any)
 const CourierShareRoute = CourierShareRouteImport.update({
@@ -845,18 +851,19 @@ export interface FileRoutesByFullPath {
   '/business/team': typeof BusinessTeamRoute
   '/business/wallet': typeof BusinessWalletRoute
   '/courier/accepted-jobs': typeof CourierAcceptedJobsRoute
+  '/courier/account-settings': typeof CourierAccountSettingsRoute
   '/courier/active': typeof CourierActiveRoute
   '/courier/availability': typeof CourierAvailabilityRoute
   '/courier/dashboard': typeof CourierDashboardRoute
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
+  '/courier/my-profile': typeof CourierMyProfileRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
   '/courier/performance': typeof CourierPerformanceRoute
   '/courier/profile': typeof CourierProfileRouteWithChildren
   '/courier/ratings': typeof CourierRatingsRoute
-  '/courier/settings': typeof CourierSettingsRoute
   '/courier/share': typeof CourierShareRoute
   '/courier/wallet': typeof CourierWalletRoute
   '/customer/account': typeof CustomerAccountRoute
@@ -969,17 +976,18 @@ export interface FileRoutesByTo {
   '/business/team': typeof BusinessTeamRoute
   '/business/wallet': typeof BusinessWalletRoute
   '/courier/accepted-jobs': typeof CourierAcceptedJobsRoute
+  '/courier/account-settings': typeof CourierAccountSettingsRoute
   '/courier/active': typeof CourierActiveRoute
   '/courier/availability': typeof CourierAvailabilityRoute
   '/courier/dashboard': typeof CourierDashboardRoute
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
+  '/courier/my-profile': typeof CourierMyProfileRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
   '/courier/performance': typeof CourierPerformanceRoute
   '/courier/ratings': typeof CourierRatingsRoute
-  '/courier/settings': typeof CourierSettingsRoute
   '/courier/share': typeof CourierShareRoute
   '/courier/wallet': typeof CourierWalletRoute
   '/customer/account': typeof CustomerAccountRoute
@@ -1095,18 +1103,19 @@ export interface FileRoutesById {
   '/business/team': typeof BusinessTeamRoute
   '/business/wallet': typeof BusinessWalletRoute
   '/courier/accepted-jobs': typeof CourierAcceptedJobsRoute
+  '/courier/account-settings': typeof CourierAccountSettingsRoute
   '/courier/active': typeof CourierActiveRoute
   '/courier/availability': typeof CourierAvailabilityRoute
   '/courier/dashboard': typeof CourierDashboardRoute
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
+  '/courier/my-profile': typeof CourierMyProfileRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
   '/courier/performance': typeof CourierPerformanceRoute
   '/courier/profile': typeof CourierProfileRouteWithChildren
   '/courier/ratings': typeof CourierRatingsRoute
-  '/courier/settings': typeof CourierSettingsRoute
   '/courier/share': typeof CourierShareRoute
   '/courier/wallet': typeof CourierWalletRoute
   '/customer/account': typeof CustomerAccountRoute
@@ -1222,18 +1231,19 @@ export interface FileRouteTypes {
     | '/business/team'
     | '/business/wallet'
     | '/courier/accepted-jobs'
+    | '/courier/account-settings'
     | '/courier/active'
     | '/courier/availability'
     | '/courier/dashboard'
     | '/courier/history'
     | '/courier/messages'
+    | '/courier/my-profile'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
     | '/courier/performance'
     | '/courier/profile'
     | '/courier/ratings'
-    | '/courier/settings'
     | '/courier/share'
     | '/courier/wallet'
     | '/customer/account'
@@ -1346,17 +1356,18 @@ export interface FileRouteTypes {
     | '/business/team'
     | '/business/wallet'
     | '/courier/accepted-jobs'
+    | '/courier/account-settings'
     | '/courier/active'
     | '/courier/availability'
     | '/courier/dashboard'
     | '/courier/history'
     | '/courier/messages'
+    | '/courier/my-profile'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
     | '/courier/performance'
     | '/courier/ratings'
-    | '/courier/settings'
     | '/courier/share'
     | '/courier/wallet'
     | '/customer/account'
@@ -1471,18 +1482,19 @@ export interface FileRouteTypes {
     | '/business/team'
     | '/business/wallet'
     | '/courier/accepted-jobs'
+    | '/courier/account-settings'
     | '/courier/active'
     | '/courier/availability'
     | '/courier/dashboard'
     | '/courier/history'
     | '/courier/messages'
+    | '/courier/my-profile'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
     | '/courier/performance'
     | '/courier/profile'
     | '/courier/ratings'
-    | '/courier/settings'
     | '/courier/share'
     | '/courier/wallet'
     | '/customer/account'
@@ -2097,6 +2109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CourierAcceptedJobsRouteImport
       parentRoute: typeof CourierRoute
     }
+    '/courier/account-settings': {
+      id: '/courier/account-settings'
+      path: '/account-settings'
+      fullPath: '/courier/account-settings'
+      preLoaderRoute: typeof CourierAccountSettingsRouteImport
+      parentRoute: typeof CourierRoute
+    }
     '/courier/active': {
       id: '/courier/active'
       path: '/active'
@@ -2130,6 +2149,13 @@ declare module '@tanstack/react-router' {
       path: '/messages'
       fullPath: '/courier/messages'
       preLoaderRoute: typeof CourierMessagesRouteImport
+      parentRoute: typeof CourierRoute
+    }
+    '/courier/my-profile': {
+      id: '/courier/my-profile'
+      path: '/my-profile'
+      fullPath: '/courier/my-profile'
+      preLoaderRoute: typeof CourierMyProfileRouteImport
       parentRoute: typeof CourierRoute
     }
     '/courier/my-quotes': {
@@ -2172,13 +2198,6 @@ declare module '@tanstack/react-router' {
       path: '/ratings'
       fullPath: '/courier/ratings'
       preLoaderRoute: typeof CourierRatingsRouteImport
-      parentRoute: typeof CourierRoute
-    }
-    '/courier/settings': {
-      id: '/courier/settings'
-      path: '/settings'
-      fullPath: '/courier/settings'
-      preLoaderRoute: typeof CourierSettingsRouteImport
       parentRoute: typeof CourierRoute
     }
     '/courier/share': {
@@ -2600,18 +2619,19 @@ const CourierProfileRouteWithChildren = CourierProfileRoute._addFileChildren(
 
 interface CourierRouteChildren {
   CourierAcceptedJobsRoute: typeof CourierAcceptedJobsRoute
+  CourierAccountSettingsRoute: typeof CourierAccountSettingsRoute
   CourierActiveRoute: typeof CourierActiveRoute
   CourierAvailabilityRoute: typeof CourierAvailabilityRoute
   CourierDashboardRoute: typeof CourierDashboardRoute
   CourierHistoryRoute: typeof CourierHistoryRoute
   CourierMessagesRoute: typeof CourierMessagesRoute
+  CourierMyProfileRoute: typeof CourierMyProfileRoute
   CourierMyQuotesRoute: typeof CourierMyQuotesRoute
   CourierNewJobsRoute: typeof CourierNewJobsRoute
   CourierNotificationsRoute: typeof CourierNotificationsRoute
   CourierPerformanceRoute: typeof CourierPerformanceRoute
   CourierProfileRoute: typeof CourierProfileRouteWithChildren
   CourierRatingsRoute: typeof CourierRatingsRoute
-  CourierSettingsRoute: typeof CourierSettingsRoute
   CourierShareRoute: typeof CourierShareRoute
   CourierWalletRoute: typeof CourierWalletRoute
   CourierMissionJobIdRoute: typeof CourierMissionJobIdRoute
@@ -2620,18 +2640,19 @@ interface CourierRouteChildren {
 
 const CourierRouteChildren: CourierRouteChildren = {
   CourierAcceptedJobsRoute: CourierAcceptedJobsRoute,
+  CourierAccountSettingsRoute: CourierAccountSettingsRoute,
   CourierActiveRoute: CourierActiveRoute,
   CourierAvailabilityRoute: CourierAvailabilityRoute,
   CourierDashboardRoute: CourierDashboardRoute,
   CourierHistoryRoute: CourierHistoryRoute,
   CourierMessagesRoute: CourierMessagesRoute,
+  CourierMyProfileRoute: CourierMyProfileRoute,
   CourierMyQuotesRoute: CourierMyQuotesRoute,
   CourierNewJobsRoute: CourierNewJobsRoute,
   CourierNotificationsRoute: CourierNotificationsRoute,
   CourierPerformanceRoute: CourierPerformanceRoute,
   CourierProfileRoute: CourierProfileRouteWithChildren,
   CourierRatingsRoute: CourierRatingsRoute,
-  CourierSettingsRoute: CourierSettingsRoute,
   CourierShareRoute: CourierShareRoute,
   CourierWalletRoute: CourierWalletRoute,
   CourierMissionJobIdRoute: CourierMissionJobIdRoute,

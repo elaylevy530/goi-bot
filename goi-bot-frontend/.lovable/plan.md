@@ -38,7 +38,7 @@ courier/ratings          דירוגים
 courier/availability     זמינות + שעות שקטות
 courier/dashboard        דאשבורד ראשי
 courier/profile          פרופיל + עריכה
-courier/settings         הגדרות
+courier/account-settings הגדרות חשבון
 courier/login + reset    התחברות + איפוס סיסמה
 ```
 
