@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
-import { nestSignedFileUrlResolved, nestUploadFile } from "@/lib/nest-files";
+import { nestUploadFile } from "@/lib/nest-files";
 import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
 import { splitWorkingAreas, WORK_AREA_REQUIRED_ERROR } from "@/lib/regions";
+import { useCourierAvatarUrl } from "@/hooks/useCourierAvatarUrl";
+import { courierInitials } from "@/lib/courier-session";
 import { Loader2, Save, Camera, User, Bike, FileText, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,25 +21,6 @@ export const Route = createFileRoute("/courier/profile/edit")({
   head: () => ({ meta: [{ title: "עריכת פרופיל — Goi" }] }),
   component: EditProfilePage,
 });
-
-function initialsOf(name?: string | null) {
-  if (!name) return "ש";
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]).join("");
-}
-
-function useAvatarUrl(courierId?: string, avatarPath?: string | null) {
-  return useQuery({
-    queryKey: ["courier-avatar-signed", courierId, avatarPath],
-    enabled: !!courierId && !!avatarPath,
-    staleTime: 1000 * 60 * 30,
-    queryFn: async () => {
-      if (!avatarPath) return null;
-      if (avatarPath.startsWith("http")) return avatarPath;
-      return nestSignedFileUrlResolved("courier-avatars", avatarPath, 60 * 60 * 24 * 7);
-    },
-  });
-}
 
 /**
  * Payload must match Nest `UpdateCourierSelfDto` exactly
@@ -66,7 +49,7 @@ function EditProfilePage() {
   const [idFile, setIdFile] = useState<File | null>(null);
 
   const avatarPath = (me as { avatar_url?: string | null } | undefined)?.avatar_url;
-  const { data: signedAvatarUrl } = useAvatarUrl(me?.id, avatarPath);
+  const { data: signedAvatarUrl } = useCourierAvatarUrl(me?.id, avatarPath);
 
   useEffect(() => {
     if (!me) return;
@@ -192,7 +175,7 @@ function EditProfilePage() {
                   {displayAvatar ? (
                     <img src={displayAvatar} alt="avatar" className="w-full h-full object-cover" />
                   ) : (
-                    initialsOf(fullName || me?.full_name)
+                    courierInitials(fullName || me?.full_name)
                   )}
                 </div>
                 <button

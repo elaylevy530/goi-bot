@@ -6,15 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  nestListMyCourierOutcomes,
-  nestListWithdrawals,
-  nestGetMyCourierStats,
-} from "@/lib/nest-domain";
-import { nestSignedFileUrlResolved } from "@/lib/nest-files";
+import { nestListMyCourierOutcomes, nestListWithdrawals } from "@/lib/nest-domain";
 import { nestUpdatePassword } from "@/lib/nest-auth";
 import { PushEnableRow } from "@/components/PushEnableRow";
 import { pushSupported } from "@/lib/push/subscribe";
+import { useCourierAvatarUrl } from "@/hooks/useCourierAvatarUrl";
+import { courierInitials, signOutCourierSession } from "@/lib/courier-session";
 import {
   User,
   LogOut,
@@ -30,6 +27,7 @@ import {
   Building2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useMyCourierLiveStats } from "@/hooks/useMyCourierLiveStats";
 import { useCourierTerms, type CourierTerms } from "@/lib/courier-kind";
 
 export const Route = createFileRoute("/courier/profile/")({
@@ -48,50 +46,15 @@ function buildMenu(t: CourierTerms) {
   ];
 }
 
-function initialsOf(name?: string | null) {
-  if (!name) return "ש";
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]).join("");
-}
-
 function ProfilePage() {
   const terms = useCourierTerms();
   const { data: me } = useMyCourier();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [pwd, setPwd] = useState("");
-
-  const { data: stats } = useQuery({
-    queryKey: ["profile-hub-stats", me?.id],
-    enabled: !!me?.id,
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const [statsRow, outcomes] = await Promise.all([
-        nestGetMyCourierStats(),
-        nestListMyCourierOutcomes(),
-      ]);
-      const liveRatings = (outcomes ?? [])
-        .filter((o) => o.delivered_at && !o.was_cancelled && o.customer_rating != null)
-        .map((o) => Number(o.customer_rating))
-        .filter((n) => Number.isFinite(n) && n > 0);
-      const liveAvg = liveRatings.length > 0
-        ? liveRatings.reduce((sum, n) => sum + n, 0) / liveRatings.length
-        : null;
-      return { avg_rating: liveAvg ?? statsRow?.avg_rating ?? null };
-    },
-  });
-
+  const stats = useMyCourierLiveStats(me?.id);
   const avatarPath = (me as { avatar_url?: string | null } | null | undefined)?.avatar_url;
-  const { data: avatarUrl } = useQuery({
-    queryKey: ["courier-avatar-signed", me?.id, avatarPath],
-    enabled: !!me?.id && !!avatarPath,
-    staleTime: 1000 * 60 * 30,
-    queryFn: async () => {
-      if (!avatarPath) return null;
-      if (avatarPath.startsWith("http")) return avatarPath;
-      return nestSignedFileUrlResolved("courier-avatars", avatarPath, 60 * 60 * 24 * 7);
-    },
-  });
+  const { data: avatarUrl } = useCourierAvatarUrl(me?.id, avatarPath);
 
   const { data: balance = 0 } = useQuery({
     queryKey: ["profile-hub-balance", me?.id],
@@ -124,11 +87,8 @@ function ProfilePage() {
 
   const isAvailable = me?.courier_status === "פעיל" && me?.is_paused !== true && me?.accepting_jobs !== false;
   const handleSignOut = async () => {
-    await qc.cancelQueries();
-    qc.clear();
-    const { nestLogout } = await import("@/lib/nest-auth");
-    nestLogout();
-    navigate({ to: "/auth", replace: true });
+    const to = await signOutCourierSession(qc);
+    navigate({ to, replace: true });
   };
 
   return (
@@ -136,7 +96,7 @@ function ProfilePage() {
       <div className="space-y-4 -mt-2 lg:max-w-3xl lg:mx-auto">
         <div className="flex items-center justify-between gap-3 pt-1">
           <div className="size-20 rounded-full overflow-hidden bg-gradient-to-br from-[#35AD29] to-[#2d9623] text-white grid place-items-center text-2xl font-extrabold ring-4 ring-emerald-100 shrink-0">
-            {avatarUrl ? <img src={avatarUrl} alt="תמונת פרופיל" className="w-full h-full object-cover" /> : initialsOf(me?.full_name)}
+            {avatarUrl ? <img src={avatarUrl} alt="תמונת פרופיל" className="w-full h-full object-cover" /> : courierInitials(me?.full_name)}
           </div>
 
           <div className="text-right">
@@ -170,7 +130,7 @@ function ProfilePage() {
               <Link to="/courier/ratings" className="text-center border-r border-slate-100 pr-2">
                 <div className="text-[11px] text-slate-500 mb-1">דירוג</div>
                 <div className="flex items-center justify-center gap-1 font-extrabold text-slate-900">
-                  <span>{stats?.avg_rating ? Number(stats.avg_rating).toFixed(1) : "—"}</span>
+                  <span>{stats.avgRating != null ? Number(stats.avgRating).toFixed(1) : "—"}</span>
                   <Star className="size-4 fill-amber-400 text-amber-400" />
                 </div>
               </Link>

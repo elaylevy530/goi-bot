@@ -12,9 +12,10 @@ import { nestListMySupportTickets, nestCreateSupportTicket } from "@/lib/nest-do
 import { MessageSquare, Plus, AlertCircle } from "lucide-react";
 import { EmptyState } from "./business.dashboard";
 import { toast } from "sonner";
+import { supportWhatsAppUrl } from "@/lib/support";
 
 const ISSUE_TYPES = ["שליח לא הגיע", "איחור", "בעיה במסירה", "בעיה בתשלום", "שאלה כללית"];
-const SUPPORT_WHATSAPP = "https://wa.me/972500000000?text=" + encodeURIComponent("שלום, אני צריך עזרה בפאנל העסקים של Goi");
+const SUPPORT_WHATSAPP = supportWhatsAppUrl("שלום, אני צריך עזרה בפאנל העסקים של Goi");
 
 export const Route = createFileRoute("/business/support")({
   head: () => ({ meta: [{ title: "תמיכה — Goi" }] }),

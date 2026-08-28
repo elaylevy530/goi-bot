@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CourierShell } from "@/components/CourierShell";
+import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,14 +14,23 @@ import {
   Shield,
   Camera,
   Car,
-  CreditCard,
-  Umbrella,
   FileText,
   Headphones,
   ChevronLeft,
   Pen,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCourierTerms } from "@/lib/courier-kind";
+import { useCourierAvatarUrl } from "@/hooks/useCourierAvatarUrl";
+import { useMyCourierLiveStats } from "@/hooks/useMyCourierLiveStats";
+import {
+  type CourierSelfRow,
+  courierActiveStatus,
+  courierInitials,
+  displayOrDash,
+  formatCourierWorkAreas,
+} from "@/lib/courier-session";
 
 export const Route = createFileRoute("/courier/my-profile")({
   head: () => ({ meta: [{ title: "הפרופיל שלי — Goi" }] }),
@@ -29,326 +38,249 @@ export const Route = createFileRoute("/courier/my-profile")({
 });
 
 function MyProfilePage() {
-  const courier = {
-    name: "עומר כהן",
-    verified: true,
-    status: "שליח פעיל",
-    courierNumber: "45821",
-    rating: 4.9,
-    totalRatings: 325,
-    deliveries: 2026,
-    deliveryMonth: "ינואר",
-    workAreas: "מרכז ושרון",
-    phone: "054-1234567",
-    email: "omer.cohen@gmail.com",
-    avatar: null,
-    vehicle: {
-      model: "SYM JoyRide 125",
-      licensePlate: "12-345-67",
-      year: 2021,
-      type: "קטנוע",
-    },
-    documents: {
-      driverLicense: { valid: true, expires: "20/07/2027" },
-      vehicleLicense: { valid: true, expires: "15/03/2026" },
-      insurance: { valid: true, expires: "01/04/2026" },
-      comprehensiveInsurance: { valid: true, expires: "01/04/2026" },
-    },
-    business: {
-      type: "עוסק פטור",
-      number: "123456789",
-      name: "עומר שליחויות",
-    },
-  };
+  const terms = useCourierTerms();
+  const { data: meRaw, isPending } = useMyCourier();
+  const me = meRaw as CourierSelfRow | null | undefined;
+  const { data: avatarUrl } = useCourierAvatarUrl(me?.id, me?.avatar_url);
+  const stats = useMyCourierLiveStats(me?.id);
+  const status = courierActiveStatus(me, terms.worker);
+  const workAreas = formatCourierWorkAreas(me);
+  const verified = me?.bank_details_verified === true;
+  const name = me?.full_name?.trim() || "—";
+
+  if (isPending) {
+    return (
+      <CourierShell title="הפרופיל שלי" subtitle="">
+        <div className="py-16 flex items-center justify-center gap-2 text-slate-500">
+          <Loader2 className="size-5 animate-spin" />
+          טוען…
+        </div>
+      </CourierShell>
+    );
+  }
+
+  if (!me) {
+    return (
+      <CourierShell title="הפרופיל שלי" subtitle="">
+        <p className="py-16 text-center text-sm text-slate-500">לא נמצא פרופיל שליח</p>
+      </CourierShell>
+    );
+  }
 
   return (
-    <CourierShell title="הפרופיל שלי" subtitle="" hideBackButton={false}>
+    <CourierShell title="הפרופיל שלי" subtitle="">
       <div className="pb-6 space-y-4">
-        {/* Profile Card */}
         <div className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-2xl p-6 overflow-hidden">
-          {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute right-0 top-0 w-64 h-64 bg-green-500 rounded-full blur-3xl" />
             <div className="absolute left-0 bottom-0 w-64 h-64 bg-blue-500 rounded-full blur-3xl" />
           </div>
 
           <div className="relative z-10">
-            {/* Top Section */}
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
-                {/* Avatar */}
                 <div className="relative">
                   <div className="size-24 rounded-full bg-slate-700 border-4 border-slate-600 overflow-hidden">
-                    {courier.avatar ? (
+                    {avatarUrl ? (
                       <img
-                        src={courier.avatar}
-                        alt={courier.name}
+                        src={avatarUrl}
+                        alt={name}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600">
-                        <User className="size-12 text-white" />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600 text-white text-2xl font-extrabold">
+                        {courierInitials(me.full_name)}
                       </div>
                     )}
                   </div>
-                  <div className="absolute bottom-0 right-0 size-8 bg-white rounded-full flex items-center justify-center border-2 border-slate-800">
+                  <Link
+                    to="/courier/profile/edit"
+                    className="absolute bottom-0 right-0 size-8 bg-white rounded-full flex items-center justify-center border-2 border-slate-800"
+                    aria-label="עריכת תמונת פרופיל"
+                  >
                     <Camera className="size-4 text-slate-700" />
-                  </div>
+                  </Link>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     GO!
                   </div>
                 </div>
 
-                {/* Name & Status */}
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-2xl font-bold text-white">
-                      {courier.name}
-                    </h2>
-                    {courier.verified && (
+                    <h2 className="text-2xl font-bold text-white">{name}</h2>
+                    {verified && (
                       <CheckCircle2 className="size-5 text-green-500 fill-green-500" />
                     )}
                   </div>
-                  <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs font-semibold px-3 py-1">
-                    • {courier.status}
+                  <Badge
+                    className={cn(
+                      "text-white text-xs font-semibold px-3 py-1",
+                      status.available
+                        ? "bg-green-600 hover:bg-green-600"
+                        : "bg-slate-500 hover:bg-slate-500",
+                    )}
+                  >
+                    • {status.label}
                   </Badge>
-                  <div className="text-slate-400 text-sm mt-2">
-                    מספר שליח: {courier.courierNumber}
-                  </div>
                 </div>
               </div>
 
-              {/* Verified Badge */}
-              <div className="flex flex-col items-center gap-2 bg-slate-800/50 backdrop-blur-sm rounded-xl px-4 py-3">
-                <Shield className="size-8 text-green-500" />
-                <div className="text-center">
-                  <div className="text-white text-xs font-semibold">
-                    החשבון מאומת
+              {verified && (
+                <div className="flex flex-col items-center gap-2 bg-slate-800/50 backdrop-blur-sm rounded-xl px-4 py-3">
+                  <Shield className="size-8 text-green-500" />
+                  <div className="text-center">
+                    <div className="text-white text-xs font-semibold">החשבון מאומת</div>
+                    <div className="text-slate-400 text-[10px]">פרטי בנק</div>
                   </div>
-                  <div className="text-slate-400 text-[10px]">במלואו</div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
-              {/* Deliveries */}
               <div className="flex flex-col items-center text-center">
                 <Calendar className="size-5 text-green-500 mb-2" />
-                <div className="text-slate-400 text-xs mb-1">
-                  שליחויות היום-חודש
-                </div>
+                <div className="text-slate-400 text-xs mb-1">שליחויות החודש</div>
                 <div className="text-white font-bold">
-                  {courier.deliveries} {courier.deliveryMonth}
+                  {stats.isLoading ? "—" : stats.deliveriesThisMonth} {stats.monthLabel}
                 </div>
               </div>
 
-              {/* Rating */}
               <div className="flex flex-col items-center text-center border-x border-slate-700/50">
                 <Star className="size-5 text-yellow-500 fill-yellow-500 mb-2" />
                 <div className="text-3xl font-bold text-white mb-1">
-                  {courier.rating}
+                  {stats.isLoading
+                    ? "—"
+                    : stats.avgRating != null
+                      ? stats.avgRating.toFixed(1)
+                      : "—"}
                 </div>
                 <div className="text-slate-400 text-xs">
-                  ({courier.totalRatings} דירוגים)
+                  {stats.isLoading
+                    ? ""
+                    : stats.ratingCount > 0
+                      ? `(${stats.ratingCount} דירוגים)`
+                      : "(אין דירוגים עדיין)"}
                 </div>
-                <button className="text-green-500 text-xs mt-1 flex items-center gap-1">
+                <Link
+                  to="/courier/ratings"
+                  className="text-green-500 text-xs mt-1 flex items-center gap-1"
+                >
                   לכל הדירוגים
                   <ChevronLeft className="size-3" />
-                </button>
+                </Link>
               </div>
 
-              {/* Work Areas */}
               <div className="flex flex-col items-center text-center">
                 <MapPin className="size-5 text-green-500 mb-2" />
                 <div className="text-slate-400 text-xs mb-1">אזורי עבודה</div>
-                <div className="text-white font-bold">{courier.workAreas}</div>
-                <button className="text-green-500 text-xs mt-1 flex items-center gap-1">
+                <div className="text-white font-bold">{workAreas ?? "טרם הוזן"}</div>
+                <Link
+                  to="/courier/availability"
+                  className="text-green-500 text-xs mt-1 flex items-center gap-1"
+                >
                   לניהול אזורים
                   <ChevronLeft className="size-3" />
-                </button>
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Personal Details */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2 px-4">
-            <User className="size-5 text-green-600" />
-            <h3 className="text-base font-bold text-slate-900">פרטים אישיים</h3>
+          <div className="flex items-center justify-between px-4">
+            <div className="flex items-center gap-2">
+              <User className="size-5 text-green-600" />
+              <h3 className="text-base font-bold text-slate-900">פרטים אישיים</h3>
+            </div>
+            <Link
+              to="/courier/profile/edit"
+              className="text-green-600 text-sm font-semibold flex items-center gap-1"
+            >
+              <Pen className="size-4" />
+              עריכה
+            </Link>
           </div>
           <Card className="p-0 overflow-hidden divide-y divide-slate-100">
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-full bg-green-50 flex items-center justify-center">
-                  <Phone className="size-5 text-green-600" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 mb-0.5">טלפון</div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {courier.phone}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-full bg-green-50 flex items-center justify-center">
-                  <Mail className="size-5 text-green-600" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 mb-0.5">אימייל</div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {courier.email}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-full bg-green-50 flex items-center justify-center">
-                  <User className="size-5 text-green-600" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 mb-0.5">שם מלא</div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {courier.name}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <DetailRow icon={Phone} label="טלפון" value={displayOrDash(me.whatsapp_phone)} />
+            <DetailRow icon={Mail} label="אימייל" value={displayOrDash(me.email)} />
+            <DetailRow icon={User} label="שם מלא" value={displayOrDash(me.full_name)} />
           </Card>
         </div>
 
-        {/* Vehicle Details */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <Car className="size-5 text-green-600" />
               <h3 className="text-base font-bold text-slate-900">פרטי רכב</h3>
             </div>
-            <button className="text-green-600 text-sm font-semibold flex items-center gap-1">
+            <Link
+              to="/courier/profile/edit"
+              className="text-green-600 text-sm font-semibold flex items-center gap-1"
+            >
               <Pen className="size-4" />
               עריכת פרטי הרכב
-            </button>
+            </Link>
           </div>
           <Card className="p-4">
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div>
-                <div className="text-xs text-slate-500 mb-1">דגם</div>
-                <div className="text-sm font-bold text-slate-900">
-                  {courier.vehicle.model}
+            {me.vehicle_type || me.vehicle_label ? (
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">סוג רכב</div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {displayOrDash(me.vehicle_type)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">רכב</div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {displayOrDash(me.vehicle_label)}
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">מספר רישוי</div>
-                <div className="flex items-center justify-center gap-1">
-                  <span className="text-sm font-bold text-slate-900 bg-yellow-100 px-2 py-1 rounded border border-yellow-400">
-                    {courier.vehicle.licensePlate}
-                  </span>
-                  <Car className="size-4 text-blue-600" />
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">שנת ייצור</div>
-                <div className="text-sm font-bold text-slate-900">
-                  {courier.vehicle.year}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">סוג רכב</div>
-                <div className="text-sm font-bold text-slate-900">
-                  {courier.vehicle.type}
-                </div>
-              </div>
-            </div>
+            ) : (
+              <EmptyHint to="/courier/profile/edit" action="הוספת פרטי רכב" />
+            )}
           </Card>
         </div>
 
-        {/* Documents & Approvals */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <Shield className="size-5 text-green-600" />
-              <h3 className="text-base font-bold text-slate-900">
-                מסמכים ואישורים
-              </h3>
+              <h3 className="text-base font-bold text-slate-900">מסמכים ואישורים</h3>
             </div>
-            <button className="text-green-600 text-sm font-semibold flex items-center gap-1">
+            <Link
+              to="/courier/profile/edit"
+              className="text-green-600 text-sm font-semibold flex items-center gap-1"
+            >
               <ChevronLeft className="size-4" />
-              עיצייניים בכל המסמכים
-            </button>
+              עדכון בפרופיל
+            </Link>
           </div>
           <Card className="p-4">
-            <div className="grid grid-cols-4 gap-4">
-              <DocumentCard
-                icon={CreditCard}
-                title="רישיון נהיגה"
-                valid={courier.documents.driverLicense.valid}
-                expires={courier.documents.driverLicense.expires}
-              />
-              <DocumentCard
-                icon={Car}
-                title="רישיון רכב"
-                valid={courier.documents.vehicleLicense.valid}
-                expires={courier.documents.vehicleLicense.expires}
-              />
-              <DocumentCard
-                icon={Shield}
-                title="ביטוח חובה"
-                valid={courier.documents.insurance.valid}
-                expires={courier.documents.insurance.expires}
-              />
-              <DocumentCard
-                icon={Umbrella}
-                title="ביטוח מקיף"
-                valid={courier.documents.comprehensiveInsurance.valid}
-                expires={courier.documents.comprehensiveInsurance.expires}
-              />
-            </div>
+            <EmptyHint to="/courier/profile/edit" action="העלאת מסמכים בפרופיל" />
           </Card>
         </div>
 
-        {/* Business Details */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <FileText className="size-5 text-green-600" />
               <h3 className="text-base font-bold text-slate-900">פרטי עוסק</h3>
             </div>
-            <button className="text-green-600 text-sm font-semibold flex items-center gap-1">
+            <Link
+              to="/courier/profile/edit"
+              className="text-green-600 text-sm font-semibold flex items-center gap-1"
+            >
               <Pen className="size-4" />
-              עריכת פרטי עוסק
-            </button>
+              עריכת פרטים
+            </Link>
           </div>
           <Card className="p-4">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-xs text-slate-500 mb-1">סוג עוסק</div>
-                <div className="text-sm font-bold text-slate-900">
-                  {courier.business.type}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">מספר עוסק</div>
-                <div className="text-sm font-bold text-slate-900">
-                  {courier.business.number}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">
-                  שם העסק לחשבונית
-                </div>
-                <div className="text-sm font-bold text-slate-900">
-                  {courier.business.name}
-                </div>
-              </div>
-            </div>
+            <EmptyHint to="/courier/profile/edit" action="עריכת פרטים בפרופיל" />
           </Card>
         </div>
 
-        {/* Support Section */}
         <div className="bg-slate-50 rounded-2xl p-6 mt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -357,16 +289,15 @@ function MyProfilePage() {
                 <Headphones className="size-7 text-green-600" />
               </div>
               <div>
-                <div className="text-base font-bold text-slate-900 mb-1">
-                  זקוק לעזרה?
-                </div>
-                <div className="text-sm text-slate-600">
-                  צוות ההתמכה שלנו כאן במיוחד
-                </div>
+                <div className="text-base font-bold text-slate-900 mb-1">זקוק לעזרה?</div>
+                <div className="text-sm text-slate-600">צוות התמיכה שלנו כאן במיוחד</div>
               </div>
             </div>
-            <Button className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-6 text-base rounded-xl">
-              איש עם התמיכה
+            <Button
+              asChild
+              className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-6 text-base rounded-xl"
+            >
+              <Link to="/courier/messages">פנה לתמיכה</Link>
             </Button>
           </div>
         </div>
@@ -375,34 +306,47 @@ function MyProfilePage() {
   );
 }
 
-function DocumentCard({
+function DetailRow({
   icon: Icon,
-  title,
-  valid,
-  expires,
+  label,
+  value,
 }: {
-  icon: typeof Shield;
-  title: string;
-  valid: boolean;
-  expires: string;
+  icon: typeof Phone;
+  label: string;
+  value: string;
 }) {
   return (
-    <div className="flex flex-col items-center">
-      <div className="size-12 bg-green-50 rounded-lg flex items-center justify-center mb-2">
-        <Icon className="size-6 text-green-600" />
+    <div className="flex items-center justify-between p-4">
+      <div className="flex items-center gap-3">
+        <div className="size-10 rounded-full bg-green-50 flex items-center justify-center">
+          <Icon className="size-5 text-green-600" />
+        </div>
+        <div>
+          <div className="text-xs text-slate-500 mb-0.5">{label}</div>
+          <div className="text-sm font-semibold text-slate-900">{value}</div>
+        </div>
       </div>
-      <div className="text-xs font-semibold text-slate-900 mb-1 text-center">
-        {title}
-      </div>
-      {valid && (
-        <>
-          <div className="flex items-center gap-1 text-green-600 mb-1">
-            <CheckCircle2 className="size-3 fill-green-600" />
-            <span className="text-xs font-semibold">בתוקף</span>
-          </div>
-          <div className="text-[10px] text-slate-500">עד {expires}</div>
-        </>
-      )}
+    </div>
+  );
+}
+
+function EmptyHint({
+  to,
+  action,
+}: {
+  to: "/courier/profile/edit";
+  action: string;
+}) {
+  return (
+    <div className="text-center space-y-2">
+      <p className="text-sm text-slate-500">טרם הוזן</p>
+      <Link
+        to={to}
+        className="text-green-600 text-sm font-semibold inline-flex items-center gap-1"
+      >
+        {action}
+        <ChevronLeft className="size-4" />
+      </Link>
     </div>
   );
 }

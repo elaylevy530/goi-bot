@@ -21,15 +21,14 @@ import {
 } from "@/lib/regions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { SUPPORT_EMAIL, supportWhatsAppUrl } from "@/lib/support";
 
 export const Route = createFileRoute("/courier/availability")({
   head: () => ({ meta: [{ title: "אזור עבודה ותמיכה — Goi" }] }),
   component: AvailabilityPage,
 });
 
-const SUPPORT_WHATSAPP =
-  "https://wa.me/972500000000?text=" + encodeURIComponent("שלום, אני צריך עזרה באזור השליחים של Goi");
-const SUPPORT_EMAIL = "support@goi.co.il";
+const SUPPORT_WHATSAPP = supportWhatsAppUrl("שלום, אני צריך עזרה באזור השליחים של Goi");
 
 const VEHICLE_OPTIONS = [
   { value: "רכב", label: "רכב", Icon: CarIcon },

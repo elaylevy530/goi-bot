@@ -75,6 +75,7 @@ export type NestCourierProfile = Record<string, unknown> & {
   whatsapp_phone: string;
   courier_status?: string;
   courier_kind?: string | null;
+  referral_code?: string | null;
 };
 
 /** Normalize Israeli phone digits to 972… (shared with Nest). */

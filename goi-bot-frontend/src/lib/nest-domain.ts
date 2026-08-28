@@ -137,6 +137,14 @@ export function nestListMyCourierOutcomes() {
   return apiFetch<Record<string, unknown>[]>("/api/accounts/couriers/me/outcomes", options());
 }
 
+export function nestListMyCourierReferrals() {
+  return apiFetch<{
+    couriers?: Record<string, unknown>[];
+    businesses?: Record<string, unknown>[];
+    totals?: Record<string, number>;
+  }>("/api/accounts/couriers/me/referrals", options());
+}
+
 export function nestListMyDeclinedOffers() {
   return apiFetch<Record<string, unknown>[]>("/api/accounts/couriers/me/declined-offers", options());
 }

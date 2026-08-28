@@ -2,13 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HelpCircle, MessageCircle, Phone, Mail, Package } from "lucide-react";
+import { SUPPORT_PHONE_DISPLAY, supportTelUrl, supportWhatsAppUrl } from "@/lib/support";
 
 export const Route = createFileRoute("/customer/help")({
   head: () => ({ meta: [{ title: "עזרה — Goi" }] }),
   component: HelpPage,
 });
-
-const WA_NUMBER = "972500000000"; // TODO: replace with real support WhatsApp
 
 function HelpPage() {
   return (
@@ -28,7 +27,7 @@ function HelpPage() {
               הדרך המהירה ביותר לקבל תשובה. הבוט שלנו מזהה אותך אוטומטית לפי הטלפון.
             </p>
             <Button asChild className="w-full">
-              <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noreferrer">
+              <a href={supportWhatsAppUrl()} target="_blank" rel="noreferrer">
                 <MessageCircle className="size-4" /> פתיחת שיחה
               </a>
             </Button>
@@ -42,8 +41,8 @@ function HelpPage() {
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">שירות לקוחות בימי חול 08:00-20:00.</p>
             <Button asChild variant="outline" className="w-full">
-              <a href={`tel:+${WA_NUMBER}`}>
-                <Phone className="size-4" /> {`+${WA_NUMBER.slice(0,3)}-${WA_NUMBER.slice(3,5)}-${WA_NUMBER.slice(5)}`}
+              <a href={supportTelUrl()}>
+                <Phone className="size-4" /> {SUPPORT_PHONE_DISPLAY}
               </a>
             </Button>
           </CardContent>

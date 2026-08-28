@@ -16,8 +16,9 @@ import { toast } from "sonner";
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
-import { apiFetch } from "@/lib/api-client";
+import { ApiClientError } from "@/lib/api-client";
 import { getNestAccessToken } from "@/lib/nest-auth";
+import { nestListMyCourierReferrals } from "@/lib/nest-domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/courier/share")({
@@ -50,10 +51,9 @@ type ReferralPayload = {
   };
 };
 
-function referralToken(me?: { id?: string; referral_code?: unknown } | null) {
+function referralCode(me?: { referral_code?: unknown } | null) {
   const code = typeof me?.referral_code === "string" ? me.referral_code.trim() : "";
-  if (code) return code;
-  return me?.id?.trim() || "";
+  return code;
 }
 
 function money(n: number) {
@@ -64,22 +64,24 @@ async function fetchReferrals(): Promise<ReferralPayload> {
   const token = getNestAccessToken();
   if (!token) return {};
   try {
-    return await apiFetch<ReferralPayload>("/api/accounts/couriers/me/referrals", { accessToken: token });
-  } catch {
-    return {};
+    return await nestListMyCourierReferrals() as ReferralPayload;
+  } catch (e) {
+    if (e instanceof ApiClientError && (e.status === 401 || e.status === 403)) return {};
+    throw e;
   }
 }
 
 function SharePage() {
-  const { data: me } = useMyCourier();
+  const { data: me, isPending: mePending } = useMyCourier();
   const [tab, setTab] = useState<"courier" | "business">("courier");
   const [showAll, setShowAll] = useState(false);
   const [moreOpen, setMoreOpen] = useState(true);
-  const token = referralToken(me);
+  const code = referralCode(me);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://goi.co.il";
-  const link = token ? `${origin}/join?ref=${encodeURIComponent(token)}` : `${origin}/join`;
+  const link = code ? `${origin}/join?ref=${encodeURIComponent(code)}` : "";
+  const linkReady = !!code;
 
-  const { data } = useQuery({
+  const { data, isError } = useQuery({
     queryKey: ["courier-referrals", me?.id],
     enabled: !!me?.id,
     queryFn: fetchReferrals,
@@ -92,6 +94,7 @@ function SharePage() {
   const totals = data?.totals ?? {};
 
   const copy = async () => {
+    if (!linkReady) return;
     try {
       await navigator.clipboard.writeText(link);
       toast.success("הקישור הועתק");
@@ -102,6 +105,7 @@ function SharePage() {
 
   const shareText = `היי! מצטרפים ל־Goi דרך הקישור שלי ומרוויחים יחד:\n${link}`;
   const share = async (channel?: "wa" | "fb" | "ig") => {
+    if (!linkReady) return;
     if (!channel && navigator.share) {
       try {
         await navigator.share({ title: "Goi", text: shareText, url: link });
@@ -143,8 +147,16 @@ function SharePage() {
               <p className="text-xl font-black">תרוויח מכל הפניה!</p>
               <p className="mt-1 text-sm text-primary-foreground/80">שתף שליחים ועסקים והרווח על כל פעילות שלהם</p>
               <div className="mt-4 flex items-center gap-2 rounded-card bg-black/20 px-3 py-2">
-                <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">{link}</p>
-                <button type="button" onClick={() => void copy()} className="grid size-10 place-items-center rounded-pill bg-surface text-primary" aria-label="העתק קישור">
+                <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">
+                  {linkReady ? link : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void copy()}
+                  disabled={!linkReady}
+                  className="grid size-10 place-items-center rounded-pill bg-surface text-primary disabled:opacity-50"
+                  aria-label="העתק קישור"
+                >
                   <Copy className="size-4" />
                 </button>
               </div>
@@ -189,6 +201,12 @@ function SharePage() {
                 <Store className="size-4" /> עסקים
               </button>
             </div>
+
+            {isError && (
+              <p className="rounded-card border border-border bg-surface py-4 text-center text-sm text-destructive">
+                לא הצלחנו לטעון את ההפניות. נסו שוב מאוחר יותר.
+              </p>
+            )}
 
             <section className="space-y-2">
               <div className="flex items-center justify-between">

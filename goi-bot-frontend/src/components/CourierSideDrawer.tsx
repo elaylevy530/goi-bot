@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { termsFor } from "@/lib/courier-kind";
+import { signOutCourierSession } from "@/lib/courier-session";
 import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
 import { nestListMyCourierNotifications, nestMyNotificationUnreadCount } from "@/lib/nest-domain";
 import {
@@ -157,16 +158,8 @@ function CourierSideDrawer() {
 
   const handleSignOut = async () => {
     closeMenu();
-    await qc.cancelQueries();
-    qc.clear();
-    const { isNestPreviewReadOnly, nestExitPreview, nestLogout } = await import("@/lib/nest-auth");
-    if (isNestPreviewReadOnly()) {
-      await nestExitPreview();
-      navigate({ to: "/dashboard", replace: true });
-      return;
-    }
-    nestLogout();
-    navigate({ to: "/auth", replace: true });
+    const to = await signOutCourierSession(qc);
+    navigate({ to, replace: true });
   };
 
   const handleToggleAvailability = async () => {
