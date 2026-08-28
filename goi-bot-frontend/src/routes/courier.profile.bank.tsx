@@ -72,7 +72,7 @@ function BankDetailsPage() {
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => window.history.length > 1 ? window.history.back() : (window.location.href = "/courier/profile")}
+            onClick={() => window.history.length > 1 ? window.history.back() : (window.location.href = "/courier/my-profile")}
             className="gap-1 text-text-strong hover:text-text-strong -ml-2"
           >
             <ChevronRight className="size-4" />

@@ -30,7 +30,7 @@ ROUTES = [
     "/courier/wallet",
     "/courier/share",
     "/courier/ratings",
-    "/courier/profile",
+    "/courier/my-profile",
     "/courier/account-settings",
 ]
 

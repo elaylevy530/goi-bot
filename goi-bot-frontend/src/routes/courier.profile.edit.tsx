@@ -235,7 +235,7 @@ function EditProfilePage() {
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => window.history.length > 1 ? window.history.back() : (window.location.href = "/courier/profile")}
+            onClick={() => window.history.length > 1 ? window.history.back() : (window.location.href = "/courier/my-profile")}
             className="gap-1 text-slate-700 hover:text-slate-900 -ml-2"
           >
             <ChevronRight className="size-4" />
