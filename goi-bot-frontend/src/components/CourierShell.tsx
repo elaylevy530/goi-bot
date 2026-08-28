@@ -160,7 +160,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
     const canGoBack = typeof window !== "undefined" && window.history.length > 1;
     if (canGoBack) {
       router.history.back();
-    } else if (path.startsWith("/courier/profile/")) {
+    } else if (path.startsWith("/courier/profile/") || path.startsWith("/courier/my-profile/")) {
       navigate({ to: "/courier/my-profile" });
     } else {
       navigate({ to: "/courier/new-jobs" });

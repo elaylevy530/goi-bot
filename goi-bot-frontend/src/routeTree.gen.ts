@@ -92,6 +92,7 @@ import { Route as CourierDashboardRouteImport } from './routes/courier.dashboard
 import { Route as CourierHistoryRouteImport } from './routes/courier.history'
 import { Route as CourierMessagesRouteImport } from './routes/courier.messages'
 import { Route as CourierMyProfileRouteImport } from './routes/courier.my-profile'
+import { Route as CourierMyProfileEditRouteImport } from './routes/courier.my-profile_.edit'
 import { Route as CourierMyQuotesRouteImport } from './routes/courier.my-quotes'
 import { Route as CourierNewJobsRouteImport } from './routes/courier.new-jobs'
 import { Route as CourierNotificationsRouteImport } from './routes/courier.notifications'
@@ -560,6 +561,11 @@ const CourierMyProfileRoute = CourierMyProfileRouteImport.update({
   path: '/my-profile',
   getParentRoute: () => CourierRoute,
 } as any)
+const CourierMyProfileEditRoute = CourierMyProfileEditRouteImport.update({
+  id: '/my-profile/edit',
+  path: '/my-profile/edit',
+  getParentRoute: () => CourierRoute,
+} as any)
 const CourierMyQuotesRoute = CourierMyQuotesRouteImport.update({
   id: '/my-quotes',
   path: '/my-quotes',
@@ -858,6 +864,7 @@ export interface FileRoutesByFullPath {
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
   '/courier/my-profile': typeof CourierMyProfileRoute
+  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
@@ -983,6 +990,7 @@ export interface FileRoutesByTo {
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
   '/courier/my-profile': typeof CourierMyProfileRoute
+  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
@@ -1110,6 +1118,7 @@ export interface FileRoutesById {
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
   '/courier/my-profile': typeof CourierMyProfileRoute
+  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
@@ -1238,6 +1247,7 @@ export interface FileRouteTypes {
     | '/courier/history'
     | '/courier/messages'
     | '/courier/my-profile'
+    | '/courier/my-profile/edit'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
@@ -1363,6 +1373,7 @@ export interface FileRouteTypes {
     | '/courier/history'
     | '/courier/messages'
     | '/courier/my-profile'
+    | '/courier/my-profile/edit'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
@@ -1489,6 +1500,7 @@ export interface FileRouteTypes {
     | '/courier/history'
     | '/courier/messages'
     | '/courier/my-profile'
+    | '/courier/my-profile/edit'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
@@ -2158,6 +2170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CourierMyProfileRouteImport
       parentRoute: typeof CourierRoute
     }
+    '/courier/my-profile/edit': {
+      id: '/courier/my-profile/edit'
+      path: '/my-profile/edit'
+      fullPath: '/courier/my-profile/edit'
+      preLoaderRoute: typeof CourierMyProfileEditRouteImport
+      parentRoute: typeof CourierRoute
+    }
     '/courier/my-quotes': {
       id: '/courier/my-quotes'
       path: '/my-quotes'
@@ -2626,6 +2645,7 @@ interface CourierRouteChildren {
   CourierHistoryRoute: typeof CourierHistoryRoute
   CourierMessagesRoute: typeof CourierMessagesRoute
   CourierMyProfileRoute: typeof CourierMyProfileRoute
+  CourierMyProfileEditRoute: typeof CourierMyProfileEditRoute
   CourierMyQuotesRoute: typeof CourierMyQuotesRoute
   CourierNewJobsRoute: typeof CourierNewJobsRoute
   CourierNotificationsRoute: typeof CourierNotificationsRoute
@@ -2647,6 +2667,7 @@ const CourierRouteChildren: CourierRouteChildren = {
   CourierHistoryRoute: CourierHistoryRoute,
   CourierMessagesRoute: CourierMessagesRoute,
   CourierMyProfileRoute: CourierMyProfileRoute,
+  CourierMyProfileEditRoute: CourierMyProfileEditRoute,
   CourierMyQuotesRoute: CourierMyQuotesRoute,
   CourierNewJobsRoute: CourierNewJobsRoute,
   CourierNotificationsRoute: CourierNotificationsRoute,

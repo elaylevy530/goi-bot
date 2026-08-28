@@ -107,7 +107,7 @@ function MyProfilePage() {
                     )}
                   </div>
                   <Link
-                    to="/courier/profile/edit"
+                    to="/courier/my-profile/edit"
                     className="absolute bottom-0 right-0 size-8 bg-white rounded-full flex items-center justify-center border-2 border-slate-800"
                     aria-label="עריכת תמונת פרופיל"
                   >
@@ -206,7 +206,7 @@ function MyProfilePage() {
               <h3 className="text-base font-bold text-slate-900">פרטים אישיים</h3>
             </div>
             <Link
-              to="/courier/profile/edit"
+              to="/courier/my-profile/edit"
               className="text-green-600 text-sm font-semibold flex items-center gap-1"
             >
               <Pen className="size-4" />
@@ -230,7 +230,7 @@ function MyProfilePage() {
               <h3 className="text-base font-bold text-slate-900">פרטי רכב</h3>
             </div>
             <Link
-              to="/courier/profile/edit"
+              to="/courier/my-profile/edit"
               className="text-green-600 text-sm font-semibold flex items-center gap-1"
             >
               <Pen className="size-4" />
@@ -249,7 +249,7 @@ function MyProfilePage() {
               <h3 className="text-base font-bold text-slate-900">מסמכים ואישורים</h3>
             </div>
             <Link
-              to="/courier/profile/edit"
+              to="/courier/my-profile/edit"
               className="text-green-600 text-sm font-semibold flex items-center gap-1"
             >
               <ChevronLeft className="size-4" />
@@ -268,7 +268,7 @@ function MyProfilePage() {
               <h3 className="text-base font-bold text-slate-900">פרטי עוסק</h3>
             </div>
             <Link
-              to="/courier/profile/edit"
+              to="/courier/my-profile/edit"
               className="text-green-600 text-sm font-semibold flex items-center gap-1"
             >
               <Pen className="size-4" />
@@ -333,7 +333,7 @@ function EmptyHint({
   to,
   action,
 }: {
-  to: "/courier/profile/edit";
+  to: "/courier/my-profile/edit";
   action: string;
 }) {
   return (
@@ -362,7 +362,7 @@ function VehicleGrid({ me }: { me: CourierSelfRow }) {
   ].filter((cell) => cell.value?.toString().trim());
 
   if (cells.length === 0) {
-    return <EmptyHint to="/courier/profile/edit" action="הוספת פרטי רכב" />;
+    return <EmptyHint to="/courier/my-profile/edit" action="הוספת פרטי רכב" />;
   }
 
   return (
@@ -390,7 +390,7 @@ function DocumentsGrid({ documents }: { documents: NestCourierDocument[] }) {
   const byType = new Map(documents.map((doc) => [doc.type, doc]));
   const hasAny = documents.some((doc) => doc.file_url || doc.expires_at);
   if (!hasAny) {
-    return <EmptyHint to="/courier/profile/edit" action="העלאת מסמכים בפרופיל" />;
+    return <EmptyHint to="/courier/my-profile/edit" action="העלאת מסמכים בפרופיל" />;
   }
 
   return (
@@ -450,7 +450,7 @@ function OsekBlock({ me }: { me: CourierSelfRow }) {
   ].filter((row) => row.value?.trim());
 
   if (rows.length === 0) {
-    return <EmptyHint to="/courier/profile/edit" action="עריכת פרטים בפרופיל" />;
+    return <EmptyHint to="/courier/my-profile/edit" action="עריכת פרטים בפרופיל" />;
   }
 
   return (
