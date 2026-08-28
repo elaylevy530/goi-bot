@@ -1,12 +1,18 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from "class-validator";
+
+const MAX_VEHICLE_YEAR = new Date().getFullYear() + 1;
 
 /** Fields a courier may edit on their own profile. */
 export class UpdateCourierSelfDto {
@@ -75,6 +81,36 @@ export class UpdateCourierSelfDto {
   @IsArray()
   @IsString({ each: true })
   vehicle_types?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  vehicle_label?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  vehicle_plate?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1980)
+  @Max(MAX_VEHICLE_YEAR)
+  vehicle_year?: number | null;
+
+  @IsOptional()
+  @IsIn(["עוסק פטור", "עוסק מורשה", ""])
+  business_type?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  tax_id?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  invoice_name?: string | null;
 
   @IsOptional()
   @IsArray()

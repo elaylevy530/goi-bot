@@ -23,6 +23,7 @@ import { CreateCourierAdminDto } from "./dto/create-courier-admin.dto";
 import { ListCouriersQueryDto } from "./dto/list-couriers-query.dto";
 import { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
 import { UpdateCourierAdminDto } from "./dto/update-courier-admin.dto";
+import { UpdateCourierDocumentSelfDto } from "./dto/update-courier-document-self.dto";
 import { UpdateCourierSelfDto } from "./dto/update-courier-self.dto";
 import { UpdateCustomerAdminDto } from "./dto/update-customer-admin.dto";
 import { UpdateCustomerSelfDto } from "./dto/update-customer-self.dto";
@@ -56,6 +57,28 @@ export class AccountsController {
     @Body() dto: UpdateCourierSelfDto,
   ) {
     return this.accounts.updateMyCourier(auth.userId, dto);
+  }
+
+  @Get("couriers/me/documents")
+  @UseGuards(JwtAuthGuard)
+  myCourierDocuments(@CurrentUser() auth: AuthUserContext) {
+    return this.accounts.listMyDocuments(auth.userId);
+  }
+
+  @Patch("couriers/me/documents/:type")
+  @UseGuards(JwtAuthGuard)
+  updateMyCourierDocument(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("type") type: string,
+    @Body() dto: UpdateCourierDocumentSelfDto,
+  ) {
+    return this.accounts.updateMyDocument(auth.userId, type, dto);
+  }
+
+  @Post("couriers/me/close")
+  @UseGuards(JwtAuthGuard)
+  closeMyCourier(@CurrentUser() auth: AuthUserContext) {
+    return this.accounts.closeMyCourier(auth.userId);
   }
 
   @Get("customers/me")

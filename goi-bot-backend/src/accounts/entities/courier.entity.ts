@@ -137,6 +137,10 @@ export class Courier {
   @Column({ type: "varchar", length: 16, nullable: true })
   referral_code!: string | null;
 
+  @Index({ unique: true })
+  @Column({ type: "varchar", length: 16, nullable: true })
+  courier_number!: string | null;
+
   @Index()
   @Column({ type: "uuid", nullable: true })
   referred_by_courier_id!: string | null;
@@ -155,6 +159,21 @@ export class Courier {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   vehicle_label!: string | null;
+
+  @Column({ type: "varchar", length: 32, nullable: true })
+  vehicle_plate!: string | null;
+
+  @Column({ type: "int", nullable: true })
+  vehicle_year!: number | null;
+
+  @Column({ type: "varchar", length: 64, nullable: true })
+  business_type!: string | null;
+
+  @Column({ type: "varchar", length: 64, nullable: true })
+  tax_id!: string | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  invoice_name!: string | null;
 
   @Column({ type: "text", nullable: true })
   custom_work_area!: string | null;

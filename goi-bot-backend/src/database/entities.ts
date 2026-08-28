@@ -4,6 +4,7 @@ import { BusinessNotification } from "../accounts/entities/business-notification
 import { BusinessBranch } from "../accounts/entities/business-branch.entity";
 import { BusinessFavoriteCourier } from "../accounts/entities/business-favorite-courier.entity";
 import { BusinessIntegration } from "../accounts/entities/business-integration.entity";
+import { CourierDocument } from "../accounts/entities/courier-document.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { CourierAdminNotification } from "../accounts/entities/courier-admin-notification.entity";
 import { CourierBonus } from "../accounts/entities/courier-bonus.entity";
@@ -68,6 +69,7 @@ export const TYPEORM_ENTITIES = [
   BusinessNotification,
   BusinessFavoriteCourier,
   Courier,
+  CourierDocument,
   CourierAdminNotification,
   CourierBonus,
   CourierPasswordReset,

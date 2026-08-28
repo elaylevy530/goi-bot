@@ -12,6 +12,7 @@ import * as bcrypt from "bcrypt";
 import { createHash, randomInt } from "crypto";
 import { IsNull, MoreThan, Repository } from "typeorm";
 import { Courier } from "../accounts/entities/courier.entity";
+import { allocateCourierNumber, ensureCourierNumber } from "../accounts/courier-number";
 import {
   allocateReferralCode,
   ensureCourierReferralCode,
@@ -227,7 +228,8 @@ export class AuthService {
       ? await this.couriers.findOne({ where: { id } })
       : await this.couriers.findOne({ where: { user_id: userId } });
     if (!courier) return null;
-    return ensureCourierReferralCode(this.couriers, courier);
+    await ensureCourierReferralCode(this.couriers, courier);
+    return ensureCourierNumber(this.couriers, courier);
   }
 
   async updateMyCustomerName(userId: string, fullName: string) {
@@ -541,6 +543,9 @@ export class AuthService {
     if (!courier.referral_code) {
       courier.referral_code = await allocateReferralCode(this.couriers);
     }
+    if (!courier.courier_number) {
+      courier.courier_number = await allocateCourierNumber(this.couriers);
+    }
     await this.couriers.save(courier);
     await this.ensureRole(userId, "courier");
 
@@ -645,6 +650,7 @@ export class AuthService {
         courier_status: "ממתין לאישור",
         lead_source: referralLead ? `referral:${referralLead}` : "טופס /join",
         referral_code: await allocateReferralCode(this.couriers),
+        courier_number: await allocateCourierNumber(this.couriers),
         referred_by_courier_id: referrer?.id ?? null,
         id_number: dto.id_number || null,
         id_photo_url: idPhotoUrl,

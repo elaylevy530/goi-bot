@@ -1,25 +1,33 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
+import { allocateCourierNumber, ensureCourierNumber } from "./courier-number";
 import {
   allocateReferralCode,
   ensureCourierReferralCode,
 } from "./referral-code";
-import { previewCourierId, previewCustomerId } from "../auth/auth-als";
+import { getPreviewClaim, previewCourierId, previewCustomerId } from "../auth/auth-als";
 import { normalizePhone } from "../auth/phone.util";
 import { Job } from "../jobs/entities/job.entity";
 import { BusinessNotification } from "./entities/business-notification.entity";
+import {
+  COURIER_DOCUMENT_TYPES,
+  CourierDocument,
+  type CourierDocumentType,
+} from "./entities/courier-document.entity";
 import { Courier } from "./entities/courier.entity";
 import { Customer } from "./entities/customer.entity";
 import type { ApproveCourierDto } from "./dto/approve-courier.dto";
 import type { CreateCourierAdminDto } from "./dto/create-courier-admin.dto";
 import type { UpdateCourierAdminDto } from "./dto/update-courier-admin.dto";
+import type { UpdateCourierDocumentSelfDto } from "./dto/update-courier-document-self.dto";
 import type { UpdateCourierSelfDto } from "./dto/update-courier-self.dto";
 import type { UpdateCustomerAdminDto } from "./dto/update-customer-admin.dto";
 import type { UpdateCustomerSelfDto } from "./dto/update-customer-self.dto";
@@ -58,6 +66,8 @@ export type CourierReferralsPayload = {
 export class AccountsService implements OnModuleInit {
   constructor(
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
+    @InjectRepository(CourierDocument)
+    private readonly courierDocuments: Repository<CourierDocument>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
     @InjectRepository(BusinessNotification)
     private readonly notifications: Repository<BusinessNotification>,
@@ -110,19 +120,68 @@ export class AccountsService implements OnModuleInit {
       `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS referred_by_courier_id uuid`,
     );
     await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS courier_number varchar(16)`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS vehicle_plate varchar(32)`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS vehicle_year int`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS business_type varchar(64)`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS tax_id varchar(64)`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE couriers ADD COLUMN IF NOT EXISTS invoice_name varchar(255)`,
+    );
+    await this.dataSource.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS IDX_couriers_referral_code ON couriers (referral_code)`,
     );
     await this.dataSource.query(
       `CREATE INDEX IF NOT EXISTS IDX_couriers_referred_by_courier_id ON couriers (referred_by_courier_id)`,
     );
+    await this.dataSource.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS IDX_couriers_courier_number ON couriers (courier_number)`,
+    );
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS courier_documents (
+        id uuid PRIMARY KEY,
+        courier_id uuid NOT NULL,
+        type varchar(64) NOT NULL,
+        file_url varchar(512),
+        expires_at date,
+        verified boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await this.dataSource.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS IDX_courier_documents_courier_id_type ON courier_documents (courier_id, type)`,
+    );
+    await this.dataSource.query(
+      `CREATE INDEX IF NOT EXISTS IDX_courier_documents_courier_id ON courier_documents (courier_id)`,
+    );
 
-    const missing = await this.couriers.find({
+    const missingReferral = await this.couriers.find({
       where: { referral_code: IsNull() },
       select: ["id"],
     });
-    for (const row of missing) {
+    for (const row of missingReferral) {
       await this.couriers.update(row.id, {
         referral_code: await allocateReferralCode(this.couriers),
+      });
+    }
+
+    const missingNumber = await this.couriers.find({
+      where: { courier_number: IsNull() },
+      select: ["id"],
+    });
+    for (const row of missingNumber) {
+      await this.couriers.update(row.id, {
+        courier_number: await allocateCourierNumber(this.couriers),
       });
     }
   }
@@ -135,7 +194,8 @@ export class AccountsService implements OnModuleInit {
     if (!courier) {
       throw new NotFoundException("Courier profile not found");
     }
-    return ensureCourierReferralCode(this.couriers, courier);
+    await ensureCourierReferralCode(this.couriers, courier);
+    return ensureCourierNumber(this.couriers, courier);
   }
 
   async getMyReferrals(userId: string): Promise<CourierReferralsPayload> {
@@ -213,8 +273,87 @@ export class AccountsService implements OnModuleInit {
     if (dto.last_lat != null || dto.last_lng != null) {
       courier.last_location_at = new Date();
     }
+    if (dto.business_type === "") {
+      dto.business_type = null;
+    }
     Object.assign(courier, dto);
     return this.couriers.save(courier);
+  }
+
+  async listMyDocuments(userId: string): Promise<CourierDocument[]> {
+    const courier = await this.getMyCourier(userId);
+    const rows = await this.courierDocuments.find({
+      where: { courier_id: courier.id },
+    });
+    const byType = new Map(rows.map((row) => [row.type, row]));
+    return COURIER_DOCUMENT_TYPES.map((type) => {
+      const existing = byType.get(type);
+      if (existing) return existing;
+      return this.courierDocuments.create({
+        courier_id: courier.id,
+        type,
+        file_url: null,
+        expires_at: null,
+        verified: false,
+      });
+    });
+  }
+
+  async updateMyDocument(
+    userId: string,
+    rawType: string,
+    dto: UpdateCourierDocumentSelfDto,
+  ): Promise<CourierDocument> {
+    if (!COURIER_DOCUMENT_TYPES.includes(rawType as CourierDocumentType)) {
+      throw new BadRequestException("Unknown document type");
+    }
+    const type = rawType as CourierDocumentType;
+    const courier = await this.getMyCourier(userId);
+    let row = await this.courierDocuments.findOne({
+      where: { courier_id: courier.id, type },
+    });
+    if (!row) {
+      row = this.courierDocuments.create({
+        courier_id: courier.id,
+        type,
+        file_url: null,
+        expires_at: null,
+        verified: false,
+      });
+    }
+    if (dto.file_url !== undefined) {
+      row.file_url = dto.file_url?.trim() || null;
+    }
+    if (dto.expires_at !== undefined) {
+      const raw = dto.expires_at?.trim() ?? "";
+      row.expires_at = raw ? raw.slice(0, 10) : null;
+    }
+    return this.courierDocuments.save(row);
+  }
+
+  /** Self-service deactivate — does not hard-delete jobs, outcomes, or payouts. */
+  async closeMyCourier(userId: string): Promise<{ ok: true }> {
+    if (getPreviewClaim()) {
+      throw new ForbiddenException(
+        "מצב תצוגת מנהל הוא לקריאה בלבד. לא ניתן לבצע פעולות כתיבה.",
+      );
+    }
+    const courier = await this.getMyCourier(userId);
+    const linkedUserId = courier.user_id;
+    courier.courier_status = "חסום";
+    courier.accepting_jobs = false;
+    courier.is_paused = true;
+    courier.paused_at = new Date();
+    courier.paused_reason = "החשבון נסגר על ידי השליח";
+    courier.user_id = null;
+    await this.couriers.save(courier);
+    if (linkedUserId) {
+      await this.dataSource.query(
+        `DELETE FROM user_roles WHERE user_id = $1 AND role = 'courier'`,
+        [linkedUserId],
+      );
+    }
+    return { ok: true as const };
   }
 
   async getMyCustomer(userId: string): Promise<Customer> {
@@ -296,6 +435,7 @@ export class AccountsService implements OnModuleInit {
         courier_kind: dto.courier_kind === "mover" ? "mover" : "courier",
         accepting_jobs: false,
         referral_code: await allocateReferralCode(this.couriers),
+        courier_number: await allocateCourierNumber(this.couriers),
       }),
     );
   }
