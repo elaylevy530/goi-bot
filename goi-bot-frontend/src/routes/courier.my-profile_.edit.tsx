@@ -15,13 +15,17 @@ import {
 } from "@/lib/nest-accounts";
 import { nestUploadFile } from "@/lib/nest-files";
 import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
-import { splitWorkingAreas, WORK_AREA_REQUIRED_ERROR } from "@/lib/regions";
+import {
+  composeWorkingAreas,
+  splitWorkingAreas,
+  workAreaSelectionError,
+} from "@/lib/regions";
 import { useCourierAvatarUrl } from "@/hooks/useCourierAvatarUrl";
 import { COURIER_DOCUMENT_TYPES, courierInitials } from "@/lib/courier-session";
 import { Loader2, Save, Camera, User, Bike, FileText, ChevronRight, Shield } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/courier/my-profile/edit")({
+export const Route = createFileRoute("/courier/my-profile_/edit")({
   head: () => ({ meta: [{ title: "עריכת פרופיל — Goi" }] }),
   component: EditProfilePage,
 });
@@ -42,7 +46,7 @@ function EditProfilePage() {
   const [idNumber, setIdNumber] = useState("");
   const [baseCity, setBaseCity] = useState("");
   const [workingAreas, setWorkingAreas] = useState<string[]>([]);
-  const [legacyAreas, setLegacyAreas] = useState<string[]>([]);
+  const [workCities, setWorkCities] = useState<string[]>([]);
   const [areasError, setAreasError] = useState<string | null>(null);
   const [vehicle, setVehicle] = useState("");
   const [vehicleLabel, setVehicleLabel] = useState("");
@@ -95,7 +99,7 @@ function EditProfilePage() {
     setBaseCity(row.base_city ?? "");
     const areas = splitWorkingAreas(row.working_areas);
     setWorkingAreas(areas.selected);
-    setLegacyAreas(areas.legacy);
+    setWorkCities(areas.legacy);
     setAreasError(null);
     setVehicle(row.vehicle_type ?? "");
     setVehicleLabel(row.vehicle_label ?? "");
@@ -140,9 +144,10 @@ function EditProfilePage() {
         newAvatarPath = uploaded.path;
       }
 
-      if (workingAreas.length === 0 && legacyAreas.length === 0) {
-        setAreasError(WORK_AREA_REQUIRED_ERROR);
-        throw new Error(WORK_AREA_REQUIRED_ERROR);
+      const areasErrorMsg = workAreaSelectionError(workingAreas, workCities);
+      if (areasErrorMsg) {
+        setAreasError(areasErrorMsg);
+        throw new Error(areasErrorMsg);
       }
       const yearTrim = vehicleYear.trim();
       let yearValue: number | null = null;
@@ -160,7 +165,7 @@ function EditProfilePage() {
         email: email || null,
         id_number: idNumber || null,
         base_city: baseCity || null,
-        working_areas: workingAreas.length > 0 ? workingAreas : legacyAreas,
+        working_areas: workingAreas.length > 0 ? composeWorkingAreas(workingAreas, workCities) : workCities,
         vehicle_type: vehicle || null,
         vehicle_label: vehicleLabel.trim() || null,
         vehicle_plate: vehiclePlate.trim() || null,
@@ -301,14 +306,18 @@ function EditProfilePage() {
                 selected={workingAreas}
                 onChange={(next) => {
                   setWorkingAreas(next);
-                  if (next.length > 0) setLegacyAreas([]);
-                  setAreasError(next.length === 0 && legacyAreas.length === 0 ? WORK_AREA_REQUIRED_ERROR : null);
+                  setAreasError(null);
+                }}
+                cities={workCities}
+                onCitiesChange={(next) => {
+                  setWorkCities(next);
+                  setAreasError(null);
                 }}
                 error={areasError}
               />
-              {legacyAreas.length > 0 && workingAreas.length === 0 && (
+              {workCities.length > 0 && workingAreas.length === 0 && (
                 <p className="text-xs text-text-subtle text-end mt-2">
-                  נשמרו ערים ישנות: {legacyAreas.join(", ")} — בחר אזור מהרשימה כדי לעדכן
+                  נשמרו ערים ישנות: {workCities.join(", ")} — בחר אזור מהרשימה כדי לעדכן
                 </p>
               )}
             </div>

@@ -92,7 +92,6 @@ import { Route as CourierDashboardRouteImport } from './routes/courier.dashboard
 import { Route as CourierHistoryRouteImport } from './routes/courier.history'
 import { Route as CourierMessagesRouteImport } from './routes/courier.messages'
 import { Route as CourierMyProfileRouteImport } from './routes/courier.my-profile'
-import { Route as CourierMyProfileEditRouteImport } from './routes/courier.my-profile_.edit'
 import { Route as CourierMyQuotesRouteImport } from './routes/courier.my-quotes'
 import { Route as CourierNewJobsRouteImport } from './routes/courier.new-jobs'
 import { Route as CourierNotificationsRouteImport } from './routes/courier.notifications'
@@ -127,6 +126,7 @@ import { Route as BusinessOrderIdRouteImport } from './routes/business.order.$id
 import { Route as BusinessTrackIdRouteImport } from './routes/business.track.$id'
 import { Route as CourierMissionJobIdRouteImport } from './routes/courier.mission.$jobId'
 import { Route as CourierMultiStopIdRouteImport } from './routes/courier.multi-stop.$id'
+import { Route as CourierMyProfileEditRouteImport } from './routes/courier.my-profile_.edit'
 import { Route as CourierProfileIndexRouteImport } from './routes/courier.profile.index'
 import { Route as CourierProfileBankRouteImport } from './routes/courier.profile.bank'
 import { Route as CourierProfileEditRouteImport } from './routes/courier.profile.edit'
@@ -561,11 +561,6 @@ const CourierMyProfileRoute = CourierMyProfileRouteImport.update({
   path: '/my-profile',
   getParentRoute: () => CourierRoute,
 } as any)
-const CourierMyProfileEditRoute = CourierMyProfileEditRouteImport.update({
-  id: '/my-profile/edit',
-  path: '/my-profile/edit',
-  getParentRoute: () => CourierRoute,
-} as any)
 const CourierMyQuotesRoute = CourierMyQuotesRouteImport.update({
   id: '/my-quotes',
   path: '/my-quotes',
@@ -742,6 +737,11 @@ const CourierMultiStopIdRoute = CourierMultiStopIdRouteImport.update({
   path: '/multi-stop/$id',
   getParentRoute: () => CourierRoute,
 } as any)
+const CourierMyProfileEditRoute = CourierMyProfileEditRouteImport.update({
+  id: '/my-profile_/edit',
+  path: '/my-profile/edit',
+  getParentRoute: () => CourierRoute,
+} as any)
 const CourierProfileIndexRoute = CourierProfileIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -864,7 +864,6 @@ export interface FileRoutesByFullPath {
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
   '/courier/my-profile': typeof CourierMyProfileRoute
-  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
@@ -900,6 +899,7 @@ export interface FileRoutesByFullPath {
   '/business/track/$id': typeof BusinessTrackIdRoute
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
+  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/profile/bank': typeof CourierProfileBankRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
@@ -990,7 +990,6 @@ export interface FileRoutesByTo {
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
   '/courier/my-profile': typeof CourierMyProfileRoute
-  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
@@ -1025,6 +1024,7 @@ export interface FileRoutesByTo {
   '/business/track/$id': typeof BusinessTrackIdRoute
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
+  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/profile/bank': typeof CourierProfileBankRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
@@ -1118,7 +1118,6 @@ export interface FileRoutesById {
   '/courier/history': typeof CourierHistoryRoute
   '/courier/messages': typeof CourierMessagesRoute
   '/courier/my-profile': typeof CourierMyProfileRoute
-  '/courier/my-profile/edit': typeof CourierMyProfileEditRoute
   '/courier/my-quotes': typeof CourierMyQuotesRoute
   '/courier/new-jobs': typeof CourierNewJobsRoute
   '/courier/notifications': typeof CourierNotificationsRoute
@@ -1154,6 +1153,7 @@ export interface FileRoutesById {
   '/business/track/$id': typeof BusinessTrackIdRoute
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
   '/courier/multi-stop/$id': typeof CourierMultiStopIdRoute
+  '/courier/my-profile_/edit': typeof CourierMyProfileEditRoute
   '/courier/profile/bank': typeof CourierProfileBankRoute
   '/courier/profile/edit': typeof CourierProfileEditRoute
   '/customer/chat/$jobId': typeof CustomerChatJobIdRoute
@@ -1247,7 +1247,6 @@ export interface FileRouteTypes {
     | '/courier/history'
     | '/courier/messages'
     | '/courier/my-profile'
-    | '/courier/my-profile/edit'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
@@ -1283,6 +1282,7 @@ export interface FileRouteTypes {
     | '/business/track/$id'
     | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
+    | '/courier/my-profile/edit'
     | '/courier/profile/bank'
     | '/courier/profile/edit'
     | '/customer/chat/$jobId'
@@ -1373,7 +1373,6 @@ export interface FileRouteTypes {
     | '/courier/history'
     | '/courier/messages'
     | '/courier/my-profile'
-    | '/courier/my-profile/edit'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
@@ -1408,6 +1407,7 @@ export interface FileRouteTypes {
     | '/business/track/$id'
     | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
+    | '/courier/my-profile/edit'
     | '/courier/profile/bank'
     | '/courier/profile/edit'
     | '/customer/chat/$jobId'
@@ -1500,7 +1500,6 @@ export interface FileRouteTypes {
     | '/courier/history'
     | '/courier/messages'
     | '/courier/my-profile'
-    | '/courier/my-profile/edit'
     | '/courier/my-quotes'
     | '/courier/new-jobs'
     | '/courier/notifications'
@@ -1536,6 +1535,7 @@ export interface FileRouteTypes {
     | '/business/track/$id'
     | '/courier/mission/$jobId'
     | '/courier/multi-stop/$id'
+    | '/courier/my-profile_/edit'
     | '/courier/profile/bank'
     | '/courier/profile/edit'
     | '/customer/chat/$jobId'
@@ -2170,13 +2170,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CourierMyProfileRouteImport
       parentRoute: typeof CourierRoute
     }
-    '/courier/my-profile/edit': {
-      id: '/courier/my-profile/edit'
-      path: '/my-profile/edit'
-      fullPath: '/courier/my-profile/edit'
-      preLoaderRoute: typeof CourierMyProfileEditRouteImport
-      parentRoute: typeof CourierRoute
-    }
     '/courier/my-quotes': {
       id: '/courier/my-quotes'
       path: '/my-quotes'
@@ -2415,6 +2408,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CourierMultiStopIdRouteImport
       parentRoute: typeof CourierRoute
     }
+    '/courier/my-profile_/edit': {
+      id: '/courier/my-profile_/edit'
+      path: '/my-profile/edit'
+      fullPath: '/courier/my-profile/edit'
+      preLoaderRoute: typeof CourierMyProfileEditRouteImport
+      parentRoute: typeof CourierRoute
+    }
     '/courier/profile/': {
       id: '/courier/profile/'
       path: '/'
@@ -2645,7 +2645,6 @@ interface CourierRouteChildren {
   CourierHistoryRoute: typeof CourierHistoryRoute
   CourierMessagesRoute: typeof CourierMessagesRoute
   CourierMyProfileRoute: typeof CourierMyProfileRoute
-  CourierMyProfileEditRoute: typeof CourierMyProfileEditRoute
   CourierMyQuotesRoute: typeof CourierMyQuotesRoute
   CourierNewJobsRoute: typeof CourierNewJobsRoute
   CourierNotificationsRoute: typeof CourierNotificationsRoute
@@ -2656,6 +2655,7 @@ interface CourierRouteChildren {
   CourierWalletRoute: typeof CourierWalletRoute
   CourierMissionJobIdRoute: typeof CourierMissionJobIdRoute
   CourierMultiStopIdRoute: typeof CourierMultiStopIdRoute
+  CourierMyProfileEditRoute: typeof CourierMyProfileEditRoute
 }
 
 const CourierRouteChildren: CourierRouteChildren = {
@@ -2667,7 +2667,6 @@ const CourierRouteChildren: CourierRouteChildren = {
   CourierHistoryRoute: CourierHistoryRoute,
   CourierMessagesRoute: CourierMessagesRoute,
   CourierMyProfileRoute: CourierMyProfileRoute,
-  CourierMyProfileEditRoute: CourierMyProfileEditRoute,
   CourierMyQuotesRoute: CourierMyQuotesRoute,
   CourierNewJobsRoute: CourierNewJobsRoute,
   CourierNotificationsRoute: CourierNotificationsRoute,
@@ -2678,6 +2677,7 @@ const CourierRouteChildren: CourierRouteChildren = {
   CourierWalletRoute: CourierWalletRoute,
   CourierMissionJobIdRoute: CourierMissionJobIdRoute,
   CourierMultiStopIdRoute: CourierMultiStopIdRoute,
+  CourierMyProfileEditRoute: CourierMyProfileEditRoute,
 }
 
 const CourierRouteWithChildren =

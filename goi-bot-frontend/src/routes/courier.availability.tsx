@@ -11,13 +11,16 @@ import {
   ScooterIcon,
   WorkAreaRegionIcon,
 } from "@/components/courier/work-area-visuals";
+import { WorkAreaCityPicker } from "@/components/courier/WorkAreaPicker";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import {
+  composeWorkingAreas,
   expandWorkAreasForCards,
+  filterCitiesToWorkAreas,
   splitWorkingAreas,
   toggleWorkArea,
+  workAreaSelectionError,
   WORK_AREA_CARDS,
-  WORK_AREA_REQUIRED_ERROR,
 } from "@/lib/regions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -48,7 +51,7 @@ function AvailabilityPage() {
   const { data: me } = useMyCourier();
   const qc = useQueryClient();
   const [areas, setAreas] = useState<string[]>([]);
-  const [legacyAreas, setLegacyAreas] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
   const [vehicle, setVehicle] = useState<"קטנוע" | "רכב" | "">("");
   const [areasError, setAreasError] = useState<string | null>(null);
 
@@ -60,7 +63,7 @@ function AvailabilityPage() {
     const row = me as { working_areas?: string[] | null; vehicle_type?: string | null };
     const split = splitWorkingAreas(row.working_areas);
     setAreas(expandWorkAreasForCards(row.working_areas));
-    setLegacyAreas(split.legacy);
+    setCities(split.legacy);
     setVehicle(normalizeVehicle(row.vehicle_type));
     setAreasError(null);
   }, [me]);
@@ -68,10 +71,8 @@ function AvailabilityPage() {
   const toggleArea = (stored: string) => {
     const next = toggleWorkArea(areas, stored);
     setAreas(next);
-    if (next.length > 0) {
-      setLegacyAreas([]);
-      setAreasError(null);
-    }
+    setCities((prev) => filterCitiesToWorkAreas(prev, next));
+    setAreasError(null);
   };
 
   const toggleAvailability = useMutation({
@@ -86,12 +87,13 @@ function AvailabilityPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      if (areas.length === 0 && legacyAreas.length === 0) {
-        setAreasError(WORK_AREA_REQUIRED_ERROR);
-        throw new Error(WORK_AREA_REQUIRED_ERROR);
+      const err = workAreaSelectionError(areas, cities);
+      if (err) {
+        setAreasError(err);
+        throw new Error(err);
       }
       const payload: Record<string, unknown> = {
-        working_areas: areas.length > 0 ? areas : legacyAreas,
+        working_areas: areas.length > 0 ? composeWorkingAreas(areas, cities) : cities,
       };
       if (vehicle) payload.vehicle_type = vehicle;
       await nestUpdateMyCourier(payload);
@@ -226,9 +228,19 @@ function AvailabilityPage() {
                   );
                 })}
               </div>
-              {legacyAreas.length > 0 && areas.length === 0 && (
+              {areas.length > 0 && (
+                <WorkAreaCityPicker
+                  regions={areas}
+                  selected={cities}
+                  onChange={(next) => {
+                    setCities(next);
+                    if (next.length > 0) setAreasError(null);
+                  }}
+                />
+              )}
+              {cities.length > 0 && areas.length === 0 && (
                 <p className="text-xs text-text-subtle text-right">
-                  נשמרו ערים ישנות: {legacyAreas.join(", ")} — בחר אזור מהרשימה כדי לעדכן
+                  נשמרו ערים ישנות: {cities.join(", ")} — בחר אזור מהרשימה כדי לעדכן
                 </p>
               )}
               {areasError && <p className="text-xs text-destructive text-right">{areasError}</p>}

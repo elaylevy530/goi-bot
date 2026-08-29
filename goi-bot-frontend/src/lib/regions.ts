@@ -194,6 +194,7 @@ export type WorkAreaLabel =
 
 export const NATIONWIDE_WORK_AREA: WorkAreaLabel = "כל הארץ";
 export const WORK_AREA_REQUIRED_ERROR = "יש לבחור לפחות אזור עבודה אחד";
+export const WORK_AREA_CITIES_REQUIRED_ERROR = "יש לבחור לפחות עיר אחת באזורים שנבחרו";
 
 /** Visual order for the courier work-areas screen (RTL grid, right-to-left). */
 export const WORK_AREA_CARDS = [
@@ -317,6 +318,105 @@ export function splitWorkingAreas(values: string[] | null | undefined): {
     else legacy.push(v);
   }
   return { selected, legacy };
+}
+
+function citySelectionKey(name: string): string {
+  return name
+    .trim()
+    .replace(/^ה(?=\S)/, "")
+    .replace(/-/g, " ")
+    .replace(/קריית/g, "קרית")
+    .replace(/\s+/g, " ");
+}
+
+function adminRegionsForWorkArea(area: string): Region[] {
+  const direct = WORK_AREA_TO_ADMIN_REGIONS[area];
+  if (direct) return direct;
+  const card = WORK_AREA_CARDS.find((c) => c.stored === area || c.label === area);
+  return card ? (WORK_AREA_TO_ADMIN_REGIONS[card.stored] ?? []) : [];
+}
+
+/** Region groups to show in the city picker (nationwide expands to the 6 cards). */
+export function workAreasForCityPicker(areas: string[]): string[] {
+  if (areas.some((a) => a === NATIONWIDE_WORK_AREA || a.includes(NATIONWIDE_WORK_AREA))) {
+    return WORK_AREA_CARDS.map((card) => card.stored);
+  }
+  const out: string[] = [];
+  for (const area of areas) {
+    const stored =
+      WORK_AREA_CARDS.find((card) => card.stored === area || card.label === area)?.stored ??
+      (isWorkAreaLabel(area) && area !== NATIONWIDE_WORK_AREA ? area : null);
+    if (stored && !out.includes(stored)) out.push(stored);
+  }
+  return out;
+}
+
+/** Unique display cities for a work-area label, derived from CITY_TO_REGION. */
+export function citiesForWorkArea(area: string): string[] {
+  const regions = adminRegionsForWorkArea(area);
+  if (regions.length === 0) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const [city, region] of Object.entries(CITY_TO_REGION)) {
+    if (!regions.includes(region)) continue;
+    const label = city.trim();
+    const key = citySelectionKey(label);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out.sort((a, b) => a.localeCompare(b, "he"));
+}
+
+export function isCitySelected(selected: string[], city: string): boolean {
+  const key = citySelectionKey(city);
+  return selected.some((c) => citySelectionKey(c) === key);
+}
+
+export function toggleCity(selected: string[], city: string): string[] {
+  const key = citySelectionKey(city);
+  if (selected.some((c) => citySelectionKey(c) === key)) {
+    return selected.filter((c) => citySelectionKey(c) !== key);
+  }
+  return [...selected, city.trim()];
+}
+
+/** Drop cities that no longer belong to the selected regions. */
+export function filterCitiesToWorkAreas(cities: string[], areas: string[]): string[] {
+  if (areas.length === 0) return [];
+  const allowedKeys = new Set(
+    workAreasForCityPicker(areas).flatMap((area) => citiesForWorkArea(area).map(citySelectionKey)),
+  );
+  return cities.filter((city) => {
+    const key = citySelectionKey(city);
+    if (allowedKeys.has(key)) return true;
+    const mapped = workAreaOf(city);
+    if (!mapped) return false;
+    return areas.some((area) => coveringWorkAreas(area).includes(mapped) || area === mapped);
+  });
+}
+
+/** Persist region labels plus cities so old region-only / city-only rows stay valid. */
+export function composeWorkingAreas(regions: string[], cities: string[]): string[] {
+  const out: string[] = [];
+  for (const region of regions) {
+    const v = region.trim();
+    if (v && !out.includes(v)) out.push(v);
+  }
+  for (const city of cities) {
+    const v = city.trim();
+    if (v && !out.includes(v) && !isWorkAreaLabel(v)) out.push(v);
+  }
+  return out;
+}
+
+export function workAreaSelectionError(
+  regions: string[],
+  cities: string[],
+): string | null {
+  if (regions.length === 0 && cities.length === 0) return WORK_AREA_REQUIRED_ERROR;
+  if (regions.length > 0 && cities.length === 0) return WORK_AREA_CITIES_REQUIRED_ERROR;
+  return null;
 }
 
 /** City / address overlap plus city → signup-region mapping. */

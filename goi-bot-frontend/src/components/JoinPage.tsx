@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { BackNav } from "@/components/BackNav";
 import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
-import { WORK_AREA_REQUIRED_ERROR } from "@/lib/regions";
+import { composeWorkingAreas, workAreaSelectionError } from "@/lib/regions";
 import { toast } from "sonner";
 import { cacheCourierKind } from "@/lib/courier-kind";
 
@@ -182,6 +182,7 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
 
   const [baseCity, setBaseCity] = useState("");
   const [workAreas, setWorkAreas] = useState<string[]>([]);
+  const [workCities, setWorkCities] = useState<string[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
   const [invoice, setInvoice] = useState<string>("");
   const [password, setPassword] = useState("");
@@ -200,7 +201,8 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
 
   const mut = useMutation({
     mutationFn: async () => {
-      if (workAreas.length === 0) throw new Error(WORK_AREA_REQUIRED_ERROR);
+      const areasError = workAreaSelectionError(workAreas, workCities);
+      if (areasError) throw new Error(areasError);
       const invoiceDb = INVOICE_OPTIONS.find((i) => i.value === invoice)?.db ?? "לא";
 
       let id_photo_base64: string | null = null;
@@ -228,7 +230,7 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
         id_photo_back_mime,
         gender: gender || null,
         base_city: baseCity,
-        wanted_work_areas: workAreas,
+        wanted_work_areas: composeWorkingAreas(workAreas, workCities),
         custom_work_area: null,
         pickup_areas: [],
         custom_pickup_area: null,
@@ -286,6 +288,7 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
     gender &&
     baseCity.trim().length >= 2 &&
     workAreas.length > 0 &&
+    workCities.length > 0 &&
     vehicleTypes.length > 0 &&
     password.length >= 6 &&
     consent;
@@ -486,7 +489,13 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
             <WorkAreaPicker
               selected={workAreas}
               onChange={setWorkAreas}
-              error={workAreas.length === 0 && (fullName.trim() || baseCity.trim()) ? WORK_AREA_REQUIRED_ERROR : null}
+              cities={workCities}
+              onCitiesChange={setWorkCities}
+              error={
+                (fullName.trim() || baseCity.trim())
+                  ? workAreaSelectionError(workAreas, workCities)
+                  : null
+              }
             />
           </Section>
 

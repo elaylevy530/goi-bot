@@ -80,11 +80,35 @@ function displayStatus(status?: string | null) {
   return { label: "ממתין לאישור", tone: "wait" as const };
 }
 
-function nextEligibleDate(from: Date) {
-  const d = new Date(from);
-  d.setDate(d.getDate() + 7);
-  d.setHours(0, 0, 0, 0);
-  return d;
+const ISRAEL_TZ = "Asia/Jerusalem";
+const WITHDRAWAL_WINDOW_ERROR = "ניתן להגיש בקשת משיכה רק ב-1 לחודש";
+
+function israelCalendarParts(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: ISRAEL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const num = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: num("year"), month: num("month"), day: num("day") };
+}
+
+function isIsraelFirstOfMonth(now = new Date()) {
+  return israelCalendarParts(now).day === 1;
+}
+
+function nextWithdrawalWindowDate(now = new Date()) {
+  const { year, month, day } = israelCalendarParts(now);
+  if (day <= 1) return { year, month, day: 1 };
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  return { year: nextYear, month: nextMonth, day: 1 };
+}
+
+function formatIsraelDate(parts: { year: number; month: number; day: number }) {
+  const utc = Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0);
+  return new Date(utc).toLocaleDateString("he-IL", { timeZone: ISRAEL_TZ });
 }
 
 function WalletPage() {
@@ -128,17 +152,6 @@ function WalletPage() {
     .slice()
     .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0];
 
-  const lastRequest = withdrawals
-    .slice()
-    .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0];
-  const nextDate = lastRequest?.created_at
-    ? nextEligibleDate(new Date(lastRequest.created_at))
-    : new Date();
-  const daysLeft = lastRequest?.created_at
-    ? Math.max(0, Math.ceil((nextDate.getTime() - Date.now()) / 86_400_000))
-    : 0;
-  const canRequestNow = !latestPending && available >= MIN_WITHDRAWAL && daysLeft === 0;
-
   const bank = me as {
     bank_name?: string | null;
     bank_branch?: string | null;
@@ -146,6 +159,10 @@ function WalletPage() {
     id?: string;
   } | null;
   const hasBank = !!(bank?.bank_name && bank?.bank_account);
+  const isWithdrawalWindowOpen = isIsraelFirstOfMonth();
+  const nextWindow = nextWithdrawalWindowDate();
+  const canRequestNow =
+    isWithdrawalWindowOpen && !latestPending && available >= MIN_WITHDRAWAL && hasBank;
   const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
   const invoiceWithdrawalId = invoiceTargetId || latestPending?.id || null;
   const invoiceAlreadyAttached = !!latestPending?.receipt_url;
@@ -201,6 +218,8 @@ function WalletPage() {
     mutationFn: async () => {
       const n = Number(amount);
       if (!me?.id) throw new Error("לא מחובר");
+      if (!isIsraelFirstOfMonth()) throw new Error(WITHDRAWAL_WINDOW_ERROR);
+      if (latestPending) throw new Error("יש כבר בקשת משיכה ממתינה");
       if (!hasBank) throw new Error("יש לחבר חשבון בנק באזור האישי");
       if (!Number.isFinite(n) || n < MIN_WITHDRAWAL) throw new Error(`הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`);
       if (n > available) throw new Error("הסכום גבוה מהיתרה הזמינה");
@@ -268,8 +287,23 @@ function WalletPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setWithdrawOpen(true)}
-                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-primary active:bg-primary-soft"
+                disabled={!canRequestNow}
+                onClick={() => {
+                  if (!canRequestNow) return;
+                  setWithdrawOpen(true);
+                }}
+                aria-label={
+                  !isWithdrawalWindowOpen
+                    ? WITHDRAWAL_WINDOW_ERROR
+                    : latestPending
+                      ? "יש כבר בקשת משיכה ממתינה"
+                      : !hasBank
+                        ? "יש לחבר חשבון בנק כדי להגיש בקשת משיכה"
+                        : available < MIN_WITHDRAWAL
+                          ? `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`
+                          : "בקשת משיכה"
+                }
+                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-primary active:bg-primary-soft disabled:opacity-60"
               >
                 <Building2 className="size-4" aria-hidden />
                 בקשת משיכה
@@ -310,12 +344,12 @@ function WalletPage() {
                 <div className="mt-2 flex items-center gap-2">
                   <CalendarDays className="size-4 text-primary" aria-hidden />
                   <p className="text-lg font-black tabular-nums text-text-strong">
-                    {canRequestNow ? "היום" : nextDate.toLocaleDateString("he-IL")}
+                    {isWithdrawalWindowOpen ? "היום" : formatIsraelDate(nextWindow)}
                   </p>
                 </div>
-                {!canRequestNow && (
+                {!isWithdrawalWindowOpen && (
                   <span className="mt-2 inline-flex rounded-pill bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-success-text">
-                    עוד {daysLeft} ימים
+                    רק ב-1 לחודש
                   </span>
                 )}
               </div>
@@ -418,7 +452,16 @@ function WalletPage() {
         </div>
       </div>
 
-      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+      <Dialog
+        open={withdrawOpen && canRequestNow}
+        onOpenChange={(open) => {
+          if (!canRequestNow) {
+            setWithdrawOpen(false);
+            return;
+          }
+          setWithdrawOpen(open);
+        }}
+      >
         <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-right">בקשת משיכה</DialogTitle>
@@ -440,7 +483,7 @@ function WalletPage() {
           <DialogFooter>
             <button
               type="button"
-              disabled={create.isPending}
+              disabled={create.isPending || !canRequestNow}
               onClick={() => create.mutate()}
               className="flex min-h-12 w-full items-center justify-center rounded-pill bg-primary text-sm font-extrabold text-primary-foreground disabled:opacity-60"
             >
