@@ -151,7 +151,7 @@ export class AccountDomainController {
     @CurrentUser() auth: AuthUserContext,
     @Body() body: WithdrawalDto,
   ) {
-    return this.domain.createWithdrawal(auth.userId, data(body));
+    return this.domain.createWithdrawal(auth.userId, data(body), auth.roles);
   }
 
   @Patch("withdrawals/:id")

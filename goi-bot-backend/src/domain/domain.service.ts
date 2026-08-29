@@ -39,6 +39,18 @@ import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 
 type Mutable = Record<string, unknown>;
 
+const ISRAEL_TZ = "Asia/Jerusalem";
+
+function isIsraelFirstOfMonth(now = new Date()): boolean {
+  const day = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: ISRAEL_TZ,
+      day: "numeric",
+    }).format(now),
+  );
+  return day === 1;
+}
+
 @Injectable()
 export class DomainService {
   constructor(
@@ -315,13 +327,17 @@ export class DomainService {
     });
     return this.attachCouriersToWithdrawals(rows);
   }
-  async createWithdrawal(userId: string, body: Mutable) {
+  async createWithdrawal(userId: string, body: Mutable, roles: AppRole[] = []) {
     const previewId = previewCourierId();
     const courier = previewId
       ? await this.couriers.findOne({ where: { id: previewId }, select: ["id"] })
       : await this.couriers.findOne({ where: { user_id: userId }, select: ["id"] });
     const courierId = courier?.id ?? (body.courier_id as string | undefined);
     if (!courierId) throw new ForbiddenException("Courier profile required");
+    const isStaff = roles.includes("admin") || roles.includes("manager");
+    if (!isStaff && !isIsraelFirstOfMonth()) {
+      throw new BadRequestException("ניתן להגיש בקשת משיכה רק ב-1 לחודש");
+    }
     const withdrawal = this.withdrawals.create({
       courier_id: courierId,
       amount: String(body.amount),
