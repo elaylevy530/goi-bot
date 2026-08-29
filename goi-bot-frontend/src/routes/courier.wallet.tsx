@@ -117,6 +117,7 @@ function WalletPage() {
   const [showAll, setShowAll] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceTargetId, setInvoiceTargetId] = useState<string | null>(null);
@@ -163,6 +164,15 @@ function WalletPage() {
   const nextWindow = nextWithdrawalWindowDate();
   const canRequestNow =
     isWithdrawalWindowOpen && !latestPending && available >= MIN_WITHDRAWAL && hasBank;
+  const requestBlockReason = !isWithdrawalWindowOpen
+    ? `${WITHDRAWAL_WINDOW_ERROR}. הבאה ב-${formatIsraelDate(nextWindow)}`
+    : latestPending
+      ? "יש כבר בקשת משיכה ממתינה"
+      : !hasBank
+        ? "יש לחבר חשבון בנק באזור האישי"
+        : available < MIN_WITHDRAWAL
+          ? `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`
+          : null;
   const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
   const invoiceWithdrawalId = invoiceTargetId || latestPending?.id || null;
   const invoiceAlreadyAttached = !!latestPending?.receipt_url;
@@ -287,23 +297,11 @@ function WalletPage() {
               </div>
               <button
                 type="button"
-                disabled={!canRequestNow}
                 onClick={() => {
-                  if (!canRequestNow) return;
+                  setFieldError(requestBlockReason);
                   setWithdrawOpen(true);
                 }}
-                aria-label={
-                  !isWithdrawalWindowOpen
-                    ? WITHDRAWAL_WINDOW_ERROR
-                    : latestPending
-                      ? "יש כבר בקשת משיכה ממתינה"
-                      : !hasBank
-                        ? "יש לחבר חשבון בנק כדי להגיש בקשת משיכה"
-                        : available < MIN_WITHDRAWAL
-                          ? `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`
-                          : "בקשת משיכה"
-                }
-                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-primary active:bg-primary-soft disabled:opacity-60"
+                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-primary active:bg-primary-soft"
               >
                 <Building2 className="size-4" aria-hidden />
                 בקשת משיכה
@@ -453,13 +451,13 @@ function WalletPage() {
       </div>
 
       <Dialog
-        open={withdrawOpen && canRequestNow}
+        open={withdrawOpen}
         onOpenChange={(open) => {
-          if (!canRequestNow) {
-            setWithdrawOpen(false);
-            return;
-          }
           setWithdrawOpen(open);
+          if (!open) {
+            setFieldError(null);
+            setAmount("");
+          }
         }}
       >
         <DialogContent dir="rtl" className="max-w-md">
@@ -469,22 +467,48 @@ function WalletPage() {
           <div className="space-y-3">
             <p className="text-sm text-text-subtle">יתרה זמינה: ₪ {money(available)}</p>
             <div>
-              <Label className="text-right">סכום למשיכה</Label>
+              <Label className="text-right" htmlFor="withdraw-amount">סכום למשיכה</Label>
               <Input
+                id="withdraw-amount"
                 type="number"
                 min={MIN_WITHDRAWAL}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 min-h-11"
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  if (!requestBlockReason) setFieldError(null);
+                }}
+                aria-invalid={!!fieldError}
+                aria-describedby={fieldError ? "withdraw-amount-error" : undefined}
+                className={cn("mt-1 min-h-11", fieldError && "border-destructive focus-visible:ring-destructive")}
                 dir="ltr"
               />
+              {fieldError && (
+                <p id="withdraw-amount-error" role="alert" className="mt-1 text-right text-xs font-medium text-destructive">
+                  {fieldError}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
             <button
               type="button"
-              disabled={create.isPending || !canRequestNow}
-              onClick={() => create.mutate()}
+              disabled={create.isPending}
+              onClick={() => {
+                if (requestBlockReason) {
+                  setFieldError(requestBlockReason);
+                  return;
+                }
+                const n = Number(amount);
+                if (!Number.isFinite(n) || n < MIN_WITHDRAWAL) {
+                  setFieldError(`הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`);
+                  return;
+                }
+                if (n > available) {
+                  setFieldError("הסכום גבוה מהיתרה הזמינה");
+                  return;
+                }
+                create.mutate();
+              }}
               className="flex min-h-12 w-full items-center justify-center rounded-pill bg-primary text-sm font-extrabold text-primary-foreground disabled:opacity-60"
             >
               שלח בקשה
