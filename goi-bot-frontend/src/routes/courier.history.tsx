@@ -245,7 +245,8 @@ export function ActiveJobs() {
         const cash = isCashPayment(j);
         const km = jobDistanceKm(j as any);
         const jobNo = j.job_number ? `#${j.job_number}` : "";
-        const stepperIdx = stage === "assigned" ? 0 : stage === "to_pickup" ? 1 : stage === "picked_up" ? 2 : 3;
+        const pickupNav = j.pickup_address ?? j.pickup_area ?? "";
+        const dropoffNav = j.dropoff_address ?? j.dropoff_area ?? "";
 
         return (
           <article
@@ -315,29 +316,36 @@ export function ActiveJobs() {
               </div>
             </div>
 
-            <ol className="relative mt-3 grid grid-cols-3 gap-1">
-              <span className="pointer-events-none absolute top-4 right-[16%] left-[16%] border-t border-dashed border-border-strong" aria-hidden />
-              {[
-                { label: "יצאתי לאיסוף", icon: Send },
-                { label: "אספתי", icon: Package },
-                { label: "נמסר", icon: Check },
-              ].map((item, i) => {
-                const done = i < stepperIdx;
-                const current = i === stepperIdx;
-                const Icon = item.icon;
-                return (
-                  <li key={item.label} className="relative z-10 flex flex-col items-center gap-1 text-center">
-                    <span className={cn(
-                      "grid size-8 place-items-center rounded-full",
-                      done || current ? "bg-primary text-primary-foreground" : "bg-muted text-text-muted",
-                    )}>
-                      <Icon className="size-3.5" />
-                    </span>
-                    <span className={cn("text-[10px] font-bold", current ? "text-primary" : "text-text-muted")}>{item.label}</span>
-                  </li>
-                );
-              })}
-            </ol>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!pickupNav) {
+                    toast.error("אין כתובת איסוף");
+                    return;
+                  }
+                  openWaze(pickupNav);
+                }}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-card border border-border bg-surface text-[12px] font-bold text-text-strong"
+              >
+                <Navigation className="size-4 text-primary" />
+                נווט לעסק
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!dropoffNav) {
+                    toast.error("אין כתובת מסירה");
+                    return;
+                  }
+                  openWaze(dropoffNav);
+                }}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-card border border-border bg-surface text-[12px] font-bold text-text-strong"
+              >
+                <Navigation className="size-4 text-primary" />
+                נווט ללקוח
+              </button>
+            </div>
 
             <div className="mt-3 grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-2">
               <div className="flex items-center justify-center gap-2 px-2">

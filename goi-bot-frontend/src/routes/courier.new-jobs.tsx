@@ -262,19 +262,33 @@ function NewJobsPage() {
   );
 
   const mapJobs: MapJob[] = useMemo(() => {
+    // Prefer targeted offers over the same job appearing as an open broadcast.
+    // Without this, a dispatched job shows twice: once as offer + once as open.
+    const offerJobIds = new Set<string>();
     const out: MapJob[] = [];
+
+    for (const o of offers as any[]) {
+      const j = Array.isArray(o?.jobs) ? o.jobs[0] : o?.jobs;
+      const jobId = String(j?.id ?? o?.job_id ?? "");
+      if (!j || !jobId || offerJobIds.has(jobId)) continue;
+      offerJobIds.add(jobId);
+      out.push({ ...j, __kind: "offer", __raw: { offer: o, job: j } });
+    }
+
     for (const j of visibleOpenJobs as any[]) {
+      const jobId = String(j?.id ?? "");
+      if (!jobId || offerJobIds.has(jobId) || declinedSet.has(jobId)) continue;
       out.push({ ...j, __kind: "open", __raw: j });
     }
+
     for (const j of visibleQuoteJobs as any[]) {
+      const jobId = String(j?.id ?? "");
+      if (!jobId || offerJobIds.has(jobId)) continue;
       out.push({ ...j, __kind: "quote", __raw: j });
     }
-    for (const o of offers as any[]) {
-      const j = o?.jobs;
-      if (j) out.push({ ...j, __kind: "offer", __raw: { offer: o, job: j } });
-    }
+
     return out;
-  }, [visibleOpenJobs, visibleQuoteJobs, offers]);
+  }, [visibleOpenJobs, visibleQuoteJobs, offers, declinedSet]);
 
   const openDetails = (job: MapJob) => {
     if (job.__kind === "offer") {
