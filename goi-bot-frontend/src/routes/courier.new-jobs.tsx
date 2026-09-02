@@ -398,7 +398,7 @@ function NewJobsPage() {
               leftExtra={
                 showingOffer ? undefined : (
                   <Link
-                    to="/courier/messages"
+                    to="/courier/notifications"
                     aria-label="התראות"
                     className="size-10 grid place-items-center rounded-full bg-surface shadow-card border border-border text-text-strong active:scale-95"
                   >
