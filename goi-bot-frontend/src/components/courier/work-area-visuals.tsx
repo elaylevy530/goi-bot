@@ -31,6 +31,19 @@ export function CarIcon({ className }: { className?: string }) {
   );
 }
 
+export function ElectricBikeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
+      <circle cx="14" cy="34" r="6" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="36" cy="34" r="6" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M14 34h8l4-10h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M26 24 30 34h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22 24V16h8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M26 12l-2.5 5h5L26 12Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function RegionNorthIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>

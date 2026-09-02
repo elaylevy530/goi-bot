@@ -215,7 +215,7 @@ function CourierSideDrawer() {
     },
     {
       key: "work-area",
-      label: "אזור עבודה ותמיכה",
+      label: "אזורי עבודה",
       to: "/courier/availability",
       icon: MapPin,
       match: (p) => p === "/courier/availability",
