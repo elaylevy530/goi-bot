@@ -376,11 +376,13 @@ function NewJobsPage() {
         {/* Floating chrome only — map fills the viewport underneath */}
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
           <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/70 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
-            <div className="relative flex items-center justify-center">
-              <CourierMenuButton className="absolute start-0 size-11 rounded-full border border-border/70 bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)] shrink-0" />
+            <div className="relative flex min-h-11 items-center">
+              <CourierMenuButton className="relative z-10 size-11 shrink-0 rounded-full border border-border/70 bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)]" />
               {/* Status control only when available — hide offline capsule */}
               {(isAvailable || showingOffer) && (
-                <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
+                <div className="pointer-events-auto absolute inset-0 grid place-items-center">
+                  <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
+                </div>
               )}
             </div>
           </div>
@@ -759,44 +761,28 @@ function SearchingCard({
       dir="rtl"
       className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
     >
-      <div className="mx-auto w-full max-w-lg pt-[8.5rem]">
-        <div className="relative">
-          {/* The cutout ends flush where the card hid the body in the mock,
-              so tuck it a few pixels behind the card edge. */}
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-8px)] z-0 flex justify-center"
+      <div className="mx-auto w-full max-w-lg">
+        <div className="relative flex min-h-[84px] items-center gap-3 overflow-hidden rounded-[1.6rem] border border-[#BFE3B9] bg-[linear-gradient(105deg,rgba(255,255,255,0.98)_0%,rgba(246,252,245,0.98)_42%,rgba(232,248,228,0.98)_100%)] px-5 py-3 shadow-[0_10px_28px_rgba(16,24,40,0.13),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(53,173,41,0.08)] backdrop-blur-md">
+          <span
+            className="pointer-events-none absolute inset-y-0 right-0 w-28 bg-[radial-gradient(circle_at_center,rgba(53,173,41,0.12),transparent_68%)]"
             aria-hidden
-          >
-            <img
-              src="/courier/goi-searching-mascot.png?v=4"
-              alt=""
-              draggable={false}
-              className="h-[138px] w-auto max-w-none select-none [animation:mascot-enter_0.4s_ease-out_both]"
-            />
+          />
+          <div className="relative size-[58px] shrink-0" aria-hidden>
+            <span className="absolute inset-0 rounded-full border border-[#35AD29]/25" />
+            <span className="absolute inset-[18%] rounded-full border border-[#35AD29]/35" />
+            <span className="absolute inset-[36%] rounded-full border border-[#35AD29]/45" />
+            <span className="absolute inset-0 animate-[spin_2.8s_linear_infinite]">
+              <span className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#35AD29] shadow-[0_0_0_3px_rgba(53,173,41,0.12)]" />
+            </span>
+            <span className="absolute bottom-[10%] right-[4%] size-2 rounded-full bg-[#35AD29]/75" />
           </div>
 
-          <div className="relative z-10 flex min-h-[84px] items-center gap-3 overflow-hidden rounded-[1.6rem] border border-[#BFE3B9] bg-[linear-gradient(105deg,rgba(255,255,255,0.98)_0%,rgba(246,252,245,0.98)_42%,rgba(232,248,228,0.98)_100%)] px-5 py-3 shadow-[0_10px_28px_rgba(16,24,40,0.13),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(53,173,41,0.08)] backdrop-blur-md">
-            <span
-              className="pointer-events-none absolute inset-y-0 right-0 w-28 bg-[radial-gradient(circle_at_center,rgba(53,173,41,0.12),transparent_68%)]"
-              aria-hidden
-            />
-            <div className="relative size-[58px] shrink-0" aria-hidden>
-              <span className="absolute inset-0 rounded-full border border-[#35AD29]/25" />
-              <span className="absolute inset-[18%] rounded-full border border-[#35AD29]/35" />
-              <span className="absolute inset-[36%] rounded-full border border-[#35AD29]/45" />
-              <span className="absolute inset-0 animate-[spin_2.8s_linear_infinite]">
-                <span className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#35AD29] shadow-[0_0_0_3px_rgba(53,173,41,0.12)]" />
-              </span>
-              <span className="absolute bottom-[10%] right-[4%] size-2 rounded-full bg-[#35AD29]/75" />
+          <div className="min-w-0 flex-1 text-right">
+            <div className="text-[16px] font-extrabold leading-snug text-[#111]">
+              מחפש משלוחים באזור שלך
             </div>
-
-            <div className="min-w-0 flex-1 text-right">
-              <div className="text-[16px] font-extrabold leading-snug text-[#111]">
-                מחפש משלוחים באזור שלך
-              </div>
-              <div className="mt-1 text-[12px] leading-snug text-[#6B6B6B]">
-                משלוח מתאים יקפוץ אוטומטית על המפה
-              </div>
+            <div className="mt-1 text-[12px] leading-snug text-[#6B6B6B]">
+              משלוח מתאים יקפוץ אוטומטית על המפה
             </div>
           </div>
         </div>
