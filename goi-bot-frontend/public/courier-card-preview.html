@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>כרטיס משלוח חדש — Goi</title>
   <style>
-    :root { --green:#35AD29; --deep:#1F5C2E; --orange:#E86B3A; --strong:#07101d; --subtle:#6B6B6B; --border:#E6E6E6; }
+    :root { --green:#2F7A28; --deep:#3E4E44; --orange:#E86B3A; --strong:#07101d; --subtle:#6B6B6B; --border:#E6E6E6; }
     * { box-sizing: border-box; }
     body { margin:0; font-family: Heebo, system-ui, sans-serif; background:#cfd4db; color:var(--strong); }
     .phone { max-width:390px; margin:0 auto; min-height:100dvh; background:linear-gradient(180deg,#e8edf2,#d5dbe3); position:relative; overflow:hidden; }
@@ -14,14 +14,15 @@
     .tab { flex:1; height:40px; border-radius:999px; border:1px solid var(--border); background:#f6f6f6; font-weight:800; font-size:13px; }
     .tab.on { background:var(--green); color:#fff; border-color:var(--green); }
     .sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:28px 28px 0 0; box-shadow:0 -12px 40px rgba(0,0,0,.18); padding:0 14px max(12px, env(safe-area-inset-bottom)); }
-    .sheet.full { top:8dvh; display:flex; flex-direction:column; }
+    .sheet.full { top:auto; display:flex; flex-direction:column; }
     .handle { display:flex; flex-direction:column; align-items:center; gap:2px; padding:10px 0 6px; }
     .bar { width:40px; height:4px; border-radius:99px; background:#D1D5DB; }
     .hint { font-size:11px; font-weight:700; color:#6b7280; display:flex; align-items:center; gap:2px; }
-    .banner { display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--deep); color:#fff; border-radius:16px; padding:14px 16px; }
-    .pay { font-size:28px; font-weight:900; line-height:1; }
-    .sub { font-size:12px; opacity:.85; margin-top:4px; font-weight:600; }
-    .wallet { width:68px; height:68px; object-fit:contain; background:transparent; filter:drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+    .banner { display:flex; align-items:center; justify-content:space-between; gap:12px; background:linear-gradient(145deg,#4A5F54 0%,#3A4C43 42%,#2F3D36 100%); color:#fff; border-radius:16px; padding:14px 16px; position:relative; overflow:hidden; box-shadow:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(0,0,0,.22), 0 6px 14px rgba(0,0,0,.18); }
+    .banner::before { content:""; position:absolute; inset:0; background:linear-gradient(115deg,rgba(255,255,255,.34) 0%,rgba(255,255,255,.08) 28%,rgba(255,255,255,0) 52%); pointer-events:none; }
+    .pay { font-size:28px; font-weight:900; line-height:1; position:relative; z-index:1; }
+    .sub { font-size:12px; opacity:.9; margin-top:4px; font-weight:600; position:relative; z-index:1; }
+    .wallet { width:68px; height:68px; object-fit:contain; background:transparent; filter:drop-shadow(0 6px 10px rgba(0,0,0,.35)); position:relative; z-index:1; }
     .row { display:flex; gap:12px; align-items:flex-start; position:relative; }
     .rail { position:absolute; right:15px; top:28px; bottom:28px; border-right:1px dashed #C9CDD3; }
     .dot { width:32px; height:32px; border-radius:999px; display:grid; place-items:center; color:#fff; flex-shrink:0; z-index:1; }
@@ -30,14 +31,12 @@
     .ttl { font-size:15px; font-weight:800; }
     .muted { font-size:12px; color:var(--subtle); }
     .badge { display:inline-flex; align-items:center; gap:4px; margin-top:6px; background:#E8F8E6; color:#1F7A2E; border-radius:999px; padding:3px 10px; font-size:11px; font-weight:700; }
-    .actions { display:flex; justify-content:flex-end; gap:6px; margin-top:8px; }
-    .ib { width:32px; height:32px; border-radius:999px; border:1px solid var(--border); background:#fff; display:grid; place-items:center; }
     .meta { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:12px; padding:10px 0; }
     .meta > div { display:flex; align-items:center; justify-content:center; gap:8px; }
     .meta > div:first-child { border-left:1px solid var(--border); }
     .meta .k { font-size:10px; font-weight:700; color:var(--subtle); text-align:right; }
     .meta .v { font-size:13px; font-weight:800; text-align:right; }
-    .cta { margin-top:12px; width:100%; height:56px; border:0; border-radius:999px; background:var(--green); color:#fff; font-size:16px; font-weight:800; box-shadow:0 8px 20px rgba(53,173,41,.35); }
+    .cta { margin-top:12px; width:100%; height:56px; border:0; border-radius:12px; background:var(--green); color:#fff; font-size:16px; font-weight:800; box-shadow:0 8px 20px rgba(47,122,40,.32); }
     .section { font-size:13px; font-weight:800; margin:12px 0 6px; text-align:right; }
     .pkg { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; border:1px solid var(--border); border-radius:16px; padding:10px 12px; }
     .pkg .k { font-size:10px; font-weight:700; color:var(--subtle); }
@@ -46,8 +45,8 @@
     .box { border:1px solid var(--border); border-radius:16px; padding:8px 12px; text-align:right; }
     .box .top { display:flex; justify-content:space-between; align-items:center; }
     .hidden { display:none !important; }
-    .body { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
-    .grow { flex:1; min-height:0; overflow:hidden; }
+    .body { overflow:hidden; display:flex; flex-direction:column; }
+    .grow { overflow:hidden; }
   </style>
 </head>
 <body>
@@ -66,7 +65,7 @@
           <div class="pay">154 ₪</div>
           <div class="sub">התגמול שלך עבור המשלוח</div>
         </div>
-        <img class="wallet" src="/courier/reward-wallet.png?v=3" alt="" />
+        <img class="wallet" src="/courier/reward-wallet.png?v=9" alt="" />
       </div>
       <div style="margin-top:12px; position:relative;">
         <div class="rail" style="top:32px;bottom:32px"></div>
@@ -116,7 +115,7 @@
             <div class="pay">154 ₪</div>
             <div class="sub">התגמול שלך עבור המשלוח</div>
           </div>
-          <img class="wallet" style="width:60px;height:60px" src="/courier/reward-wallet.png?v=3" alt="" />
+          <img class="wallet" style="width:60px;height:60px" src="/courier/reward-wallet.png?v=9" alt="" />
         </div>
         <div class="grow">
           <div class="section">פרטי המשלוח</div>

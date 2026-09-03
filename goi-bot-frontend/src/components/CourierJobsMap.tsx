@@ -22,7 +22,7 @@ const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
 
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
-const MAP_FIT_PAD = { top: 180, right: 48, bottom: 260, left: 56 } as const;
+const MAP_FIT_PAD = { top: 160, right: 40, bottom: 200, left: 48 } as const;
 
 function tokenColor(el: HTMLElement | null, name: string, fallback: string) {
   if (!el) return fallback;
@@ -748,7 +748,9 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
             <div
               className={cn(
                 "absolute z-10 pointer-events-none",
-                offerExpanded ? "inset-0" : "inset-x-0 bottom-0 px-0 sm:inset-x-3 sm:bottom-3",
+                offerExpanded
+                  ? "inset-0"
+                  : "inset-x-0 bottom-0 flex h-[30%] flex-col justify-end",
               )}
             >
               {offerExpanded && (
@@ -760,7 +762,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 />
               )}
               {hasMultiple && (
-                <div dir="rtl" className="pointer-events-auto mx-3 mb-2 flex items-center justify-between gap-2">
+                <div dir="rtl" className="pointer-events-auto mx-2 mb-1.5 flex shrink-0 items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => goToIdx(activeIdx - 1)}
@@ -815,8 +817,8 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 className={cn(
                   "pointer-events-auto",
                   offerExpanded
-                    ? "h-full"
-                    : "flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]",
+                    ? "relative h-full w-full"
+                    : "flex min-h-0 max-h-full gap-0 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar",
                 )}
                 style={offerExpanded ? undefined : { scrollbarWidth: "none" }}
               >

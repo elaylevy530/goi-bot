@@ -106,7 +106,10 @@ export function CourierOfferCard({
       <button
         type="button"
         onClick={() => onQuote(job)}
-        className="flex h-14 w-full items-center justify-center rounded-full bg-[#35AD29] text-[16px] font-extrabold text-white shadow-[0_8px_20px_rgba(53,173,41,0.35)] active:scale-[0.99]"
+        className={cn(
+          "flex w-full items-center justify-center rounded-xl bg-[#2F7A28] text-[16px] font-extrabold text-white shadow-[0_8px_18px_rgba(47,122,40,0.32)] active:scale-[0.99]",
+          expanded ? "h-14" : "h-11 text-[15px]",
+        )}
       >
         הגש הצעת מחיר
       </button>
@@ -115,20 +118,23 @@ export function CourierOfferCard({
         type="button"
         disabled={claiming}
         onClick={() => onClaim(job)}
-        className="flex h-14 w-full items-center justify-center rounded-full bg-[#35AD29] text-[16px] font-extrabold text-white shadow-[0_8px_20px_rgba(53,173,41,0.35)] disabled:opacity-60 active:scale-[0.99]"
+        className={cn(
+          "flex w-full items-center justify-center rounded-xl bg-[#2F7A28] text-[16px] font-extrabold text-white shadow-[0_8px_18px_rgba(47,122,40,0.32)] disabled:opacity-60 active:scale-[0.99]",
+          expanded ? "h-14" : "h-11 text-[15px]",
+        )}
       >
         לקחתי את {t.theJob}
       </button>
     )
   );
 
-  /* -------- Expanded: dedicated sheet, no inner scroll -------- */
+  /* -------- Expanded: full-bleed sheet on the map -------- */
   if (expanded) {
     return (
       <div
         data-job-id={job.id}
         dir="rtl"
-        className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 flex h-[min(92dvh,760px)] flex-col rounded-t-[1.75rem] bg-surface shadow-[0_-12px_40px_rgba(0,0,0,0.22)]"
+        className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 flex w-full max-h-[min(92%,760px)] flex-col rounded-t-[1.25rem] rounded-b-none bg-surface shadow-[0_-12px_40px_rgba(0,0,0,0.22)]"
       >
         <button
           type="button"
@@ -145,10 +151,10 @@ export function CourierOfferCard({
           </span>
         </button>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex flex-col overflow-hidden px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} compact />
 
-          <div className="mt-2.5 min-h-0 flex-1 overflow-hidden">
+          <div className="mt-2 overflow-hidden">
             <p className="mb-1 text-right text-[13px] font-extrabold text-text-strong">פרטי המשלוח</p>
             <StopsTimeline
               businessName={businessName}
@@ -161,7 +167,7 @@ export function CourierOfferCard({
               dense
             />
 
-            <p className="mb-1 mt-2.5 text-right text-[13px] font-extrabold text-text-strong">פרטי החבילה</p>
+            <p className="mb-1 mt-2 text-right text-[13px] font-extrabold text-text-strong">פרטי החבילה</p>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-2xl border border-border px-3 py-2.5">
               <PkgChip label="סוג" value={packageType} />
               <PkgChip label="כמות" value={packages === 1 ? "חבילה אחת" : `${packages} חבילות`} />
@@ -170,53 +176,55 @@ export function CourierOfferCard({
             </div>
           </div>
 
-          <div className="mt-2.5 shrink-0">{cta}</div>
+          <div className="mt-1.5 shrink-0">{cta}</div>
         </div>
       </div>
     );
   }
 
-  /* -------- Collapsed: reference compact card -------- */
+  /* -------- Collapsed: ~30% map height, denser -------- */
   return (
-    <div data-job-id={job.id} dir="rtl" className="snap-center w-full shrink-0">
-      <article className="overflow-hidden rounded-t-[1.75rem] rounded-b-[1.25rem] bg-surface shadow-card-strong border border-border">
+    <div data-job-id={job.id} dir="rtl" className="h-full min-h-0 w-full min-w-full shrink-0 snap-center">
+      <article className="flex h-full max-h-full flex-col overflow-hidden rounded-t-[1.25rem] rounded-b-none border border-b-0 border-border bg-surface shadow-card-strong">
         <button
           type="button"
-          className="flex w-full flex-col items-center pt-2.5 pb-1"
+          className="flex w-full shrink-0 flex-col items-center gap-0.5 pt-1.5 pb-0.5"
           onClick={() => setOpen(true)}
           onTouchStart={onHandleTouchStart}
           onTouchEnd={onHandleTouchEnd}
           aria-label="פתח פרטים"
         >
           <span className="h-1 w-10 rounded-full bg-[#D1D5DB]" aria-hidden />
+          <span className="text-[10px] font-bold text-text-muted">החלק למעלה לפרטים נוספים</span>
         </button>
 
-        <div className="px-3.5 pb-3.5">
-          <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} />
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
+          <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} compact />
 
-          <div className="mt-3">
+          <div className="mt-1.5 min-h-0 flex-1 overflow-hidden">
             <StopsTimeline
               businessName={businessName}
               pickup={pickup}
               dropTitle={dropTitle}
               dropoffArea={job.dropoff_area}
+              dense
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-2.5">
+          <div className="mt-1.5 grid shrink-0 grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-1.5">
             <MetaCell
-              icon={<Route className="size-4 text-[#35AD29]" />}
+              icon={<Route className="size-3.5 text-[#35AD29]" />}
               label="מרחק מסלול"
               value={tripKm != null ? formatKm(tripKm) : "—"}
             />
             <MetaCell
-              icon={<CreditCard className="size-4 text-[#35AD29]" />}
+              icon={<CreditCard className="size-3.5 text-[#35AD29]" />}
               label="אמצעי תשלום"
               value={payLabel}
             />
           </div>
 
-          <div className="mt-3">{cta}</div>
+          <div className="mt-1.5 shrink-0">{cta}</div>
         </div>
       </article>
     </div>
@@ -235,29 +243,39 @@ function RewardBanner({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl bg-[#1F5C2E] text-white",
-        compact ? "px-3.5 py-3" : "px-4 py-3.5",
+        "relative overflow-hidden rounded-2xl text-white",
+        "bg-[linear-gradient(145deg,#4A5F54_0%,#3A4C43_42%,#2F3D36_100%)]",
+        "shadow-[inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.22),0_6px_14px_rgba(0,0,0,0.18)]",
+        compact ? "px-3 py-2" : "px-4 py-3.5",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.34)_0%,rgba(255,255,255,0.08)_28%,rgba(255,255,255,0)_52%)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -left-8 top-[-40%] h-[140%] w-16 rotate-12 bg-white/15 blur-md"
+        aria-hidden
+      />
+      <div className="relative flex items-center justify-between gap-3">
         <div className="min-w-0 text-right">
           {isQuote ? (
-            <p className="text-[28px] font-black leading-none">₪?</p>
+            <p className={cn("font-black leading-none", compact ? "text-[22px]" : "text-[28px]")}>₪?</p>
           ) : (
-            <p className="text-[28px] font-black leading-none tabular-nums">
+            <p className={cn("font-black leading-none tabular-nums", compact ? "text-[22px]" : "text-[28px]")}>
               {payment.toFixed(0)} ₪
             </p>
           )}
-          <p className="mt-1 text-[12px] font-semibold text-white/85">
+          <p className={cn("font-semibold text-white/90", compact ? "mt-0.5 text-[11px]" : "mt-1 text-[12px]")}>
             התגמול שלך עבור המשלוח
           </p>
         </div>
         <img
-          src="/courier/reward-wallet.png?v=3"
+          src="/courier/reward-wallet.png?v=9"
           alt=""
           className={cn(
             "shrink-0 bg-transparent object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)]",
-            compact ? "h-16 w-16" : "h-[72px] w-[72px]",
+            compact ? "h-12 w-12" : "h-[72px] w-[72px]",
           )}
           draggable={false}
         />
@@ -392,11 +410,11 @@ function MetaCell({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-center gap-2 px-2">
+    <div className="flex items-center justify-center gap-1.5 px-1.5">
       {icon}
-      <div className="text-right">
-        <p className="text-[10px] font-bold text-text-muted">{label}</p>
-        <p className="text-[13px] font-extrabold text-text-strong">{value}</p>
+      <div className="min-w-0 text-right">
+        <p className="text-[9px] font-bold text-text-muted">{label}</p>
+        <p className="truncate text-[12px] font-extrabold text-text-strong">{value}</p>
       </div>
     </div>
   );
