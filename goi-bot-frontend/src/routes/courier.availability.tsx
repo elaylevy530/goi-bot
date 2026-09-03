@@ -1,15 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
   Check,
-  ChevronLeft,
-  Headphones,
   Loader2,
-  Mail,
-  MessageCircle,
-  MessageSquare,
 } from "lucide-react";
 import { CourierBellButton, CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
@@ -34,14 +29,11 @@ import {
 } from "@/lib/regions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { SUPPORT_EMAIL, supportWhatsAppUrl } from "@/lib/support";
 
 export const Route = createFileRoute("/courier/availability")({
   head: () => ({ meta: [{ title: "אזורי עבודה — Goi" }] }),
   component: AvailabilityPage,
 });
-
-const SUPPORT_WHATSAPP = supportWhatsAppUrl("שלום, אני צריך עזרה באזור השליחים של Goi");
 
 type VehicleChoice = "רכב" | "קטנוע" | "אופניים חשמליים" | "";
 
@@ -366,60 +358,6 @@ function AvailabilityPage() {
                 <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
                   Goi ישלח לך הצעות לפי האזורים והערים שבחרת, כלי התחבורה והמיקום שלך בזמן אמת.
                 </p>
-              </div>
-            </section>
-
-            {/* Support — secondary */}
-            <section className="overflow-hidden rounded-[1.35rem] border border-black/5 bg-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-black/5 px-4 py-3">
-                <Headphones className="size-4 text-primary" aria-hidden />
-                <div className="min-w-0 flex-1 text-right">
-                  <p className="text-sm font-extrabold text-text-strong">צריכים עזרה?</p>
-                  <p className="text-[11px] text-text-muted">תמיכה זמינה בכל ערוץ</p>
-                </div>
-              </div>
-              <div className="divide-y divide-black/5">
-                <Link
-                  to="/courier/messages"
-                  className="flex min-h-12 items-center gap-3 px-4 py-3 transition-colors active:bg-[#F7F8F7]"
-                >
-                  <ChevronLeft className="size-4 text-text-muted" aria-hidden />
-                  <span className="min-w-0 flex-1 text-right">
-                    <span className="block text-sm font-bold text-text-strong">צ׳אט עם Goi</span>
-                    <span className="block text-[11px] text-text-muted">פנייה מתוך האפליקציה</span>
-                  </span>
-                  <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <MessageCircle className="size-4" />
-                  </span>
-                </Link>
-                <a
-                  href={SUPPORT_WHATSAPP}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex min-h-12 items-center gap-3 px-4 py-3 transition-colors active:bg-[#F7F8F7]"
-                >
-                  <ChevronLeft className="size-4 text-text-muted" aria-hidden />
-                  <span className="min-w-0 flex-1 text-right">
-                    <span className="block text-sm font-bold text-text-strong">וואטסאפ</span>
-                    <span className="block text-[11px] text-text-muted">שיחה ישירה עם התמיכה</span>
-                  </span>
-                  <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <MessageSquare className="size-4" />
-                  </span>
-                </a>
-                <a
-                  href={`mailto:${SUPPORT_EMAIL}`}
-                  className="flex min-h-12 items-center gap-3 px-4 py-3 transition-colors active:bg-[#F7F8F7]"
-                >
-                  <ChevronLeft className="size-4 text-text-muted" aria-hidden />
-                  <span className="min-w-0 flex-1 text-right">
-                    <span className="block text-sm font-bold text-text-strong">{SUPPORT_EMAIL}</span>
-                    <span className="block text-[11px] text-text-muted">נחזור אליכם במייל</span>
-                  </span>
-                  <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <Mail className="size-4" />
-                  </span>
-                </a>
               </div>
             </section>
           </div>
