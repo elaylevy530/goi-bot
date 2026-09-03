@@ -41,6 +41,14 @@ type ReferralRow = {
 type ReferralPayload = {
   couriers?: ReferralRow[];
   businesses?: ReferralRow[];
+  commissions?: {
+    id?: string;
+    job_id?: string;
+    kind?: "courier" | "business";
+    amount?: number;
+    created_at?: string;
+  }[];
+  commission_ils?: number;
   totals?: {
     couriers_registered?: number;
     couriers_active?: number;
@@ -78,7 +86,9 @@ function SharePage() {
   const [moreOpen, setMoreOpen] = useState(true);
   const code = referralCode(me);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://goi.co.il";
-  const link = code ? `${origin}/join?ref=${encodeURIComponent(code)}` : "";
+  const courierLink = code ? `${origin}/join?ref=${encodeURIComponent(code)}` : "";
+  const businessLink = code ? `${origin}/signup-business?ref=${encodeURIComponent(code)}` : "";
+  const link = courierLink;
   const linkReady = !!code;
 
   const { data, isError } = useQuery({
@@ -93,10 +103,10 @@ function SharePage() {
   const visible = showAll ? list : list.slice(0, 4);
   const totals = data?.totals ?? {};
 
-  const copy = async () => {
-    if (!linkReady) return;
+  const copy = async (value = link) => {
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(value);
       toast.success("הקישור הועתק");
     } catch {
       toast.error("לא הצלחנו להעתיק");
@@ -122,13 +132,18 @@ function SharePage() {
     }
   };
 
+  const couriersRegistered = totals.couriers_registered ?? couriers.length;
+  const couriersActive = totals.couriers_active ?? couriers.filter((c) => c.status === "פעיל").length;
+  const businessesRegistered = totals.businesses_registered ?? businesses.length;
+  const businessesActive = totals.businesses_active ?? businesses.filter((b) => b.status === "פעיל").length;
   const stats = useMemo(() => ([
-    { icon: Users, value: String((totals.couriers_registered ?? 0) + (totals.businesses_registered ?? 0) || couriers.length + businesses.length), label: "שליחים ועסקים" },
-    { icon: Bike, value: String(totals.couriers_active ?? couriers.filter((c) => c.status === "פעיל").length), label: `מתוך ${totals.couriers_registered ?? couriers.length} שנרשמו` },
-    { icon: Store, value: String(totals.businesses_active ?? businesses.filter((b) => b.status === "פעיל").length), label: `מתוך ${totals.businesses_registered ?? businesses.length} שנרשמו` },
-    { icon: Coins, value: `₪ ${money(Number(totals.profit ?? 0))}`, label: "כל הזמנים" },
-    { icon: Wallet, value: `₪ ${money(Number(totals.pending ?? 0))}`, label: "יועבר בקרוב" },
-  ]), [totals, couriers, businesses]);
+    { icon: Coins, value: `₪ ${money(Number(totals.profit ?? 0))}`, label: "רווח ממשלוחים", hint: "₪1.50 לשליח או לעסק — ₪3 אם שניהם" },
+    { icon: Wallet, value: `₪ ${money(Number(totals.pending ?? 0))}`, label: "יועבר בקרוב", hint: "עמלות החודש ייפתחו בארנק ב-1 לחודש" },
+    { icon: Users, value: String(couriersRegistered), label: "שליחים שהצטרפו", hint: `${couriersActive} פעילים עכשיו` },
+    { icon: Bike, value: String(couriersActive), label: "שליחים פעילים", hint: `מתוך ${couriersRegistered} שנרשמו` },
+    { icon: Building2, value: String(businessesRegistered), label: "עסקים שהצטרפו", hint: `${businessesActive} פעילים עכשיו` },
+    { icon: Store, value: String(businessesActive), label: "עסקים פעילים", hint: `מתוך ${businessesRegistered} שנרשמו` },
+  ]), [totals.profit, totals.pending, couriersRegistered, couriersActive, businessesRegistered, businessesActive]);
 
   return (
     <CourierShell fullBleed>
@@ -144,21 +159,41 @@ function SharePage() {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
           <div className="mx-auto flex max-w-lg flex-col gap-4">
             <section className="overflow-hidden rounded-card bg-primary-deep p-4 text-primary-foreground shadow-card-strong">
-              <p className="text-xl font-black">תרוויח מכל הפניה!</p>
-              <p className="mt-1 text-sm text-primary-foreground/80">שתף שליחים ועסקים והרווח על כל פעילות שלהם</p>
-              <div className="mt-4 flex items-center gap-2 rounded-card bg-black/20 px-3 py-2">
-                <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">
-                  {linkReady ? link : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void copy()}
-                  disabled={!linkReady}
-                  className="grid size-10 place-items-center rounded-pill bg-surface text-primary disabled:opacity-50"
-                  aria-label="העתק קישור"
-                >
-                  <Copy className="size-4" />
-                </button>
+              <p className="text-xl font-black">צרף שליחים ועסקים — והרוויח קבוע</p>
+              <p className="mt-1 text-sm leading-relaxed text-primary-foreground/80">
+                ₪1.50 על כל משלוח ששליח שגייסת ביצע, ו־₪1.50 על כל משלוח שעסק שגייסת שיגר. אם שניהם שלך על אותו משלוח — ₪3.
+              </p>
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 rounded-card bg-black/20 px-3 py-2">
+                  <p className="w-14 shrink-0 text-[11px] font-bold text-primary-foreground/70">שליחים</p>
+                  <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">
+                    {linkReady ? courierLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void copy(courierLink)}
+                    disabled={!linkReady}
+                    className="grid size-10 place-items-center rounded-pill bg-surface text-primary disabled:opacity-50"
+                    aria-label="העתק קישור לשליחים"
+                  >
+                    <Copy className="size-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 rounded-card bg-black/20 px-3 py-2">
+                  <p className="w-14 shrink-0 text-[11px] font-bold text-primary-foreground/70">עסקים</p>
+                  <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">
+                    {linkReady ? businessLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void copy(businessLink)}
+                    disabled={!linkReady}
+                    className="grid size-10 place-items-center rounded-pill bg-surface text-primary disabled:opacity-50"
+                    aria-label="העתק קישור לעסקים"
+                  >
+                    <Copy className="size-4" />
+                  </button>
+                </div>
               </div>
               <button type="button" onClick={() => setMoreOpen((v) => !v)} className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-primary-foreground/90">
                 עוד אפשרויות לשיתוף
@@ -166,18 +201,26 @@ function SharePage() {
               </button>
             </section>
 
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {stats.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <div key={s.label} className="min-w-[7.5rem] rounded-card border border-border bg-surface p-3 shadow-card">
-                    <Icon className="size-4 text-primary" aria-hidden />
-                    <p className="mt-2 text-lg font-black tabular-nums text-text-strong">{s.value}</p>
-                    <p className="mt-1 text-[11px] text-text-subtle">{s.label}</p>
-                  </div>
-                );
-              })}
-            </div>
+            <section>
+              <h2 className="mb-2 text-sm font-extrabold text-text-strong">הרשת שלך</h2>
+              <div className="grid grid-cols-2 gap-2">
+                {stats.map((s) => {
+                  const Icon = s.icon;
+                  return (
+                    <div key={s.label} className="rounded-card border border-border bg-surface p-3 shadow-card">
+                      <span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary">
+                        <Icon className="size-4" aria-hidden />
+                      </span>
+                      <p className="mt-2 break-words text-lg font-black tabular-nums leading-tight text-text-strong">
+                        {s.value}
+                      </p>
+                      <p className="mt-1 text-[12px] font-bold text-text-strong">{s.label}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-text-muted">{s.hint}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
 
             <div className="grid grid-cols-2 gap-2">
               <button

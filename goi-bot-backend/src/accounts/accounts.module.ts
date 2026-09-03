@@ -8,6 +8,8 @@ import { BusinessNotification } from "./entities/business-notification.entity";
 import { CourierDocument } from "./entities/courier-document.entity";
 import { Courier } from "./entities/courier.entity";
 import { Customer } from "./entities/customer.entity";
+import { ReferralCommission } from "./entities/referral-commission.entity";
+import { ReferralCommissionsService } from "./referral-commissions.service";
 
 @Module({
   imports: [
@@ -17,10 +19,11 @@ import { Customer } from "./entities/customer.entity";
       Customer,
       BusinessNotification,
       Job,
+      ReferralCommission,
     ]),
   ],
   controllers: [AccountsController],
-  providers: [AccountsService, CronSecretGuard],
-  exports: [AccountsService],
+  providers: [AccountsService, ReferralCommissionsService, CronSecretGuard],
+  exports: [AccountsService, ReferralCommissionsService],
 })
 export class AccountsModule {}

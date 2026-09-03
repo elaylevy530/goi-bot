@@ -167,6 +167,8 @@ export function nestRegisterBusiness(input: {
   business_category: string;
   service_type: string;
   terms_accepted: true;
+  referred_by?: string | null;
+  referral_code?: string | null;
 }) {
   return apiFetch<NestAuthSession>("/api/auth/register/business", {
     method: "POST",

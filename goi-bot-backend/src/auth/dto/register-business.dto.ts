@@ -70,4 +70,15 @@ export class RegisterBusinessDto {
 
   @Equals(true)
   terms_accepted!: true;
+
+  /** Courier id or referral code from /signup-business?ref=… */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  referred_by?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  referral_code?: string | null;
 }

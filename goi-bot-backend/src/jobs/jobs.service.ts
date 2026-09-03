@@ -10,6 +10,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomBytes } from "crypto";
 import { In, IsNull, MoreThanOrEqual, Not, Repository } from "typeorm";
+import { ReferralCommissionsService } from "../accounts/referral-commissions.service";
 import { BusinessNotification } from "../accounts/entities/business-notification.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
@@ -71,6 +72,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     private readonly whatsappDispatch: WhatsappDispatchService,
     private readonly greenApi: GreenApiClient,
     private readonly offerPush: OfferPushService,
+    private readonly referralCommissions: ReferralCommissionsService,
   ) {}
 
   onModuleInit() {
@@ -1295,6 +1297,20 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       await this.hideCourierBusinessConversation(jobId);
     }
     await this.jobs.save(job);
+    if (step === "נמסר") {
+      try {
+        await this.referralCommissions.creditForCompletedJob({
+          jobId: job.id,
+          selectedCourierId: job.selected_courier_id,
+          customerId: job.customer_id,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Referral commission failed for job ${job.id}`,
+          err instanceof Error ? err.stack : err,
+        );
+      }
+    }
     await this.statusLogs.save(
       this.statusLogs.create({
         entity_type: "job",

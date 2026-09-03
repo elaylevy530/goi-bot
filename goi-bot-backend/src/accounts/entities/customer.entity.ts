@@ -16,6 +16,11 @@ export class Customer {
   @Column({ type: "uuid", nullable: true })
   user_id!: string | null;
 
+  /** Courier who recruited this business via /signup-business?ref= */
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  referred_by_courier_id!: string | null;
+
   @Column({ type: "varchar", length: 255 })
   name!: string;
 

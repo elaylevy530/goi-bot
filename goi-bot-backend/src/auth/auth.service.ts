@@ -148,6 +148,11 @@ export class AuthService {
       service_type: dto.service_type,
     };
 
+    const referralLead = dto.referred_by?.trim() || dto.referral_code?.trim() || "";
+    const referrer = referralLead
+      ? await findCourierByReferralToken(this.couriers, referralLead)
+      : null;
+
     // Use save() (not update()) — TypeORM's update() rejects jsonb Record<string, unknown>.
     await this.customers.save(
       this.customers.create({
@@ -166,6 +171,7 @@ export class AuthService {
         pickup_address: dto.address?.trim() || null,
         payment_method_on_file: false,
         niche_details: nicheDetails,
+        referred_by_courier_id: referrer?.id ?? null,
       }),
     );
 

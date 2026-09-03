@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { AccountsModule } from "../accounts/accounts.module";
 import { BusinessNotification } from "../accounts/entities/business-notification.entity";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Courier } from "../accounts/entities/courier.entity";
@@ -45,6 +46,7 @@ import { PublicMoverJobsController } from "./public-mover-jobs.controller";
       Conversation,
       Message,
     ]),
+    AccountsModule,
     PartnersModule,
     PaymentsModule,
     WhatsappModule,

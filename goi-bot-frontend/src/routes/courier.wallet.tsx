@@ -13,6 +13,7 @@ import {
   Info,
   Sparkles,
   Upload,
+  Users,
   Wallet,
   X,
 } from "lucide-react";
@@ -24,7 +25,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
-import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListWithdrawals, nestUpdateWithdrawal } from "@/lib/nest-domain";
+import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListMyCourierReferrals, nestListWithdrawals, nestUpdateWithdrawal } from "@/lib/nest-domain";
 import { nestUploadFile } from "@/lib/nest-files";
 import { cn } from "@/lib/utils";
 
@@ -161,6 +162,14 @@ function WalletPage() {
     queryFn: () => nestListWithdrawals() as Promise<WithdrawalRow[]>,
   });
 
+  const { data: referrals } = useQuery({
+    queryKey: ["courier-referrals", me?.id],
+    enabled: !!me?.id,
+    refetchInterval: 30_000,
+    queryFn: () => nestListMyCourierReferrals(),
+  });
+  const commissions = referrals?.commissions ?? [];
+
   const { data: bonuses = [] } = useQuery({
     queryKey: ["wallet-bonuses"],
     queryFn: () => nestListActiveBonuses(),
@@ -168,12 +177,20 @@ function WalletPage() {
   });
 
   const completed = rows.filter((o) => o.delivered_at && !o.was_cancelled);
-  const previousEarned = completed
+  const previousJobEarned = completed
     .filter((o) => isPreviousIsraelMonth(o.delivered_at))
     .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-  const currentMonthEarned = completed
+  const currentJobEarned = completed
     .filter((o) => !isPreviousIsraelMonth(o.delivered_at))
     .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
+  const previousCommissionEarned = commissions
+    .filter((c) => isPreviousIsraelMonth(c.created_at))
+    .reduce((s, c) => s + Number(c.amount ?? 0), 0);
+  const currentCommissionEarned = commissions
+    .filter((c) => !isPreviousIsraelMonth(c.created_at))
+    .reduce((s, c) => s + Number(c.amount ?? 0), 0);
+  const previousEarned = previousJobEarned + previousCommissionEarned;
+  const currentMonthEarned = currentJobEarned + currentCommissionEarned;
   const paidOut = withdrawals.filter((w) => w.status === "שולמה").reduce((s, w) => s + Number(w.amount ?? 0), 0);
   const pending = withdrawals.filter((w) => w.status !== "נדחתה" && w.status !== "שולמה");
   const reserved = pending.reduce((s, w) => s + Number(w.amount ?? 0), 0);
@@ -220,7 +237,7 @@ function WalletPage() {
   const tx = useMemo(() => {
     const items: {
       id: string;
-      kind: "job" | "tip" | "bonus" | "withdraw";
+      kind: "job" | "tip" | "bonus" | "withdraw" | "referral";
       title: string;
       at: string;
       amount: number;
@@ -236,6 +253,17 @@ function WalletPage() {
       if (tip) {
         items.push({ id: `tip-${o.id}`, kind: "tip", title: `טיפ ${no}`.trim(), at: o.delivered_at!, amount: tip, status: "אושרה" });
       }
+    }
+    for (const c of commissions) {
+      const kindLabel = c.kind === "business" ? "עסק שגייסת" : "שליח שגייסת";
+      items.push({
+        id: `ref-${c.id}`,
+        kind: "referral",
+        title: `עמלה ${kindLabel}`,
+        at: c.created_at || "",
+        amount: Number(c.amount ?? 0),
+        status: isPreviousIsraelMonth(c.created_at) ? "אושרה" : "ממתינה",
+      });
     }
     for (const b of bonuses as { id?: string; title?: string; amount?: number; created_at?: string; ends_at?: string }[]) {
       items.push({
@@ -260,7 +288,7 @@ function WalletPage() {
       });
     }
     return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  }, [rows, bonuses, withdrawals, bank?.bank_account]);
+  }, [rows, bonuses, withdrawals, bank?.bank_account, commissions]);
 
   const visibleTx = showAll ? tx : tx.slice(0, 5);
 
@@ -520,7 +548,7 @@ function WalletPage() {
                 <ul className="flex flex-col gap-2">
                   {visibleTx.map((item) => {
                     const st = displayStatus(item.status);
-                    const Icon = item.kind === "tip" ? Heart : item.kind === "bonus" ? Sparkles : item.kind === "withdraw" ? Building2 : Bike;
+                    const Icon = item.kind === "tip" ? Heart : item.kind === "bonus" ? Sparkles : item.kind === "withdraw" ? Building2 : item.kind === "referral" ? Users : Bike;
                     return (
                       <li key={item.id} className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
                         <div className="grid size-10 shrink-0 place-items-center rounded-pill bg-primary-soft text-primary">

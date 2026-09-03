@@ -13,6 +13,7 @@ import { CourierAdminNotification } from "../accounts/entities/courier-admin-not
 import { WithdrawalRequest } from "../accounts/entities/withdrawal-request.entity";
 import { CourierBonus } from "../accounts/entities/courier-bonus.entity";
 import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
+import { ReferralCommission } from "../accounts/entities/referral-commission.entity";
 import { SavedContact } from "../accounts/entities/saved-contact.entity";
 import { TeamMember } from "../accounts/entities/team-member.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
@@ -76,6 +77,8 @@ export class DomainService {
     @InjectRepository(SavedContact) private readonly savedContacts: Repository<SavedContact>,
     @InjectRepository(TeamMember) private readonly teamMembers: Repository<TeamMember>,
     @InjectRepository(RecurringOrder) private readonly recurringOrders: Repository<RecurringOrder>,
+    @InjectRepository(ReferralCommission)
+    private readonly referralCommissions: Repository<ReferralCommission>,
   ) {}
 
   getOutcome(jobId: string) {
@@ -334,6 +337,18 @@ export class DomainService {
       )
       .getRawOne<{ earned: string | number }>();
     const earned = Number(earnedRow?.earned ?? 0);
+    const commissionRow = await this.referralCommissions
+      .createQueryBuilder("c")
+      .select("COALESCE(SUM(c.amount), 0)", "earned")
+      .where("c.beneficiary_courier_id = :courierId", { courierId })
+      .andWhere(
+        `(EXTRACT(YEAR FROM (c.created_at AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
+          + EXTRACT(MONTH FROM (c.created_at AT TIME ZONE '${ISRAEL_TZ}'))::int)
+         < (EXTRACT(YEAR FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
+          + EXTRACT(MONTH FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int)`,
+      )
+      .getRawOne<{ earned: string | number }>();
+    const commissions = Number(commissionRow?.earned ?? 0);
     const rows = await this.withdrawals.find({ where: { courier_id: courierId } });
     const paidOut = rows
       .filter((w) => w.status === "שולמה")
@@ -341,7 +356,7 @@ export class DomainService {
     const reserved = rows
       .filter((w) => w.status !== "נדחתה" && w.status !== "שולמה")
       .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
-    return Math.max(0, earned - paidOut - reserved);
+    return Math.max(0, earned + commissions - paidOut - reserved);
   }
 
   async createWithdrawal(userId: string, body: Mutable, roles: AppRole[] = []) {

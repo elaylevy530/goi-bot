@@ -25,6 +25,11 @@ import {
 } from "./entities/courier-document.entity";
 import { Courier } from "./entities/courier.entity";
 import { Customer } from "./entities/customer.entity";
+import { ReferralCommission } from "./entities/referral-commission.entity";
+import {
+  isCurrentIsraelMonth,
+  REFERRAL_COMMISSION_ILS,
+} from "./referral-commission";
 import type { ApproveCourierDto } from "./dto/approve-courier.dto";
 import type { CreateCourierAdminDto } from "./dto/create-courier-admin.dto";
 import type { UpdateCourierAdminDto } from "./dto/update-courier-admin.dto";
@@ -53,6 +58,14 @@ export type CourierReferralRow = {
 export type CourierReferralsPayload = {
   couriers: CourierReferralRow[];
   businesses: CourierReferralRow[];
+  commissions: {
+    id: string;
+    job_id: string;
+    kind: "courier" | "business";
+    amount: number;
+    created_at: Date;
+  }[];
+  commission_ils: number;
   totals: {
     couriers_registered: number;
     couriers_active: number;
@@ -73,6 +86,8 @@ export class AccountsService implements OnModuleInit {
     @InjectRepository(BusinessNotification)
     private readonly notifications: Repository<BusinessNotification>,
     @InjectRepository(Job) private readonly jobs: Repository<Job>,
+    @InjectRepository(ReferralCommission)
+    private readonly commissions: Repository<ReferralCommission>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -169,6 +184,31 @@ export class AccountsService implements OnModuleInit {
       `CREATE INDEX IF NOT EXISTS IDX_courier_documents_courier_id ON courier_documents (courier_id)`,
     );
 
+    await this.dataSource.query(
+      `ALTER TABLE customers ADD COLUMN IF NOT EXISTS referred_by_courier_id uuid`,
+    );
+    await this.dataSource.query(
+      `CREATE INDEX IF NOT EXISTS IDX_customers_referred_by_courier_id ON customers (referred_by_courier_id)`,
+    );
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS referral_commissions (
+        id uuid PRIMARY KEY,
+        beneficiary_courier_id uuid NOT NULL,
+        job_id uuid NOT NULL,
+        kind varchar(16) NOT NULL,
+        amount numeric NOT NULL DEFAULT 0,
+        source_courier_id uuid,
+        source_customer_id uuid,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await this.dataSource.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS IDX_referral_commissions_job_id_kind ON referral_commissions (job_id, kind)`,
+    );
+    await this.dataSource.query(
+      `CREATE INDEX IF NOT EXISTS IDX_referral_commissions_beneficiary ON referral_commissions (beneficiary_courier_id)`,
+    );
+
     const missingReferral = await this.couriers.find({
       where: { referral_code: IsNull() },
       select: ["id"],
@@ -234,6 +274,31 @@ export class AccountsService implements OnModuleInit {
     });
 
     const jobsByCourier = await this.completedJobsByCourier(unique.map((c) => c.id));
+    const mine = await this.commissions.find({
+      where: { beneficiary_courier_id: me.id },
+    });
+    const profitByCourier = new Map<string, number>();
+    const profitByBusiness = new Map<string, number>();
+    let profit = 0;
+    let pending = 0;
+    for (const row of mine) {
+      const amount = Number(row.amount) || 0;
+      profit += amount;
+      if (isCurrentIsraelMonth(row.created_at)) pending += amount;
+      if (row.kind === "courier" && row.source_courier_id) {
+        profitByCourier.set(
+          row.source_courier_id,
+          (profitByCourier.get(row.source_courier_id) ?? 0) + amount,
+        );
+      }
+      if (row.kind === "business" && row.source_customer_id) {
+        profitByBusiness.set(
+          row.source_customer_id,
+          (profitByBusiness.get(row.source_customer_id) ?? 0) + amount,
+        );
+      }
+    }
+
     const couriers: CourierReferralRow[] = unique.map((c) => ({
       id: c.id,
       full_name: c.full_name,
@@ -242,21 +307,49 @@ export class AccountsService implements OnModuleInit {
       status: c.courier_status,
       created_at: c.created_at,
       jobs_completed: jobsByCourier.get(c.id) ?? 0,
-      your_profit: 0,
+      your_profit: profitByCourier.get(c.id) ?? 0,
       kind: "courier",
     }));
 
+    const referredBusinesses = await this.customers.find({
+      where: { referred_by_courier_id: me.id },
+      order: { created_at: "DESC" },
+    });
+    const jobsByBusiness = await this.completedJobsByCustomer(
+      referredBusinesses.map((b) => b.id),
+    );
+    const businesses: CourierReferralRow[] = referredBusinesses.map((b) => ({
+      id: b.id,
+      full_name: b.business_name || b.name,
+      avatar_url: b.logo_url,
+      vehicle_type: null,
+      status: b.status === "active" ? "פעיל" : b.status,
+      created_at: b.created_at,
+      jobs_completed: jobsByBusiness.get(b.id) ?? 0,
+      your_profit: profitByBusiness.get(b.id) ?? 0,
+      kind: "business",
+    }));
+
     const couriersActive = couriers.filter((c) => c.status === "פעיל").length;
+    const businessesActive = businesses.filter((b) => b.status === "פעיל").length;
     return {
       couriers,
-      businesses: [],
+      businesses,
+      commissions: mine.map((row) => ({
+        id: row.id,
+        job_id: row.job_id,
+        kind: row.kind,
+        amount: Number(row.amount) || 0,
+        created_at: row.created_at,
+      })),
+      commission_ils: REFERRAL_COMMISSION_ILS,
       totals: {
         couriers_registered: couriers.length,
         couriers_active: couriersActive,
-        businesses_registered: 0,
-        businesses_active: 0,
-        profit: 0,
-        pending: 0,
+        businesses_registered: businesses.length,
+        businesses_active: businessesActive,
+        profit,
+        pending,
       },
     };
   }
@@ -276,6 +369,23 @@ export class AccountsService implements OnModuleInit {
       .getRawMany<{ courier_id: string; n: string | number }>();
     for (const row of rows) {
       map.set(row.courier_id, Number(row.n) || 0);
+    }
+    return map;
+  }
+
+  private async completedJobsByCustomer(ids: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (ids.length === 0) return map;
+    const rows = await this.jobs
+      .createQueryBuilder("j")
+      .select("j.customer_id", "customer_id")
+      .addSelect("COUNT(*)::int", "n")
+      .where("j.customer_id IN (:...ids)", { ids })
+      .andWhere("j.status = :done", { done: "הושלמה" })
+      .groupBy("j.customer_id")
+      .getRawMany<{ customer_id: string; n: string | number }>();
+    for (const row of rows) {
+      map.set(row.customer_id, Number(row.n) || 0);
     }
     return map;
   }

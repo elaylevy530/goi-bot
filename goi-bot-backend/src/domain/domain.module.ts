@@ -6,6 +6,7 @@ import { BusinessIntegration } from "../accounts/entities/business-integration.e
 import { BusinessFavoriteCourier } from "../accounts/entities/business-favorite-courier.entity";
 import { IntegrationRequestLog } from "../accounts/entities/integration-request-log.entity";
 import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
+import { ReferralCommission } from "../accounts/entities/referral-commission.entity";
 import { SavedContact } from "../accounts/entities/saved-contact.entity";
 import { TeamMember } from "../accounts/entities/team-member.entity";
 import { BillingRecord } from "../payments/entities/billing-record.entity";
@@ -62,6 +63,7 @@ import { DomainService } from "./domain.service";
       SavedContact,
       TeamMember,
       RecurringOrder,
+      ReferralCommission,
       CourierStats,
       BusinessBranch,
       BusinessIntegration,

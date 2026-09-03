@@ -404,6 +404,18 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
           <p className="text-sm md:text-base text-muted-foreground mt-2">
             קבל הצעות עבודה ישירות בוואטסאפ — בלי אפליקציות, בלי התחייבות
           </p>
+          {referredBy ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              עסק?{" "}
+              <Link
+                to="/signup-business"
+                search={{ ref: referredBy }}
+                className="font-bold text-primary underline underline-offset-4"
+              >
+                הרשמה לעסק דרך אותו קישור
+              </Link>
+            </p>
+          ) : null}
         </header>
 
 

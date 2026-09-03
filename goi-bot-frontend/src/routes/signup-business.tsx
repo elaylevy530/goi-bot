@@ -22,6 +22,9 @@ export const Route = createFileRoute("/signup-business")({
       { name: "robots", content: "noindex, follow" },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    ref: typeof s.ref === "string" && s.ref.trim() ? s.ref.trim() : undefined,
+  }),
   ssr: false,
   component: SignupBusinessPage,
 });
@@ -36,6 +39,7 @@ type Step = 1 | 2;
 
 function SignupBusinessPage() {
   const navigate = useNavigate();
+  const { ref } = Route.useSearch();
 
   const [step, setStep] = useState<Step>(1);
   const [category, setCategory] = useState<BusinessCategory | null>(null);
@@ -62,6 +66,7 @@ function SignupBusinessPage() {
         business_category: category.key,
         service_type: category.serviceType,
         terms_accepted: true as const,
+        ...(ref ? { referred_by: ref, referral_code: ref } : {}),
       });
     },
     onSuccess: (session) => {

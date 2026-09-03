@@ -141,6 +141,14 @@ export function nestListMyCourierReferrals() {
   return apiFetch<{
     couriers?: Record<string, unknown>[];
     businesses?: Record<string, unknown>[];
+    commissions?: {
+      id?: string;
+      job_id?: string;
+      kind?: "courier" | "business";
+      amount?: number;
+      created_at?: string;
+    }[];
+    commission_ils?: number;
     totals?: Record<string, number>;
   }>("/api/accounts/couriers/me/referrals", options());
 }

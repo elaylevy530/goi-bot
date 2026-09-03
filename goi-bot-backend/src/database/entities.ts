@@ -58,6 +58,7 @@ import { WhatsappMessage } from "../whatsapp/entities/whatsapp-message.entity";
 import { SavedContact } from "../accounts/entities/saved-contact.entity";
 import { TeamMember } from "../accounts/entities/team-member.entity";
 import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
+import { ReferralCommission } from "../accounts/entities/referral-commission.entity";
 import { WalletTransaction } from "../payments/entities/wallet-transaction.entity";
 
 /** All TypeORM entities registered for synchronize. No migrations. */
@@ -110,6 +111,7 @@ export const TYPEORM_ENTITIES = [
   SavedContact,
   TeamMember,
   RecurringOrder,
+  ReferralCommission,
   WalletTransaction,
   SupportTicket,
   PilotCity,
