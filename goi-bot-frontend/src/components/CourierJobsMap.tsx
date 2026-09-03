@@ -8,6 +8,12 @@ import {
 import { useMyCourier } from "@/components/CourierShell";
 import { CourierOfferCard } from "@/components/courier/CourierOfferCard";
 import { termsFor } from "@/lib/courier-kind";
+import {
+  COURIER_MAP_STYLES_DARK,
+  COURIER_MAP_STYLES_LIGHT,
+  readCourierTheme,
+  useCourierTheme,
+} from "@/lib/courier-theme";
 import { fetchDrivingRoute, haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
 import { pickupReadyMapLabel } from "@/lib/pickup-ready";
 
@@ -161,6 +167,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
+  const { dark } = useCourierTheme();
   const mapDivRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
@@ -209,6 +216,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   useEffect(() => {
     if (!ready || !mapDivRef.current || mapRef.current) return;
     const div = mapDivRef.current;
+    const initialDark = readCourierTheme() === "dark";
     mapRef.current = new window.google.maps.Map(div, {
       center: DEFAULT_CENTER,
       zoom: 13,
@@ -218,11 +226,8 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       zoomControl: false,
       clickableIcons: false,
       gestureHandling: "greedy",
-      styles: [
-        { featureType: "poi", stylers: [{ visibility: "off" }] },
-        { featureType: "transit", stylers: [{ visibility: "off" }] },
-        { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-      ],
+      backgroundColor: initialDark ? "#121212" : "#f1f5f9",
+      styles: [...(initialDark ? COURIER_MAP_STYLES_DARK : COURIER_MAP_STYLES_LIGHT)] as google.maps.MapTypeStyle[],
     });
 
     const invalidate = () => {
@@ -249,6 +254,15 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       window.clearTimeout(t2);
     };
   }, [ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    map.setOptions({
+      backgroundColor: dark ? "#121212" : "#f1f5f9",
+      styles: [...(dark ? COURIER_MAP_STYLES_DARK : COURIER_MAP_STYLES_LIGHT)] as google.maps.MapTypeStyle[],
+    });
+  }, [dark, ready]);
 
   // After jobs land (carousel / layout shift), force a map repaint.
   useEffect(() => {
@@ -659,7 +673,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
         ) : (
           <div
             ref={mapDivRef}
-            className="absolute inset-0 w-full h-full bg-slate-100"
+            className="absolute inset-0 w-full h-full bg-map-canvas"
           />
         )}
 

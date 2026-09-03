@@ -11,6 +11,12 @@ import {
   type LatLng,
   type RouteStep,
 } from "@/lib/google-driving-route";
+import {
+  COURIER_MAP_STYLES_DARK,
+  COURIER_MAP_STYLES_LIGHT,
+  readCourierTheme,
+  useCourierTheme,
+} from "@/lib/courier-theme";
 import { cn } from "@/lib/utils";
 
 export type MissionStop = {
@@ -153,6 +159,7 @@ export function MissionNavMap({
   onRouteRef.current = onRoute;
 
   const fix = useNavFix();
+  const { dark } = useCourierTheme();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(mode === "navigate");
@@ -180,6 +187,7 @@ export function MissionNavMap({
   useEffect(() => {
     if (!ready || !mapDivRef.current || mapRef.current || !window.google?.maps) return;
     const div = mapDivRef.current;
+    const initialDark = readCourierTheme() === "dark";
     const map = new window.google.maps.Map(div, {
       center: DEFAULT_CENTER,
       zoom: mode === "navigate" ? 16 : 13,
@@ -187,10 +195,8 @@ export function MissionNavMap({
       clickableIcons: false,
       gestureHandling: "greedy",
       keyboardShortcuts: false,
-      styles: [
-        { featureType: "poi", stylers: [{ visibility: "off" }] },
-        { featureType: "transit", stylers: [{ visibility: "off" }] },
-      ],
+      backgroundColor: initialDark ? "#121212" : "#f1f5f9",
+      styles: [...(initialDark ? COURIER_MAP_STYLES_DARK : COURIER_MAP_STYLES_LIGHT)] as google.maps.MapTypeStyle[],
     });
     mapRef.current = map;
     map.addListener("dragstart", () => {
@@ -203,6 +209,15 @@ export function MissionNavMap({
     ro.observe(div);
     return () => ro.disconnect();
   }, [ready, mode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    map.setOptions({
+      backgroundColor: dark ? "#121212" : "#f1f5f9",
+      styles: [...(dark ? COURIER_MAP_STYLES_DARK : COURIER_MAP_STYLES_LIGHT)] as google.maps.MapTypeStyle[],
+    });
+  }, [dark, ready]);
 
   useEffect(() => {
     if (!ready || !window.google?.maps) return;

@@ -1,11 +1,17 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { InstallAppSidebarItem } from "@/components/InstallApp";
 import { termsFor } from "@/lib/courier-kind";
+import {
+  applyCourierThemeClass,
+  clearCourierThemeClass,
+  readCourierTheme,
+  useCourierTheme,
+} from "@/lib/courier-theme";
 import { signOutCourierSession } from "@/lib/courier-session";
 import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
 import { nestListMyCourierNotifications, nestMyNotificationUnreadCount } from "@/lib/nest-domain";
@@ -23,9 +29,11 @@ import {
   MapPin,
   Menu,
   MessageSquare,
+  Moon,
   Navigation,
   Settings,
   Star,
+  Sun,
   TrendingUp,
   User,
   Wallet,
@@ -111,6 +119,17 @@ export function CourierMenuProvider({ children }: { children: ReactNode }) {
     [open],
   );
 
+  // Keep `.dark` on <html> only while the courier panel is mounted.
+  useEffect(() => {
+    applyCourierThemeClass(readCourierTheme());
+    const onTheme = () => applyCourierThemeClass(readCourierTheme());
+    window.addEventListener("goi-courier-theme", onTheme);
+    return () => {
+      window.removeEventListener("goi-courier-theme", onTheme);
+      clearCourierThemeClass();
+    };
+  }, []);
+
   return (
     <CourierMenuContext.Provider value={api}>
       {children}
@@ -145,6 +164,7 @@ function CourierSideDrawer() {
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { dark, toggle: toggleTheme } = useCourierTheme();
 
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
   const accepting = approved && me?.accepting_jobs !== false;
@@ -285,7 +305,7 @@ function CourierSideDrawer() {
             </div>
           </div>
 
-          <div className="border-b border-border px-5 py-4">
+          <div className="border-b border-border px-5 py-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <Switch
                 checked={accepting}
@@ -297,6 +317,23 @@ function CourierSideDrawer() {
               <div className="min-w-0 flex-1 text-right">
                 <p className="text-sm font-semibold text-text-strong">זמין לקבלת עבודה</p>
                 <p className="text-xs text-text-muted mt-0.5">{t.panel}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Switch
+                checked={dark}
+                onCheckedChange={() => toggleTheme()}
+                aria-label="מצב כהה"
+                className="shrink-0 data-[state=checked]:bg-primary"
+              />
+              <div className="min-w-0 flex-1 text-right">
+                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-strong">
+                  {dark ? <Moon className="size-3.5 text-primary" aria-hidden /> : <Sun className="size-3.5 text-primary" aria-hidden />}
+                  מצב כהה
+                </p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {dark ? "מפה ותפריט במצב לילה" : "מפה ותפריט במצב יום"}
+                </p>
               </div>
             </div>
           </div>
@@ -337,7 +374,7 @@ function CourierSideDrawer() {
           </nav>
 
           <div className="border-t border-border pt-1">
-            <InstallAppSidebarItem variant="light" />
+            <InstallAppSidebarItem variant={dark ? "dark" : "light"} />
             <button
               type="button"
               onClick={() => void handleSignOut()}
