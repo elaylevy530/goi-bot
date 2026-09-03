@@ -68,7 +68,7 @@ function NewJobsPage() {
 
   const { data: declinedRows = [] } = useQuery({
     queryKey: ["courier-job-declines", me?.id],
-    enabled: isApproved,
+    enabled: isAvailable,
     queryFn: async () => {
       const rows = await nestListCourierDeclines();
       return rows.map((r) => ({ job_id: r.job_id }));
@@ -76,9 +76,9 @@ function NewJobsPage() {
   });
   const declinedSet = useMemo(() => new Set(declinedRows.map((r: any) => r.job_id)), [declinedRows]);
 
-  const { data: offers = [], isLoading } = useQuery({
+  const { data: offers = [] } = useQuery({
     queryKey: ["new-jobs", me?.id, "pending"],
-    enabled: isApproved,
+    enabled: isAvailable,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListCourierOffers("pending");
@@ -93,7 +93,7 @@ function NewJobsPage() {
 
   const { data: quoteJobs = [] } = useQuery({
     queryKey: ["courier-quote-requests", me?.id],
-    enabled: isApproved,
+    enabled: isAvailable,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenQuoteJobs();
@@ -105,13 +105,13 @@ function NewJobsPage() {
   const quoteJobIdsKey = quoteJobIds.join(",");
   const { data: myQuotes = [] } = useQuery({
     queryKey: ["my-quotes-on-open", me?.id, quoteJobIdsKey],
-    enabled: isApproved && quoteJobIds.length > 0,
+    enabled: isAvailable && quoteJobIds.length > 0,
     queryFn: () => nestListCourierQuotes(quoteJobIds),
   });
 
   const { data: openJobs = [] } = useQuery({
     queryKey: ["courier-open-jobs", me?.id],
-    enabled: isApproved,
+    enabled: isAvailable,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenBroadcastJobs();
@@ -120,14 +120,14 @@ function NewJobsPage() {
   });
 
   useEffect(() => {
-    if (!me?.id) return;
+    if (!me?.id || !isAvailable) return;
     const timer = window.setInterval(() => {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
     }, 20_000);
     return () => window.clearInterval(timer);
-  }, [me?.id, qc]);
+  }, [me?.id, isAvailable, qc]);
 
   const quoteByJob = useMemo(() => {
     const map: Record<string, any> = {};
@@ -388,12 +388,7 @@ function NewJobsPage() {
           </div>
         </div>
 
-        {isLoading && availableCount === 0 ? (
-          <div className="flex-1 grid place-items-center text-text-muted">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0">
             <CourierJobsMap
               jobs={mapJobs}
               onClaim={handleClaim}
@@ -453,7 +448,6 @@ function NewJobsPage() {
               }
             />
           </div>
-        )}
       </div>
       </PullToRefresh>
 
@@ -676,27 +670,38 @@ function SearchingCard({
 
   const goOnline = useMutation({
     mutationFn: async () => {
-      if (!me || !approved) return;
-      if (typeof navigator !== "undefined" && navigator.geolocation) {
-        try {
-          await new Promise<void>((resolve) => {
-            navigator.geolocation.getCurrentPosition(
-              () => resolve(),
-              () => resolve(),
-              { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
-            );
-          });
-        } catch {}
+      let courier = me;
+      if (!courier) {
+        const { nestMyCourier, getNestAccessToken } = await import("@/lib/nest-auth");
+        if (!getNestAccessToken()) throw new Error("יש להתחבר מחדש");
+        courier = await nestMyCourier();
       }
-      try {
-        const { enablePushForCourier, pushSupported } = await import("@/lib/push/subscribe");
-        if (pushSupported() && me?.id) {
-          const res = await enablePushForCourier(me.id);
-          if (!res.ok && res.reason === "denied") {
-            toast.error("התראות חסומות — הפעל בהגדרות הדפדפן כדי לקבל הצעות");
-          }
+      const canGoOnline = courier?.courier_status === "פעיל" && courier?.is_paused !== true;
+      if (!courier || !canGoOnline) {
+        throw new Error("החשבון ממתין לאישור או מושהה");
+      }
+      void (async () => {
+        if (typeof navigator !== "undefined" && navigator.geolocation) {
+          try {
+            await new Promise<void>((resolve) => {
+              navigator.geolocation.getCurrentPosition(
+                () => resolve(),
+                () => resolve(),
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+              );
+            });
+          } catch {}
         }
-      } catch {}
+        try {
+          const { enablePushForCourier, pushSupported } = await import("@/lib/push/subscribe");
+          if (pushSupported() && courier.id) {
+            const res = await enablePushForCourier(courier.id);
+            if (!res.ok && res.reason === "denied") {
+              toast.error("התראות חסומות — הפעל בהגדרות הדפדפן כדי לקבל הצעות");
+            }
+          }
+        } catch {}
+      })();
       await nestUpdateMyCourier({ accepting_jobs: true });
     },
     onSuccess: () => {
@@ -731,9 +736,9 @@ function SearchingCard({
               variant="availability"
               label="החלק כדי להפוך לזמין"
               subtitle="והתחל לקבל משלוחים"
-              disabled={!approved || goOnline.isPending}
+              disabled={goOnline.isPending || (me != null && !approved)}
               onConfirm={() => {
-                if (!approved || goOnline.isPending) return;
+                if (goOnline.isPending || (me != null && !approved)) return;
                 goOnline.mutate();
               }}
             />
