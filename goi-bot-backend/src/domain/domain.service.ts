@@ -40,16 +40,7 @@ import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 type Mutable = Record<string, unknown>;
 
 const ISRAEL_TZ = "Asia/Jerusalem";
-
-function isIsraelFirstOfMonth(now = new Date()): boolean {
-  const day = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: ISRAEL_TZ,
-      day: "numeric",
-    }).format(now),
-  );
-  return day === 1;
-}
+const MIN_COURIER_WITHDRAWAL = 400;
 
 @Injectable()
 export class DomainService {
@@ -327,6 +318,32 @@ export class DomainService {
     });
     return this.attachCouriersToWithdrawals(rows);
   }
+  async withdrawableBalanceForCourier(courierId: string) {
+    const earnedRow = await this.outcomes
+      .createQueryBuilder("o")
+      .innerJoin(Job, "j", "j.id = o.job_id")
+      .select("COALESCE(SUM(COALESCE(j.payment, 0) + COALESCE(o.tip_amount, 0)), 0)", "earned")
+      .where("o.courier_id = :courierId", { courierId })
+      .andWhere("o.delivered_at IS NOT NULL")
+      .andWhere("COALESCE(o.was_cancelled, false) = false")
+      .andWhere(
+        `(EXTRACT(YEAR FROM (o.delivered_at AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
+          + EXTRACT(MONTH FROM (o.delivered_at AT TIME ZONE '${ISRAEL_TZ}'))::int)
+         < (EXTRACT(YEAR FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
+          + EXTRACT(MONTH FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int)`,
+      )
+      .getRawOne<{ earned: string | number }>();
+    const earned = Number(earnedRow?.earned ?? 0);
+    const rows = await this.withdrawals.find({ where: { courier_id: courierId } });
+    const paidOut = rows
+      .filter((w) => w.status === "שולמה")
+      .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
+    const reserved = rows
+      .filter((w) => w.status !== "נדחתה" && w.status !== "שולמה")
+      .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
+    return Math.max(0, earned - paidOut - reserved);
+  }
+
   async createWithdrawal(userId: string, body: Mutable, roles: AppRole[] = []) {
     const previewId = previewCourierId();
     const courier = previewId
@@ -335,8 +352,27 @@ export class DomainService {
     const courierId = courier?.id ?? (body.courier_id as string | undefined);
     if (!courierId) throw new ForbiddenException("Courier profile required");
     const isStaff = roles.includes("admin") || roles.includes("manager");
-    if (!isStaff && !isIsraelFirstOfMonth()) {
-      throw new BadRequestException("ניתן להגיש בקשת משיכה רק ב-1 לחודש");
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("סכום משיכה לא תקין");
+    }
+    if (!isStaff) {
+      if (amount < MIN_COURIER_WITHDRAWAL) {
+        throw new BadRequestException(`הסכום המינימלי למשיכה הוא ₪${MIN_COURIER_WITHDRAWAL}`);
+      }
+      const existing = await this.withdrawals.find({ where: { courier_id: courierId } });
+      const hasPending = existing.some((w) => w.status !== "נדחתה" && w.status !== "שולמה");
+      if (hasPending) {
+        throw new BadRequestException("יש כבר בקשת משיכה ממתינה");
+      }
+      const available = await this.withdrawableBalanceForCourier(courierId);
+      if (Math.round(amount * 100) > Math.round(available * 100)) {
+        throw new BadRequestException(
+          available <= 0
+            ? "ניתן למשוך רק משלוחים מחודשים קודמים, החל מה-1 לחודש"
+            : "הסכום גבוה מהיתרה הזמינה",
+        );
+      }
     }
     const withdrawal = this.withdrawals.create({
       courier_id: courierId,

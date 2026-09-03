@@ -4,6 +4,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomBytes } from "crypto";
@@ -17,6 +19,7 @@ import type { AppRole } from "../auth/auth.types";
 import { Conversation } from "../push/entities/conversation.entity";
 import { OfferPushService } from "../push/offer-push.service";
 import { WhatsappDispatchService } from "../whatsapp/whatsapp-dispatch.service";
+import { GreenApiClient } from "../whatsapp/green-api.client";
 import { CourierJobDecline } from "./entities/courier-job-decline.entity";
 import { Job } from "./entities/job.entity";
 import { JobQuote } from "./entities/job-quote.entity";
@@ -28,6 +31,9 @@ import { JobOutcome } from "./entities/job-outcome.entity";
 import { JobStop } from "./entities/job-stop.entity";
 import { StatusLog } from "./entities/status-log.entity";
 import { generateJobShortCode } from "./job-short-code";
+import {
+  isWithinScheduledGoOnlineWindow,
+} from "./job-schedule";
 import {
   CLAIMABLE_STATUSES,
   OPEN_STATUSES,
@@ -41,8 +47,10 @@ function generateTrackingToken(): string {
 const OFFER_TTL_MS = 30 * 60 * 1000;
 
 @Injectable()
-export class JobsService {
+export class JobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobsService.name);
+  private scheduledGoOnlineTimer?: ReturnType<typeof setInterval>;
+  private scheduledGoOnlineRunning = false;
 
   constructor(
     @InjectRepository(Job) private readonly jobs: Repository<Job>,
@@ -61,8 +69,25 @@ export class JobsService {
     @InjectRepository(Conversation)
     private readonly conversations: Repository<Conversation>,
     private readonly whatsappDispatch: WhatsappDispatchService,
+    private readonly greenApi: GreenApiClient,
     private readonly offerPush: OfferPushService,
   ) {}
+
+  onModuleInit() {
+    void this.jobs.query(
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS scheduled_online_notified_at timestamptz`,
+    );
+    this.scheduledGoOnlineTimer = setInterval(() => {
+      void this.activateCouriersForUpcomingScheduledJobs();
+    }, 60_000);
+    setTimeout(() => {
+      void this.activateCouriersForUpcomingScheduledJobs();
+    }, 8_000);
+  }
+
+  onModuleDestroy() {
+    if (this.scheduledGoOnlineTimer) clearInterval(this.scheduledGoOnlineTimer);
+  }
 
   /**
    * Rank eligible couriers for admin matching UI (does not create offers).
@@ -1074,6 +1099,80 @@ export class JobsService {
         status: Not(In(["הושלמה", "בוטלה"])),
       },
     });
+  }
+
+  async activateCouriersForUpcomingScheduledJobs() {
+    if (this.scheduledGoOnlineRunning) {
+      return { ok: true as const, activated: 0, reminded: 0, skipped: true };
+    }
+    this.scheduledGoOnlineRunning = true;
+    try {
+      const rows = await this.jobs.find({
+        where: {
+          selected_courier_id: Not(IsNull()),
+          status: Not(In(["הושלמה", "בוטלה"])),
+          scheduled_online_notified_at: IsNull(),
+        },
+        take: 400,
+      });
+      const due = rows.filter((job) => isWithinScheduledGoOnlineWindow(job));
+      let activated = 0;
+      let reminded = 0;
+      for (const job of due) {
+        job.scheduled_online_notified_at = new Date();
+        await this.jobs.save(job);
+        const courierId = job.selected_courier_id;
+        if (!courierId) continue;
+        const courier = await this.couriers.findOne({ where: { id: courierId } });
+        if (!courier || courier.courier_status !== "פעיל" || courier.is_paused) {
+          continue;
+        }
+        if (!courier.accepting_jobs) {
+          courier.accepting_jobs = true;
+          await this.couriers.save(courier);
+          activated += 1;
+        }
+        const when = [job.job_date, job.job_time].filter(Boolean).join(" ") || "בקרוב";
+        const title = "משלוח מתוזמן מתחיל בקרוב";
+        const body = `יש לך משלוח ב-${when}. עברת לזמין אוטומטית — היכנסו לאפליקציה.`;
+        try {
+          await this.offerPush.notifyCourier(courier.id, {
+            title,
+            body,
+            url: "/courier/active",
+            tag: `goi-scheduled-${job.id}`,
+          });
+          reminded += 1;
+        } catch (e) {
+          this.logger.warn(
+            `scheduled go-online push failed job=${job.id}`,
+            e instanceof Error ? e.message : e,
+          );
+        }
+        if (courier.whatsapp_phone && this.greenApi.isConfigured()) {
+          try {
+            await this.greenApi.sendText(
+              courier.whatsapp_phone,
+              `Goi: ${body}`,
+            );
+          } catch (e) {
+            this.logger.warn(
+              `scheduled go-online WhatsApp failed job=${job.id}`,
+              e instanceof Error ? e.message : e,
+            );
+          }
+        }
+      }
+      return { ok: true as const, activated, reminded };
+    } catch (e) {
+      this.logger.error(
+        "scheduled go-online tick failed",
+        e instanceof Error ? e.stack : e,
+      );
+      throw e;
+    } finally {
+      this.scheduledGoOnlineRunning = false;
+    }
   }
 
   async listOpenBroadcastJobs(userId: string) {

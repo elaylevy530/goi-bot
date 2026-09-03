@@ -22,6 +22,8 @@ import { CourierPasswordReset } from "../accounts/entities/courier-password-rese
 import { Customer } from "../accounts/entities/customer.entity";
 import { User } from "../accounts/entities/user.entity";
 import { UserRole } from "../accounts/entities/user-role.entity";
+import { Job } from "../jobs/entities/job.entity";
+import { courierHasLiveActiveJob } from "../jobs/job-schedule";
 import { previewCourierId, previewCustomerId } from "./auth-als";
 import type {
   AppRole,
@@ -68,6 +70,7 @@ export class AuthService {
     @InjectRepository(UserRole) private readonly userRoles: Repository<UserRole>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
+    @InjectRepository(Job) private readonly jobs: Repository<Job>,
     @InjectRepository(CourierPasswordReset)
     private readonly passwordResets: Repository<CourierPasswordReset>,
     @InjectRepository(AdminPreviewSession)
@@ -227,14 +230,18 @@ export class AuthService {
     return this.customers.findOne({ where: { user_id: userId } });
   }
 
-  async getMyCourier(userId: string): Promise<Courier | null> {
+  async getMyCourier(userId: string): Promise<(Courier & { has_live_active_job: boolean }) | null> {
     const id = previewCourierId();
     const courier = id
       ? await this.couriers.findOne({ where: { id } })
       : await this.couriers.findOne({ where: { user_id: userId } });
     if (!courier) return null;
     await ensureCourierReferralCode(this.couriers, courier);
-    return ensureCourierNumber(this.couriers, courier);
+    const row = await ensureCourierNumber(this.couriers, courier);
+    return {
+      ...row,
+      has_live_active_job: await courierHasLiveActiveJob(this.jobs, row.id),
+    };
   }
 
   async updateMyCustomerName(userId: string, fullName: string) {

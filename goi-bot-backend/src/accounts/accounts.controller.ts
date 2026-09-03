@@ -41,7 +41,7 @@ export class AccountsController {
   @Get("couriers/me")
   @UseGuards(JwtAuthGuard)
   myCourier(@CurrentUser() auth: AuthUserContext) {
-    return this.accounts.getMyCourier(auth.userId);
+    return this.accounts.getMyCourierWithAvailability(auth.userId);
   }
 
   @Get("couriers/me/referrals")

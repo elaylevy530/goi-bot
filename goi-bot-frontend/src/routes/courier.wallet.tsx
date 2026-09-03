@@ -81,7 +81,6 @@ function displayStatus(status?: string | null) {
 }
 
 const ISRAEL_TZ = "Asia/Jerusalem";
-const WITHDRAWAL_WINDOW_ERROR = "ניתן להגיש בקשת משיכה רק ב-1 לחודש";
 
 function israelCalendarParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -94,16 +93,34 @@ function israelCalendarParts(now = new Date()) {
   return { year: num("year"), month: num("month"), day: num("day") };
 }
 
-function isIsraelFirstOfMonth(now = new Date()) {
-  return israelCalendarParts(now).day === 1;
+function israelYearMonthValue(d: Date) {
+  const { year, month } = israelCalendarParts(d);
+  return year * 12 + month;
+}
+
+function isPreviousIsraelMonth(iso?: string | null, now = new Date()) {
+  if (!iso) return false;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return false;
+  return israelYearMonthValue(at) < israelYearMonthValue(now);
 }
 
 function nextWithdrawalWindowDate(now = new Date()) {
-  const { year, month, day } = israelCalendarParts(now);
-  if (day <= 1) return { year, month, day: 1 };
+  const { year, month } = israelCalendarParts(now);
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
   return { year: nextYear, month: nextMonth, day: 1 };
+}
+
+function previousMonthLabel(now = new Date()) {
+  const { year, month } = israelCalendarParts(now);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  return new Date(Date.UTC(prevYear, prevMonth - 1, 15, 12, 0, 0)).toLocaleDateString("he-IL", {
+    timeZone: ISRAEL_TZ,
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function formatIsraelDate(parts: { year: number; month: number; day: number }) {
@@ -142,13 +159,17 @@ function WalletPage() {
     staleTime: 30_000,
   });
 
-  const earned = rows
-    .filter((o) => o.delivered_at && !o.was_cancelled)
+  const completed = rows.filter((o) => o.delivered_at && !o.was_cancelled);
+  const previousEarned = completed
+    .filter((o) => isPreviousIsraelMonth(o.delivered_at))
+    .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
+  const currentMonthEarned = completed
+    .filter((o) => !isPreviousIsraelMonth(o.delivered_at))
     .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
   const paidOut = withdrawals.filter((w) => w.status === "שולמה").reduce((s, w) => s + Number(w.amount ?? 0), 0);
   const pending = withdrawals.filter((w) => w.status !== "נדחתה" && w.status !== "שולמה");
   const reserved = pending.reduce((s, w) => s + Number(w.amount ?? 0), 0);
-  const available = Math.max(0, earned - paidOut - reserved);
+  const available = Math.max(0, previousEarned - paidOut - reserved);
   const latestPending = pending
     .slice()
     .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0];
@@ -160,19 +181,16 @@ function WalletPage() {
     id?: string;
   } | null;
   const hasBank = !!(bank?.bank_name && bank?.bank_account);
-  const isWithdrawalWindowOpen = isIsraelFirstOfMonth();
   const nextWindow = nextWithdrawalWindowDate();
-  const canRequestNow =
-    isWithdrawalWindowOpen && !latestPending && available >= MIN_WITHDRAWAL && hasBank;
-  const requestBlockReason = !isWithdrawalWindowOpen
-    ? `${WITHDRAWAL_WINDOW_ERROR}. הבאה ב-${formatIsraelDate(nextWindow)}`
-    : latestPending
-      ? "יש כבר בקשת משיכה ממתינה"
-      : !hasBank
-        ? "יש לחבר חשבון בנק באזור האישי"
-        : available < MIN_WITHDRAWAL
-          ? `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`
-          : null;
+  const requestBlockReason = latestPending
+    ? "יש כבר בקשת משיכה ממתינה"
+    : !hasBank
+      ? "יש לחבר חשבון בנק באזור האישי"
+      : available < MIN_WITHDRAWAL
+        ? currentMonthEarned > 0
+          ? `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}. משלוחי החודש ייפתחו ב-${formatIsraelDate(nextWindow)}`
+          : `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`
+        : null;
   const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
   const invoiceWithdrawalId = invoiceTargetId || latestPending?.id || null;
   const invoiceAlreadyAttached = !!latestPending?.receipt_url;
@@ -228,7 +246,6 @@ function WalletPage() {
     mutationFn: async () => {
       const n = Number(amount);
       if (!me?.id) throw new Error("לא מחובר");
-      if (!isIsraelFirstOfMonth()) throw new Error(WITHDRAWAL_WINDOW_ERROR);
       if (latestPending) throw new Error("יש כבר בקשת משיכה ממתינה");
       if (!hasBank) throw new Error("יש לחבר חשבון בנק באזור האישי");
       if (!Number.isFinite(n) || n < MIN_WITHDRAWAL) throw new Error(`הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`);
@@ -289,7 +306,12 @@ function WalletPage() {
                 <div className="min-w-0 text-right">
                   <p className="text-sm text-primary-foreground/80">יתרה זמינה למשיכה</p>
                   <p className="mt-1 text-3xl font-black tabular-nums">₪ {money(available)}</p>
-                  <p className="mt-2 text-xs text-primary-foreground/70">סכום זה כולל את כל הרווחים והטיפים שלך</p>
+                  <p className="mt-2 text-xs text-primary-foreground/70">
+                    משלוחים שהושלמו עד {previousMonthLabel()}
+                    {currentMonthEarned > 0
+                      ? ` · ₪${money(currentMonthEarned)} החודש ייפתחו ב-${formatIsraelDate(nextWindow)}`
+                      : ""}
+                  </p>
                 </div>
                 <div className="grid size-14 shrink-0 place-items-center rounded-card bg-primary-foreground/10">
                   <Wallet className="size-7" aria-hidden />
@@ -336,20 +358,21 @@ function WalletPage() {
               </div>
 
               <div className="rounded-card border border-border bg-surface p-3 shadow-card">
-                <p className="text-xs font-bold text-text-strong">
-                  {canRequestNow ? "אפשר להגיש משיכה עכשיו" : "אפשר להגיש משיכה הבאה"}
-                </p>
+                <p className="text-xs font-bold text-text-strong">משלוחי החודש ייפתחו</p>
                 <div className="mt-2 flex items-center gap-2">
                   <CalendarDays className="size-4 text-primary" aria-hidden />
                   <p className="text-lg font-black tabular-nums text-text-strong">
-                    {isWithdrawalWindowOpen ? "היום" : formatIsraelDate(nextWindow)}
+                    {formatIsraelDate(nextWindow)}
                   </p>
                 </div>
-                {!isWithdrawalWindowOpen && (
-                  <span className="mt-2 inline-flex rounded-pill bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-success-text">
-                    רק ב-1 לחודש
-                  </span>
-                )}
+                {currentMonthEarned > 0 ? (
+                  <p className="mt-1 text-[11px] text-text-muted">
+                    ₪ {money(currentMonthEarned)} עדיין לא זמינים
+                  </p>
+                ) : null}
+                <span className="mt-2 inline-flex rounded-pill bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-success-text">
+                  החל מ-1 לחודש, על חודשים קודמים
+                </span>
               </div>
             </div>
 
@@ -401,7 +424,7 @@ function WalletPage() {
 
             <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-sm text-text">
               <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <p>כל רווח ממשלוח, טיפ או בונוס נכנס אוטומטית לארנק שלך.</p>
+              <p>אפשר למשוך משלוחים מחודשים קודמים החל מה-1 לחודש. משלוחי החודש הנוכחי ייפתחו ב-1 לחודש הבא.</p>
             </div>
 
             <section className="space-y-2">
@@ -465,7 +488,12 @@ function WalletPage() {
             <DialogTitle className="text-right">בקשת משיכה</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-text-subtle">יתרה זמינה: ₪ {money(available)}</p>
+            <p className="text-sm text-text-subtle">
+              יתרה זמינה (חודשים קודמים): ₪ {money(available)}
+              {currentMonthEarned > 0
+                ? `. משלוחי החודש (₪ ${money(currentMonthEarned)}) ייפתחו ב-${formatIsraelDate(nextWindow)}`
+                : ""}
+            </p>
             <div>
               <Label className="text-right" htmlFor="withdraw-amount">סכום למשיכה</Label>
               <Input

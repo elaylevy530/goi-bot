@@ -439,7 +439,7 @@ function ActiveEmptyState({ hasJobsInTab, tab }: { hasJobsInTab: boolean; tab: A
       <p className="mt-2 max-w-xs text-sm text-text-subtle">
         {hasJobsInTab
           ? "נסו לבחור סטטוס אחר או לחזור לכל המשלוחים"
-          : "כשתהיה לך משלוח חדש, הוא יופיע כאן"}
+          : "כשיהיה לך משלוח פעיל, הוא יופיע כאן"}
       </p>
     </div>
   );

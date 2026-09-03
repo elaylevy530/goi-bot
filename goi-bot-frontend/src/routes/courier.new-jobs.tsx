@@ -17,6 +17,7 @@ import {
   nestRespondOffer,
 } from "@/lib/nest-jobs";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
+import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob } from "@/lib/courier-session";
 import { nestListConversations } from "@/lib/nest-chat";
 import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -807,6 +808,7 @@ function AcceptJobsToggle({
 }) {
   const qc = useQueryClient();
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
+  const liveJobLocksOffline = courierHasLiveActiveJob(me);
   const [on, setOn] = useState<boolean>(false);
 
   useEffect(() => {
@@ -840,6 +842,9 @@ function AcceptJobsToggle({
   const toggle = useMutation({
     mutationFn: async (next: boolean) => {
       if (!me) return;
+      if (!next && liveJobLocksOffline) {
+        throw new Error(LIVE_JOB_OFFLINE_ERROR);
+      }
       if (next) await requestPermissionsOnce();
       await nestUpdateMyCourier({ accepting_jobs: next });
     },
@@ -865,12 +870,18 @@ function AcceptJobsToggle({
         : "סטטוס - לא פעיל";
   const subtitle = !approved
     ? "החשבון ממתין לאישור או מושהה"
+    : liveJobLocksOffline && on
+      ? "יש משלוח פעיל — לא ניתן לעבור למצב לא זמין"
     : on
       ? "תקבלו משלוחים והתראות"
       : "הפעילו כדי לקבל משלוחים והתראות";
 
   const flip = () => {
     if (!approved || toggle.isPending) return;
+    if (on && liveJobLocksOffline) {
+      toast.error(LIVE_JOB_OFFLINE_ERROR);
+      return;
+    }
     const next = !on;
     setOn(next);
     toggle.mutate(next);
@@ -881,7 +892,7 @@ function AcceptJobsToggle({
       <button
         type="button"
         onClick={flip}
-        disabled={!approved || toggle.isPending}
+        disabled={!approved || toggle.isPending || (on && liveJobLocksOffline)}
         aria-label={title}
         className={`flex items-center gap-1.5 rounded-pill bg-surface px-3.5 py-2 shadow-card ${
           !approved ? "opacity-70" : ""
@@ -905,9 +916,13 @@ function AcceptJobsToggle({
     >
       <Switch
         checked={on}
-        disabled={!approved || toggle.isPending}
+        disabled={!approved || toggle.isPending || (on && liveJobLocksOffline)}
         onCheckedChange={(next) => {
           if (!approved) return;
+          if (!next && liveJobLocksOffline) {
+            toast.error(LIVE_JOB_OFFLINE_ERROR);
+            return;
+          }
           setOn(next);
           toggle.mutate(next);
         }}

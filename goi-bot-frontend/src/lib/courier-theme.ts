@@ -6,29 +6,21 @@ const STORAGE_KEY = "goi.courier.theme";
 const EVENT = "goi-courier-theme";
 
 export function readCourierTheme(): CourierTheme {
-  if (typeof window === "undefined") return "light";
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) === "dark" ? "dark" : "light";
-  } catch {
-    return "light";
-  }
+  return "light";
 }
 
-export function writeCourierTheme(theme: CourierTheme) {
+export function writeCourierTheme(_theme: CourierTheme) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, theme);
+    window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new Event(EVENT));
 }
 
-/** Apply/remove `.dark` on <html> for courier CSS tokens. */
-export function applyCourierThemeClass(theme: CourierTheme) {
-  if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+/** Apply/remove `.dark` on <html> for courier CSS tokens. Dark mode is currently off. */
+export function applyCourierThemeClass(_theme?: CourierTheme) {
+  clearCourierThemeClass();
 }
 
 export function clearCourierThemeClass() {
@@ -52,15 +44,15 @@ function subscribe(onStoreChange: () => void) {
 
 export function useCourierTheme() {
   const theme = useSyncExternalStore(subscribe, readCourierTheme, () => "light" as CourierTheme);
-  const setTheme = (next: CourierTheme) => {
-    writeCourierTheme(next);
-    applyCourierThemeClass(next);
+  const setTheme = (_next: CourierTheme) => {
+    writeCourierTheme("light");
+    applyCourierThemeClass("light");
   };
   return {
     theme,
-    dark: theme === "dark",
+    dark: false,
     setTheme,
-    toggle: () => setTheme(theme === "dark" ? "light" : "dark"),
+    toggle: () => setTheme("light"),
   };
 }
 

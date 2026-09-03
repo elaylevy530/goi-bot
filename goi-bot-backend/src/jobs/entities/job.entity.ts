@@ -192,6 +192,10 @@ export class Job {
   @Column({ type: "varchar", length: 32, nullable: true })
   job_time!: string | null;
 
+  /** Set when the 30-minute go-online reminder was sent for a scheduled job. */
+  @Column({ type: "timestamptz", nullable: true })
+  scheduled_online_notified_at!: Date | null;
+
   @Column({ type: "boolean", default: false })
   fragile!: boolean;
 

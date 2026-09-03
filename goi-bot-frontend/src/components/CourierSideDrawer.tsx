@@ -9,10 +9,9 @@ import { termsFor } from "@/lib/courier-kind";
 import {
   applyCourierThemeClass,
   clearCourierThemeClass,
-  readCourierTheme,
-  useCourierTheme,
 } from "@/lib/courier-theme";
-import { signOutCourierSession } from "@/lib/courier-session";
+import { toast } from "sonner";
+import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob, signOutCourierSession } from "@/lib/courier-session";
 import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
 import { nestListMyCourierNotifications, nestMyNotificationUnreadCount } from "@/lib/nest-domain";
 import {
@@ -29,11 +28,9 @@ import {
   MapPin,
   Menu,
   MessageSquare,
-  Moon,
   Navigation,
   Settings,
   Star,
-  Sun,
   TrendingUp,
   User,
   Wallet,
@@ -119,13 +116,10 @@ export function CourierMenuProvider({ children }: { children: ReactNode }) {
     [open],
   );
 
-  // Keep `.dark` on <html> only while the courier panel is mounted.
+  // Dark mode is currently disabled — keep courier chrome on light tokens.
   useEffect(() => {
-    applyCourierThemeClass(readCourierTheme());
-    const onTheme = () => applyCourierThemeClass(readCourierTheme());
-    window.addEventListener("goi-courier-theme", onTheme);
+    applyCourierThemeClass("light");
     return () => {
-      window.removeEventListener("goi-courier-theme", onTheme);
       clearCourierThemeClass();
     };
   }, []);
@@ -164,10 +158,10 @@ function CourierSideDrawer() {
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { dark, toggle: toggleTheme } = useCourierTheme();
 
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
   const accepting = approved && me?.accepting_jobs !== false;
+  const liveJobLocksOffline = courierHasLiveActiveJob(me);
   const roleLabel = accepting
     ? `${t.worker} פעיל`
     : approved
@@ -183,12 +177,17 @@ function CourierSideDrawer() {
   };
 
   const handleToggleAvailability = async () => {
+    if (!approved) return;
+    if (accepting && liveJobLocksOffline) {
+      toast.error(LIVE_JOB_OFFLINE_ERROR);
+      return;
+    }
     const { nestUpdateMyCourier } = await import("@/lib/nest-accounts");
     try {
       await nestUpdateMyCourier({ accepting_jobs: !accepting });
       await qc.invalidateQueries({ queryKey: ["my-courier-me"] });
     } catch (error) {
-      console.error("Failed to toggle availability:", error);
+      toast.error(error instanceof Error ? error.message : "לא הצלחנו לעדכן זמינות");
     }
   };
 
@@ -275,7 +274,7 @@ function CourierSideDrawer() {
         className="w-[min(300px,88vw)] max-w-[300px] p-0 gap-0 border-0 bg-surface shadow-card-strong [&>button]:hidden"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
-        <SheetTitle className="sr-only">תפריט {t.panel}</SheetTitle>
+        <SheetTitle className="sr-only">תפריט</SheetTitle>
 
         <div className="flex h-full flex-col">
           <div className="border-b border-border px-5 py-5">
@@ -289,18 +288,17 @@ function CourierSideDrawer() {
                 <X className="size-5" />
               </button>
               <div className="flex items-center gap-3 min-w-0">
-                <div className="min-w-0 text-right">
-                  <p className="text-base font-bold text-text-strong truncate">
-                    {me?.full_name?.trim() || t.worker}
-                  </p>
-                  <p className="text-xs text-text-subtle mt-0.5">{roleLabel}</p>
-                  <p className="text-[11px] text-text-muted mt-1">{t.panel}</p>
-                </div>
                 <CourierAvatar
                   path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
                   name={me?.full_name}
                   size={48}
                 />
+                <div className="min-w-0 text-right">
+                  <p className="text-base font-bold text-text-strong truncate">
+                    {me?.full_name?.trim() || t.worker}
+                  </p>
+                  <p className="text-xs text-text-subtle mt-0.5">{roleLabel}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -310,30 +308,17 @@ function CourierSideDrawer() {
               <Switch
                 checked={accepting}
                 onCheckedChange={() => void handleToggleAvailability()}
-                disabled={!approved}
+                disabled={!approved || (accepting && liveJobLocksOffline)}
                 aria-label="זמין לקבלת עבודה"
                 className="shrink-0 data-[state=checked]:bg-primary"
               />
               <div className="min-w-0 flex-1 text-right">
                 <p className="text-sm font-semibold text-text-strong">זמין לקבלת עבודה</p>
-                <p className="text-xs text-text-muted mt-0.5">{t.panel}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Switch
-                checked={dark}
-                onCheckedChange={() => toggleTheme()}
-                aria-label="מצב כהה"
-                className="shrink-0 data-[state=checked]:bg-primary"
-              />
-              <div className="min-w-0 flex-1 text-right">
-                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-strong">
-                  {dark ? <Moon className="size-3.5 text-primary" aria-hidden /> : <Sun className="size-3.5 text-primary" aria-hidden />}
-                  מצב כהה
-                </p>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {dark ? "מפה ותפריט במצב לילה" : "מפה ותפריט במצב יום"}
-                </p>
+                {accepting && liveJobLocksOffline ? (
+                  <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
+                    יש משלוח פעיל — לא ניתן לעבור למצב לא זמין
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -374,7 +359,7 @@ function CourierSideDrawer() {
           </nav>
 
           <div className="border-t border-border pt-1">
-            <InstallAppSidebarItem variant={dark ? "dark" : "light"} />
+            <InstallAppSidebarItem variant="light" />
             <button
               type="button"
               onClick={() => void handleSignOut()}

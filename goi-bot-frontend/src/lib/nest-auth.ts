@@ -77,6 +77,9 @@ export type NestCourierProfile = Record<string, unknown> & {
   courier_kind?: string | null;
   referral_code?: string | null;
   courier_number?: string | null;
+  accepting_jobs?: boolean | null;
+  has_live_active_job?: boolean | null;
+  is_paused?: boolean | null;
   vehicle_type?: string | null;
   vehicle_label?: string | null;
   vehicle_plate?: string | null;

@@ -24,6 +24,7 @@ import {
 } from "@/components/courier/work-area-visuals";
 import { WorkAreaCityPicker } from "@/components/courier/WorkAreaPicker";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
+import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob } from "@/lib/courier-session";
 import {
   composeWorkingAreas,
   expandWorkAreasForCards,
@@ -97,6 +98,7 @@ function AvailabilityPage() {
 
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
   const accepting = approved && me?.accepting_jobs !== false;
+  const liveJobLocksOffline = courierHasLiveActiveJob(me);
 
   useEffect(() => {
     if (!me) return;
@@ -120,6 +122,9 @@ function AvailabilityPage() {
 
   const toggleAvailability = useMutation({
     mutationFn: async (next: boolean) => {
+      if (!next && liveJobLocksOffline) {
+        throw new Error(LIVE_JOB_OFFLINE_ERROR);
+      }
       await nestUpdateMyCourier({ accepting_jobs: next });
     },
     onSuccess: () => {
@@ -196,15 +201,23 @@ function AvailabilityPage() {
                     </span>
                   </div>
                   <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
-                    {approved
-                      ? "כשהמתג דולק תקבל הצעות משלוח בזמן אמת"
-                      : "הזמינות תיפתח אחרי אישור החשבון"}
+                    {!approved
+                      ? "הזמינות תיפתח אחרי אישור החשבון"
+                      : liveJobLocksOffline && accepting
+                        ? "יש משלוח פעיל — לא ניתן לעבור למצב לא זמין"
+                        : "כשהמתג דולק תקבל הצעות משלוח בזמן אמת"}
                   </p>
                 </div>
                 <Switch
                   checked={accepting}
-                  disabled={!approved || toggleAvailability.isPending}
-                  onCheckedChange={(next) => toggleAvailability.mutate(next)}
+                  disabled={!approved || toggleAvailability.isPending || (accepting && liveJobLocksOffline)}
+                  onCheckedChange={(next) => {
+                    if (!next && liveJobLocksOffline) {
+                      toast.error(LIVE_JOB_OFFLINE_ERROR);
+                      return;
+                    }
+                    toggleAvailability.mutate(next);
+                  }}
                   aria-label="זמין לקבל עבודות"
                   className="h-8 w-[3.25rem] shrink-0 data-[state=checked]:bg-primary [&>span]:size-7 [&>span]:data-[state=checked]:translate-x-[1.35rem]"
                 />

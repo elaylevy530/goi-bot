@@ -289,8 +289,9 @@ function PerformancePage() {
               }}
             >
               <SelectTrigger
+                dir="rtl"
                 aria-label="בחירת תקופה"
-                className="min-h-11 w-full rounded-card border-border bg-surface text-sm font-bold text-text-strong shadow-card"
+                className="min-h-11 w-full justify-start gap-2 rounded-card border-border bg-surface text-sm font-bold text-text-strong shadow-card"
               >
                 <SelectValue />
               </SelectTrigger>

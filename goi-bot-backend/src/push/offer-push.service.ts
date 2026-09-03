@@ -4,6 +4,7 @@ import { In, Repository } from "typeorm";
 import type { Job } from "../jobs/entities/job.entity";
 import { CourierPushSubscription } from "./entities/courier-push-subscription.entity";
 import { WebPushService } from "./web-push.service";
+import type { PushPayload } from "./web-push.service";
 
 /**
  * Fan-out Web Push to courier subscriptions when a job is dispatched.
@@ -62,6 +63,34 @@ export class OfferPushService {
     } catch (e) {
       this.logger.error(
         `offer push ${job.id} failed`,
+        e instanceof Error ? e.stack : e,
+      );
+      return { sent: 0, failed: subs.length, skipped: "send_failed" };
+    }
+  }
+
+  async notifyCourier(
+    courierId: string,
+    payload: PushPayload,
+  ): Promise<{ sent: number; failed: number; skipped?: string }> {
+    if (!this.webPush.isConfigured()) {
+      return { sent: 0, failed: 0, skipped: "vapid_missing" };
+    }
+    const subs = await this.courierSubs.find({ where: { courier_id: courierId } });
+    if (!subs.length) {
+      return { sent: 0, failed: 0, skipped: "no_subscriptions" };
+    }
+    try {
+      const results = await this.webPush.sendPushBatch(subs, payload);
+      const gone = results.filter((r) => r.gone).map((r) => r.endpoint);
+      if (gone.length) {
+        await this.courierSubs.delete({ endpoint: In(gone) });
+      }
+      const sent = results.filter((r) => r.ok).length;
+      return { sent, failed: results.length - sent };
+    } catch (e) {
+      this.logger.error(
+        `courier push ${courierId} failed`,
         e instanceof Error ? e.stack : e,
       );
       return { sent: 0, failed: subs.length, skipped: "send_failed" };

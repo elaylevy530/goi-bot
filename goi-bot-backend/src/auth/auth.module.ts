@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { Job } from "../jobs/entities/job.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { CourierPasswordReset } from "../accounts/entities/courier-password-reset.entity";
 import { Customer } from "../accounts/entities/customer.entity";
@@ -38,6 +39,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       UserRole,
       Customer,
       Courier,
+      Job,
       CourierPasswordReset,
       AdminPreviewSession,
     ]),

@@ -16,6 +16,7 @@ import {
 import { getPreviewClaim, previewCourierId, previewCustomerId } from "../auth/auth-als";
 import { normalizePhone } from "../auth/phone.util";
 import { Job } from "../jobs/entities/job.entity";
+import { courierHasLiveActiveJob, LIVE_JOB_OFFLINE_ERROR } from "../jobs/job-schedule";
 import { BusinessNotification } from "./entities/business-notification.entity";
 import {
   COURIER_DOCUMENT_TYPES,
@@ -201,6 +202,14 @@ export class AccountsService implements OnModuleInit {
     return ensureCourierNumber(this.couriers, courier);
   }
 
+  async getMyCourierWithAvailability(userId: string) {
+    const courier = await this.getMyCourier(userId);
+    return {
+      ...courier,
+      has_live_active_job: await courierHasLiveActiveJob(this.jobs, courier.id),
+    };
+  }
+
   async getMyReferrals(userId: string): Promise<CourierReferralsPayload> {
     const me = await this.getMyCourier(userId);
     const leadSources = new Set<string>([`referral:${me.id}`]);
@@ -273,6 +282,12 @@ export class AccountsService implements OnModuleInit {
 
   async updateMyCourier(userId: string, dto: UpdateCourierSelfDto): Promise<Courier> {
     const courier = await this.getMyCourier(userId);
+    if (dto.accepting_jobs === false) {
+      const live = await courierHasLiveActiveJob(this.jobs, courier.id);
+      if (live) {
+        throw new BadRequestException(LIVE_JOB_OFFLINE_ERROR);
+      }
+    }
     if (dto.last_lat != null || dto.last_lng != null) {
       courier.last_location_at = new Date();
     }

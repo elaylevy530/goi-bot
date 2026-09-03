@@ -27,6 +27,7 @@ export type NestJob = Record<string, unknown> & {
   customer_phone?: string | null;
   pickup_contact_phone?: string | null;
   job_date?: string | null;
+  job_time?: string | null;
 };
 
 export type NestOfferEvent = Record<string, unknown> & {

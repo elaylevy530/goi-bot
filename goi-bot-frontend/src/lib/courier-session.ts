@@ -9,6 +9,7 @@ export type CourierSelfRow = {
   avatar_url?: string | null;
   courier_status?: string | null;
   accepting_jobs?: boolean | null;
+  has_live_active_job?: boolean | null;
   is_paused?: boolean | null;
   courier_number?: string | null;
   vehicle_type?: string | null;
@@ -37,6 +38,14 @@ export function courierInitials(name?: string | null) {
   if (!name) return "ש";
   const parts = name.trim().split(/\s+/).slice(0, 2);
   return parts.map((p) => p[0]).join("");
+}
+
+export const LIVE_JOB_OFFLINE_ERROR = "לא ניתן לעבור למצב לא זמין בזמן משלוח פעיל";
+
+export function courierHasLiveActiveJob(
+  me: Pick<CourierSelfRow, "has_live_active_job"> | null | undefined,
+) {
+  return me?.has_live_active_job === true;
 }
 
 export function courierActiveStatus(
