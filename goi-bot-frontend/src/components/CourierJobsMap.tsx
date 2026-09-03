@@ -16,6 +16,7 @@ import {
 } from "@/lib/courier-theme";
 import { fetchDrivingRoute, haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
 import { pickupReadyMapLabel } from "@/lib/pickup-ready";
+import { cn } from "@/lib/utils";
 
 const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
@@ -82,15 +83,20 @@ export type MapJob = {
 };
 
 
-function stopPinSvg(kind: "store" | "home", fill: string, onFill = "#fff") {
+function stopPinSvg(kind: "store" | "home", fill: string, onFill = "#fff", caption?: string) {
   const glyph =
     kind === "store"
       ? `<path d="M10 14.2h16v1.6H10zm1.2 1.6h13.6V22H11.2zm2 0V22m4.8-6.2V22m4.8-6.2V22" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
          <path d="M10 14.2l1.3-3.4h13.4L26 14.2" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
       : `<path d="M11 18.5V23h5.2v-3.2h3.6V23H25v-4.5" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
          <path d="M10 18.8L18 12l8 6.8" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const label = caption
+    ? `<rect x="2" y="40" rx="6" ry="6" width="32" height="14" fill="#fff" stroke="#E5E7EB" stroke-width="1"/>
+       <text x="18" y="50" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial" font-size="8" font-weight="700" fill="#1A1A1A">${caption}</text>`
+    : "";
+  const h = caption ? 56 : 44;
   const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="${h}" viewBox="0 0 36 ${h}">
   <defs>
     <filter id="sp" x="-30%" y="-20%" width="160%" height="160%">
       <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0006"/>
@@ -100,6 +106,7 @@ function stopPinSvg(kind: "store" | "home", fill: string, onFill = "#fff") {
     <circle cx="18" cy="16" r="14" fill="${fill}" stroke="${onFill}" stroke-width="3"/>
     <polygon points="12,28 24,28 18,40" fill="${fill}"/>
     ${glyph}
+    ${label}
   </g>
 </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -184,6 +191,11 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   const [activeRoute, setActiveRoute] = useState<DrivingRoute | null>(null);
   const [filter, setFilter] = useState<"all" | "now" | "schedule" | "quote">("all");
   const [readyTick, setReadyTick] = useState(() => Date.now());
+  const [offerExpanded, setOfferExpanded] = useState(false);
+
+  useEffect(() => {
+    setOfferExpanded(false);
+  }, [activeId]);
 
   useEffect(() => {
     const id = window.setInterval(() => setReadyTick(Date.now()), 15_000);
@@ -501,9 +513,9 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     const orange = "#E86B3A";
     const onFill = tokenColor(el, "--primary-foreground", "#fff");
 
-    const stopIcon = (kind: "store" | "home", fill: string) => ({
-      url: stopPinSvg(kind, fill, onFill),
-      scaledSize: new window.google.maps.Size(36, 44),
+    const stopIcon = (kind: "store" | "home", fill: string, caption: string) => ({
+      url: stopPinSvg(kind, fill, onFill, caption),
+      scaledSize: new window.google.maps.Size(36, 56),
       anchor: new window.google.maps.Point(18, 40),
     });
 
@@ -511,7 +523,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       pickupStopRef.current = new window.google.maps.Marker({
         position: pickup,
         map,
-        icon: stopIcon("store", green),
+        icon: stopIcon("store", green, "בית העסק"),
         title: "בית העסק",
         zIndex: 850,
       });
@@ -537,7 +549,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       dropMarkerRef.current = new window.google.maps.Marker({
         position: drop,
         map,
-        icon: stopIcon("home", orange),
+        icon: stopIcon("home", orange, "הלקוח"),
         title: "הלקוח",
         zIndex: 850,
       });
@@ -709,7 +721,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
           </div>
         )}
 
-        {/* Compact offer carousel — map stays dominant */}
+        {/* Offer sheet — expands to a full sheet without inner scroll */}
         {scoredJobs.length > 0 && active && (() => {
           const renderCard = (j: MapJob, distToPickupKm: number | null) => (
             <CourierOfferCard
@@ -723,15 +735,32 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
               onDecline={onDecline}
               onQuote={onQuote}
               onDetails={onDetails}
+              expanded={j.id === activeId ? offerExpanded : false}
+              onExpandedChange={(open) => {
+                if (j.id === activeId) setOfferExpanded(open);
+              }}
             />
           );
 
-          const hasMultiple = scoredJobs.length >= 2;
+          const hasMultiple = scoredJobs.length >= 2 && !offerExpanded;
 
           return (
-            <div className="absolute inset-x-3 bottom-3 z-10 pointer-events-none">
+            <div
+              className={cn(
+                "absolute z-10 pointer-events-none",
+                offerExpanded ? "inset-0" : "inset-x-0 bottom-0 px-0 sm:inset-x-3 sm:bottom-3",
+              )}
+            >
+              {offerExpanded && (
+                <button
+                  type="button"
+                  aria-label="סגור"
+                  className="pointer-events-auto absolute inset-0 bg-black/25"
+                  onClick={() => setOfferExpanded(false)}
+                />
+              )}
               {hasMultiple && (
-                <div dir="rtl" className="pointer-events-auto flex items-center justify-between gap-2 mb-2">
+                <div dir="rtl" className="pointer-events-auto mx-3 mb-2 flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => goToIdx(activeIdx - 1)}
@@ -774,6 +803,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 dir="rtl"
                 ref={carouselRef}
                 onScroll={(e) => {
+                  if (offerExpanded) return;
                   const el = e.currentTarget;
                   const w = el.clientWidth;
                   if (w <= 0) return;
@@ -782,10 +812,17 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                   const target = scoredJobs[clamped]?.job.id;
                   if (target && target !== activeId) setActiveId(target);
                 }}
-                className="pointer-events-auto flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
-                style={{ scrollbarWidth: "none" }}
+                className={cn(
+                  "pointer-events-auto",
+                  offerExpanded
+                    ? "h-full"
+                    : "flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]",
+                )}
+                style={offerExpanded ? undefined : { scrollbarWidth: "none" }}
               >
-                {scoredJobs.map((s) => renderCard(s.job, s.distToPickup))}
+                {offerExpanded
+                  ? renderCard(active, scoredJobs[activeIdx]?.distToPickup ?? null)
+                  : scoredJobs.map((s) => renderCard(s.job, s.distToPickup))}
               </div>
             </div>
           );

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>כרטיס משלוח חדש — Goi</title>
+  <style>
+    :root { --green:#35AD29; --deep:#1F5C2E; --orange:#E86B3A; --strong:#07101d; --subtle:#6B6B6B; --border:#E6E6E6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Heebo, system-ui, sans-serif; background:#cfd4db; color:var(--strong); }
+    .phone { max-width:390px; margin:0 auto; min-height:100dvh; background:linear-gradient(180deg,#e8edf2,#d5dbe3); position:relative; overflow:hidden; }
+    .map { height:42dvh; background:#e9eef3 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40h80M40 0v80' stroke='%23c5ccd4' stroke-width='1'/%3E%3C/svg%3E"); display:flex; align-items:center; justify-content:center; color:#64748b; font-size:13px; font-weight:700; }
+    .tabs { display:flex; gap:8px; padding:10px 12px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:5; }
+    .tab { flex:1; height:40px; border-radius:999px; border:1px solid var(--border); background:#f6f6f6; font-weight:800; font-size:13px; }
+    .tab.on { background:var(--green); color:#fff; border-color:var(--green); }
+    .sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:28px 28px 0 0; box-shadow:0 -12px 40px rgba(0,0,0,.18); padding:0 14px max(12px, env(safe-area-inset-bottom)); }
+    .sheet.full { top:8dvh; display:flex; flex-direction:column; }
+    .handle { display:flex; flex-direction:column; align-items:center; gap:2px; padding:10px 0 6px; }
+    .bar { width:40px; height:4px; border-radius:99px; background:#D1D5DB; }
+    .hint { font-size:11px; font-weight:700; color:#6b7280; display:flex; align-items:center; gap:2px; }
+    .banner { display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--deep); color:#fff; border-radius:16px; padding:14px 16px; }
+    .pay { font-size:28px; font-weight:900; line-height:1; }
+    .sub { font-size:12px; opacity:.85; margin-top:4px; font-weight:600; }
+    .wallet { width:68px; height:68px; object-fit:contain; background:transparent; filter:drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+    .row { display:flex; gap:12px; align-items:flex-start; position:relative; }
+    .rail { position:absolute; right:15px; top:28px; bottom:28px; border-right:1px dashed #C9CDD3; }
+    .dot { width:32px; height:32px; border-radius:999px; display:grid; place-items:center; color:#fff; flex-shrink:0; z-index:1; }
+    .dot.g { background:var(--green); } .dot.o { background:var(--orange); }
+    .lbl { font-size:11px; font-weight:700; }
+    .ttl { font-size:15px; font-weight:800; }
+    .muted { font-size:12px; color:var(--subtle); }
+    .badge { display:inline-flex; align-items:center; gap:4px; margin-top:6px; background:#E8F8E6; color:#1F7A2E; border-radius:999px; padding:3px 10px; font-size:11px; font-weight:700; }
+    .actions { display:flex; justify-content:flex-end; gap:6px; margin-top:8px; }
+    .ib { width:32px; height:32px; border-radius:999px; border:1px solid var(--border); background:#fff; display:grid; place-items:center; }
+    .meta { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:12px; padding:10px 0; }
+    .meta > div { display:flex; align-items:center; justify-content:center; gap:8px; }
+    .meta > div:first-child { border-left:1px solid var(--border); }
+    .meta .k { font-size:10px; font-weight:700; color:var(--subtle); text-align:right; }
+    .meta .v { font-size:13px; font-weight:800; text-align:right; }
+    .cta { margin-top:12px; width:100%; height:56px; border:0; border-radius:999px; background:var(--green); color:#fff; font-size:16px; font-weight:800; box-shadow:0 8px 20px rgba(53,173,41,.35); }
+    .section { font-size:13px; font-weight:800; margin:12px 0 6px; text-align:right; }
+    .pkg { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; border:1px solid var(--border); border-radius:16px; padding:10px 12px; }
+    .pkg .k { font-size:10px; font-weight:700; color:var(--subtle); }
+    .pkg .v { font-size:12px; font-weight:800; }
+    .boxes { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    .box { border:1px solid var(--border); border-radius:16px; padding:8px 12px; text-align:right; }
+    .box .top { display:flex; justify-content:space-between; align-items:center; }
+    .hidden { display:none !important; }
+    .body { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+    .grow { flex:1; min-height:0; overflow:hidden; }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="tabs">
+      <button class="tab on" id="tabCompact" type="button">קומפקטי</button>
+      <button class="tab" id="tabExpanded" type="button">מורחב (בלי גלילה)</button>
+    </div>
+    <div class="map">מפה · סיכות בית העסק / הלקוח</div>
+
+    <!-- compact -->
+    <div class="sheet" id="compact">
+      <div class="handle"><span class="bar"></span></div>
+      <div class="banner">
+        <div>
+          <div class="pay">154 ₪</div>
+          <div class="sub">התגמול שלך עבור המשלוח</div>
+        </div>
+        <img class="wallet" src="/courier/reward-wallet.png?v=3" alt="" />
+      </div>
+      <div style="margin-top:12px; position:relative;">
+        <div class="rail" style="top:32px;bottom:32px"></div>
+        <div class="row">
+          <span class="dot g">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M3 9h18l-1 11H4L3 9Z"/><path d="M3 9l2-5h14l2 5"/><path d="M8 20v-6h8v6"/></svg>
+          </span>
+          <div style="flex:1;text-align:right">
+            <div class="lbl" style="color:var(--green)">איסוף</div>
+            <div class="ttl">דלמרקט</div>
+            <div class="muted">הרצל 16, תל אביב-יפו</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <span class="dot o">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+          </span>
+          <div style="flex:1;text-align:right">
+            <div class="lbl" style="color:var(--orange)">מסירה</div>
+            <div class="ttl">יצחק שדה 88</div>
+            <div class="muted">תל אביב-יפו</div>
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 17l8-10"/></svg>
+          <div><div class="k">מרחק מסלול</div><div class="v">3.1 ק״מ</div></div>
+        </div>
+        <div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+          <div><div class="k">אמצעי תשלום</div><div class="v">אשראי</div></div>
+        </div>
+      </div>
+      <button class="cta" type="button">לקחתי את המשלוח</button>
+    </div>
+
+    <!-- expanded -->
+    <div class="sheet full hidden" id="expanded">
+      <div class="handle">
+        <span class="bar"></span>
+        <span class="hint">▼ החלק למטה</span>
+      </div>
+      <div class="body">
+        <div class="banner" style="padding:12px 14px">
+          <div>
+            <div class="pay">154 ₪</div>
+            <div class="sub">התגמול שלך עבור המשלוח</div>
+          </div>
+          <img class="wallet" style="width:60px;height:60px" src="/courier/reward-wallet.png?v=3" alt="" />
+        </div>
+        <div class="grow">
+          <div class="section">פרטי המשלוח</div>
+          <div style="position:relative">
+            <div class="rail" style="top:28px;bottom:28px"></div>
+            <div class="row">
+              <span class="dot g">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M3 9h18l-1 11H4L3 9Z"/><path d="M3 9l2-5h14l2 5"/><path d="M8 20v-6h8v6"/></svg>
+              </span>
+              <div style="flex:1;text-align:right">
+                <div class="lbl" style="color:var(--green)">איסוף</div>
+                <div class="ttl" style="font-size:14px">דלמרקט</div>
+                <div class="muted">הרצל 16, תל אביב-יפו</div>
+                <span class="badge">⏱ מוכנה בעוד 12 דק׳</span>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-start;padding-right:40px;margin:6px 0">
+              <span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:800;background:#fff">3.1 ק״מ</span>
+            </div>
+            <div class="row">
+              <span class="dot o">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+              </span>
+              <div style="flex:1;text-align:right">
+                <div class="lbl" style="color:var(--orange)">מסירה</div>
+                <div class="ttl" style="font-size:14px">יצחק שדה 88</div>
+                <div class="muted">תל אביב-יפו</div>
+              </div>
+            </div>
+          </div>
+          <div class="section">פרטי החבילה</div>
+          <div class="pkg">
+            <div><div class="k">סוג</div><div class="v">שקית</div></div>
+            <div><div class="k">כמות</div><div class="v">חבילה אחת</div></div>
+            <div><div class="k">משקל</div><div class="v">עד 5 ק״ג</div></div>
+            <div><div class="k">הערה</div><div class="v">לשמור במצב ישר</div></div>
+          </div>
+        </div>
+        <button class="cta" type="button" style="margin-top:10px">לקחתי את המשלוח</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const compact = document.getElementById('compact');
+    const expanded = document.getElementById('expanded');
+    const tabCompact = document.getElementById('tabCompact');
+    const tabExpanded = document.getElementById('tabExpanded');
+    function show(mode) {
+      const isExp = mode === 'expanded';
+      compact.classList.toggle('hidden', isExp);
+      expanded.classList.toggle('hidden', !isExp);
+      tabCompact.classList.toggle('on', !isExp);
+      tabExpanded.classList.toggle('on', isExp);
+    }
+    tabCompact.onclick = () => show('compact');
+    tabExpanded.onclick = () => show('expanded');
+  </script>
+</body>
+</html>

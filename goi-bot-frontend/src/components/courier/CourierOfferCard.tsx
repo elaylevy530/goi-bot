@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import {
-  ChevronsUp,
+  ChevronDown,
   Clock,
   CreditCard,
   Home,
-  Navigation,
-  Phone,
   Route,
   Store,
 } from "lucide-react";
@@ -13,7 +11,6 @@ import type { MapJob } from "@/components/CourierJobsMap";
 import type { CourierTerms } from "@/lib/courier-kind";
 import type { DrivingRoute } from "@/lib/google-driving-route";
 import { pickupReadyBadge } from "@/lib/pickup-ready";
-import { openWaze } from "@/lib/waze";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -26,6 +23,8 @@ type Props = {
   onDecline?: (job: MapJob) => void;
   onQuote: (job: MapJob) => void;
   onDetails?: (job: MapJob) => void;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 function addressLine(address?: string | null, area?: string | null) {
@@ -41,8 +40,7 @@ function formatKm(km: number) {
 function streetTitle(address?: string | null, area?: string | null) {
   const full = addressLine(address, area);
   if (full === "—") return full;
-  const first = full.split(",")[0]?.trim();
-  return first || full;
+  return full.split(",")[0]?.trim() || full;
 }
 
 export function CourierOfferCard({
@@ -53,10 +51,18 @@ export function CourierOfferCard({
   terms: t,
   onClaim,
   onQuote,
+  expanded: expandedProp,
+  onExpandedChange,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [expandedInner, setExpandedInner] = useState(false);
+  const expanded = expandedProp ?? expandedInner;
   const [now, setNow] = useState(() => Date.now());
   const dragY = useRef<number | null>(null);
+
+  const setOpen = (next: boolean) => {
+    if (expandedProp === undefined) setExpandedInner(next);
+    onExpandedChange?.(next);
+  };
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -64,7 +70,8 @@ export function CourierOfferCard({
   }, []);
 
   useEffect(() => {
-    setExpanded(false);
+    setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when job changes
   }, [job.id]);
 
   const businessName = job.customer_name?.trim() || "בית העסק";
@@ -76,12 +83,10 @@ export function CourierOfferCard({
   const dropoff = addressLine(job.dropoff_address, job.dropoff_area);
   const dropTitle = streetTitle(job.dropoff_address, job.dropoff_area);
   const readyBadge = pickupReadyBadge(job, now);
-  const packageType = String(job.package_type || job.item_category || job.job_type || "חבילה").trim();
-  const packageWeight = String(job.package_size || "").trim() || "—";
+  const packageType = String(job.package_type || job.item_category || "שקית").trim() || "שקית";
+  const packageWeight = String(job.package_size || "").trim() || "עד 5 ק״ג";
   const packageNote = String(job.description || job.dropoff_notes || job.pickup_notes || "").trim() || "—";
   const dropNote = String(job.dropoff_notes || "").trim();
-  const pickupPhone = String(job.pickup_contact_phone || "").trim();
-  const recipientPhone = String(job.recipient_phone || "").trim();
 
   const onHandleTouchStart = (e: TouchEvent) => {
     dragY.current = e.touches[0]?.clientY ?? null;
@@ -92,109 +97,154 @@ export function CourierOfferCard({
     if (y == null) return;
     const dy = y - dragY.current;
     dragY.current = null;
-    if (dy < -36) setExpanded(true);
-    if (dy > 36) setExpanded(false);
+    if (dy < -40) setOpen(true);
+    if (dy > 40) setOpen(false);
   };
 
-  return (
-    <div data-job-id={job.id} dir="rtl" className="snap-center w-full shrink-0">
-      <article
-        className={cn(
-          "overflow-hidden rounded-[1.75rem] bg-surface shadow-card-strong border border-border transition-[max-height] duration-300",
-          expanded ? "max-h-[78dvh]" : "max-h-[none]",
-        )}
+  const cta = (
+    isQuote ? (
+      <button
+        type="button"
+        onClick={() => onQuote(job)}
+        className="flex h-14 w-full items-center justify-center rounded-full bg-[#35AD29] text-[16px] font-extrabold text-white shadow-[0_8px_20px_rgba(53,173,41,0.35)] active:scale-[0.99]"
+      >
+        הגש הצעת מחיר
+      </button>
+    ) : (
+      <button
+        type="button"
+        disabled={claiming}
+        onClick={() => onClaim(job)}
+        className="flex h-14 w-full items-center justify-center rounded-full bg-[#35AD29] text-[16px] font-extrabold text-white shadow-[0_8px_20px_rgba(53,173,41,0.35)] disabled:opacity-60 active:scale-[0.99]"
+      >
+        לקחתי את {t.theJob}
+      </button>
+    )
+  );
+
+  /* -------- Expanded: dedicated sheet, no inner scroll -------- */
+  if (expanded) {
+    return (
+      <div
+        data-job-id={job.id}
+        dir="rtl"
+        className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 flex h-[min(92dvh,760px)] flex-col rounded-t-[1.75rem] bg-surface shadow-[0_-12px_40px_rgba(0,0,0,0.22)]"
       >
         <button
           type="button"
-          className="flex w-full flex-col items-center gap-1 pt-2.5 pb-1"
-          onClick={() => setExpanded((v) => !v)}
+          className="flex shrink-0 flex-col items-center gap-0.5 pb-1 pt-2.5"
+          onClick={() => setOpen(false)}
           onTouchStart={onHandleTouchStart}
           onTouchEnd={onHandleTouchEnd}
-          aria-expanded={expanded}
+          aria-label="סגור פרטים"
         >
-          <span className="h-1 w-10 rounded-full bg-border-strong/80" aria-hidden />
-          {expanded ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-text-muted">
-              <ChevronsUp className="size-3.5 rotate-180" aria-hidden />
-              החלק למטה
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-text-muted">
-              <ChevronsUp className="size-3.5" aria-hidden />
-              החלק למעלה לפרטים
-            </span>
-          )}
+          <span className="h-1 w-10 rounded-full bg-[#D1D5DB]" aria-hidden />
+          <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-text-muted">
+            <ChevronDown className="size-3.5" aria-hidden />
+            החלק למטה
+          </span>
         </button>
 
-        <div className={cn("px-3 pb-3", expanded && "overflow-y-auto max-h-[calc(78dvh-3rem)]")}>
-          <RewardBanner
-            isQuote={isQuote}
-            payment={Number(job.payment ?? 0)}
-          />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} compact />
 
-          {expanded ? (
-            <ExpandedBody
+          <div className="mt-2.5 min-h-0 flex-1 overflow-hidden">
+            <p className="mb-1 text-right text-[13px] font-extrabold text-text-strong">פרטי המשלוח</p>
+            <StopsTimeline
               businessName={businessName}
               pickup={pickup}
               dropTitle={dropTitle}
               dropoffArea={job.dropoff_area}
               readyBadge={readyBadge}
               dropNote={dropNote}
-              packageType={packageType}
-              packages={packages}
-              packageWeight={packageWeight}
-              packageNote={packageNote}
               tripKm={tripKm}
-              payLabel={payLabel}
-              pickupPhone={pickupPhone}
-              recipientPhone={recipientPhone}
-              pickupNav={pickup}
-              dropoffNav={dropoff}
+              dense
             />
-          ) : (
-            <CollapsedBody
+
+            <p className="mb-1 mt-2.5 text-right text-[13px] font-extrabold text-text-strong">פרטי החבילה</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-2xl border border-border px-3 py-2.5">
+              <PkgChip label="סוג" value={packageType} />
+              <PkgChip label="כמות" value={packages === 1 ? "חבילה אחת" : `${packages} חבילות`} />
+              <PkgChip label="משקל" value={packageWeight} />
+              <PkgChip label="הערה" value={packageNote} />
+            </div>
+          </div>
+
+          <div className="mt-2.5 shrink-0">{cta}</div>
+        </div>
+      </div>
+    );
+  }
+
+  /* -------- Collapsed: reference compact card -------- */
+  return (
+    <div data-job-id={job.id} dir="rtl" className="snap-center w-full shrink-0">
+      <article className="overflow-hidden rounded-t-[1.75rem] rounded-b-[1.25rem] bg-surface shadow-card-strong border border-border">
+        <button
+          type="button"
+          className="flex w-full flex-col items-center pt-2.5 pb-1"
+          onClick={() => setOpen(true)}
+          onTouchStart={onHandleTouchStart}
+          onTouchEnd={onHandleTouchEnd}
+          aria-label="פתח פרטים"
+        >
+          <span className="h-1 w-10 rounded-full bg-[#D1D5DB]" aria-hidden />
+        </button>
+
+        <div className="px-3.5 pb-3.5">
+          <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} />
+
+          <div className="mt-3">
+            <StopsTimeline
               businessName={businessName}
               pickup={pickup}
               dropTitle={dropTitle}
               dropoffArea={job.dropoff_area}
-              tripKm={tripKm}
-              payLabel={payLabel}
             />
-          )}
+          </div>
 
-          {isQuote ? (
-            <button
-              type="button"
-              onClick={() => onQuote(job)}
-              className="mt-3 flex min-h-14 w-full items-center justify-center rounded-full bg-[#35AD29] px-3 text-[16px] font-extrabold text-white shadow-fab active:scale-[0.99]"
-            >
-              הגש הצעת מחיר
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={claiming}
-              onClick={() => onClaim(job)}
-              className="mt-3 flex min-h-14 w-full items-center justify-center rounded-full bg-[#35AD29] px-3 text-[16px] font-extrabold text-white shadow-fab disabled:opacity-60 active:scale-[0.99]"
-            >
-              לקחתי את {t.theJob}
-            </button>
-          )}
+          <div className="mt-3 grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-2.5">
+            <MetaCell
+              icon={<Route className="size-4 text-[#35AD29]" />}
+              label="מרחק מסלול"
+              value={tripKm != null ? formatKm(tripKm) : "—"}
+            />
+            <MetaCell
+              icon={<CreditCard className="size-4 text-[#35AD29]" />}
+              label="אמצעי תשלום"
+              value={payLabel}
+            />
+          </div>
+
+          <div className="mt-3">{cta}</div>
         </div>
       </article>
     </div>
   );
 }
 
-function RewardBanner({ isQuote, payment }: { isQuote: boolean; payment: number }) {
+function RewardBanner({
+  isQuote,
+  payment,
+  compact = false,
+}: {
+  isQuote: boolean;
+  payment: number;
+  compact?: boolean;
+}) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-[#1F5C2E] px-4 py-3.5">
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl bg-[#1F5C2E] text-white",
+        compact ? "px-3.5 py-3" : "px-4 py-3.5",
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 text-right text-white">
+        <div className="min-w-0 text-right">
           {isQuote ? (
-            <p className="text-3xl font-black leading-none">₪?</p>
+            <p className="text-[28px] font-black leading-none">₪?</p>
           ) : (
-            <p className="text-3xl font-black leading-none tabular-nums">
+            <p className="text-[28px] font-black leading-none tabular-nums">
               {payment.toFixed(0)} ₪
             </p>
           )}
@@ -203,9 +253,12 @@ function RewardBanner({ isQuote, payment }: { isQuote: boolean; payment: number 
           </p>
         </div>
         <img
-          src="/courier/reward-wallet.png"
+          src="/courier/reward-wallet.png?v=3"
           alt=""
-          className="h-16 w-16 shrink-0 object-contain drop-shadow-md"
+          className={cn(
+            "shrink-0 bg-transparent object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)]",
+            compact ? "h-16 w-16" : "h-[72px] w-[72px]",
+          )}
           draggable={false}
         />
       </div>
@@ -213,200 +266,118 @@ function RewardBanner({ isQuote, payment }: { isQuote: boolean; payment: number 
   );
 }
 
-function CollapsedBody({
-  businessName,
-  pickup,
-  dropTitle,
-  dropoffArea,
-  tripKm,
-  payLabel,
-}: {
-  businessName: string;
-  pickup: string;
-  dropTitle: string;
-  dropoffArea?: string | null;
-  tripKm: number | null;
-  payLabel: string;
-}) {
-  return (
-    <div className="mt-3 space-y-3">
-      <div className="relative pr-1">
-        <div className="absolute right-[15px] top-7 bottom-7 border-r border-dashed border-border-strong" aria-hidden />
-        <div className="relative flex items-start gap-3">
-          <span className="z-10 mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#35AD29] text-white shadow-sm">
-            <Store className="size-4" strokeWidth={2.25} />
-          </span>
-          <div className="min-w-0 flex-1 text-right">
-            <p className="text-[11px] font-bold text-[#35AD29]">איסוף</p>
-            <p className="truncate text-[15px] font-extrabold text-text-strong">{businessName}</p>
-            <p className="truncate text-[12px] text-text-subtle">{pickup}</p>
-          </div>
-        </div>
-        <div className="relative mt-3 flex items-start gap-3">
-          <span className="z-10 mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#E86B3A] text-white shadow-sm">
-            <Home className="size-4" strokeWidth={2.25} />
-          </span>
-          <div className="min-w-0 flex-1 text-right">
-            <p className="text-[11px] font-bold text-[#E86B3A]">מסירה</p>
-            <p className="truncate text-[15px] font-extrabold text-text-strong">{dropTitle}</p>
-            <p className="truncate text-[12px] text-text-subtle">{dropoffArea || "—"}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-2.5">
-        <MetaCell
-          icon={<Route className="size-4 text-primary" />}
-          label="מרחק מסלול"
-          value={tripKm != null ? formatKm(tripKm) : "—"}
-        />
-        <MetaCell
-          icon={<CreditCard className="size-4 text-primary" />}
-          label="אמצעי תשלום"
-          value={payLabel}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ExpandedBody({
+function StopsTimeline({
   businessName,
   pickup,
   dropTitle,
   dropoffArea,
   readyBadge,
   dropNote,
-  packageType,
-  packages,
-  packageWeight,
-  packageNote,
   tripKm,
-  payLabel,
-  pickupPhone,
-  recipientPhone,
-  pickupNav,
-  dropoffNav,
+  dense = false,
 }: {
   businessName: string;
   pickup: string;
   dropTitle: string;
   dropoffArea?: string | null;
-  readyBadge: string | null;
-  dropNote: string;
-  packageType: string;
-  packages: number;
-  packageWeight: string;
-  packageNote: string;
-  tripKm: number | null;
-  payLabel: string;
-  pickupPhone: string;
-  recipientPhone: string;
-  pickupNav: string;
-  dropoffNav: string;
+  readyBadge?: string | null;
+  dropNote?: string;
+  tripKm?: number | null;
+  dense?: boolean;
 }) {
+  const showTripOnRail = dense && tripKm != null;
   return (
-    <div className="mt-3 space-y-4">
-      <section>
-        <h3 className="mb-2 text-right text-[13px] font-extrabold text-text-strong">פרטי המשלוח</h3>
-        <div className="relative pr-1">
-          <div className="absolute right-[15px] top-8 bottom-10 border-r border-dashed border-border-strong" aria-hidden />
+    <div className="relative">
+      <div
+        className={cn(
+          "pointer-events-none absolute right-[15px] border-r border-dashed border-[#C9CDD3]",
+          dense ? "top-7 bottom-7" : "top-7 bottom-8",
+        )}
+        aria-hidden
+      />
 
-          <div className="relative flex items-start gap-3">
-            <span className="z-10 mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#35AD29] text-white">
-              <Store className="size-4" strokeWidth={2.25} />
-            </span>
-            <div className="min-w-0 flex-1 text-right">
-              <p className="text-[11px] font-bold text-[#35AD29]">איסוף</p>
-              <p className="text-[15px] font-extrabold text-text-strong">{businessName}</p>
-              <p className="text-[12px] text-text-subtle">{pickup}</p>
-              {readyBadge && (
-                <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#E8F8E6] px-2.5 py-1 text-[11px] font-bold text-[#1F7A2E]">
-                  <Clock className="size-3.5" aria-hidden />
-                  {readyBadge}
-                </span>
-              )}
-              <ActionRow
-                phone={pickupPhone}
-                onNavigate={() => openWaze(pickupNav)}
-              />
-            </div>
-          </div>
+      <StopRow
+        tone="pickup"
+        icon={<Store className="size-4" strokeWidth={2.3} />}
+        label="איסוף"
+        title={businessName}
+        subtitle={pickup}
+        badge={readyBadge}
+        dense={dense}
+      />
 
-          <div className="relative mt-4 flex items-start gap-3">
-            <span className="z-10 mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#E86B3A] text-white">
-              <Home className="size-4" strokeWidth={2.25} />
-            </span>
-            <div className="min-w-0 flex-1 text-right">
-              <p className="text-[11px] font-bold text-[#E86B3A]">מסירה</p>
-              <p className="text-[15px] font-extrabold text-text-strong">{dropTitle}</p>
-              <p className="text-[12px] text-text-subtle">{dropoffArea || "—"}</p>
-              {dropNote && (
-                <p className="mt-1 text-[12px] font-semibold text-text-strong">{dropNote}</p>
-              )}
-              <ActionRow
-                phone={recipientPhone}
-                onNavigate={() => openWaze(dropoffNav)}
-              />
-            </div>
-          </div>
+      {showTripOnRail ? (
+        <div className="relative z-10 my-1.5 flex justify-start pr-10">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-0.5 text-[11px] font-extrabold tabular-nums text-text-strong shadow-sm">
+            <Route className="size-3 text-[#35AD29]" aria-hidden />
+            {formatKm(tripKm)}
+          </span>
         </div>
-      </section>
+      ) : (
+        <div className={dense ? "mt-2.5" : "mt-3"} />
+      )}
 
-      <section>
-        <h3 className="mb-1 text-right text-[13px] font-extrabold text-text-strong">פרטי החבילה</h3>
-        <dl className="divide-y divide-border text-right">
-          <PkgRow label="סוג" value={packageType} />
-          <PkgRow label="כמות" value={packages === 1 ? "חבילה אחת" : `${packages} חבילות`} />
-          <PkgRow label="משקל" value={packageWeight} />
-          <PkgRow label="הערה" value={packageNote} />
-        </dl>
-      </section>
-
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-border px-3 py-2.5 text-right">
-          <div className="flex items-center justify-between gap-2">
-            <Route className="size-4 text-primary" aria-hidden />
-            <p className="text-[11px] font-bold text-text-muted">מרחק מסלול</p>
-          </div>
-          <p className="mt-1 text-[15px] font-extrabold tabular-nums text-text-strong">
-            {tripKm != null ? formatKm(tripKm) : "—"}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border px-3 py-2.5 text-right">
-          <div className="flex items-center justify-between gap-2">
-            <CreditCard className="size-4 text-primary" aria-hidden />
-            <p className="text-[11px] font-bold text-text-muted">אמצעי תשלום</p>
-          </div>
-          <p className="mt-1 text-[15px] font-extrabold text-text-strong">{payLabel}</p>
-        </div>
-      </div>
+      <StopRow
+        tone="dropoff"
+        icon={<Home className="size-4" strokeWidth={2.3} />}
+        label="מסירה"
+        title={dropTitle}
+        subtitle={dropoffArea || "—"}
+        note={dropNote}
+        dense={dense}
+      />
     </div>
   );
 }
 
-function ActionRow({ phone, onNavigate }: { phone: string; onNavigate: () => void }) {
+function StopRow({
+  tone,
+  icon,
+  label,
+  title,
+  subtitle,
+  badge,
+  note,
+  dense,
+}: {
+  tone: "pickup" | "dropoff";
+  icon: ReactNode;
+  label: string;
+  title: string;
+  subtitle: string;
+  badge?: string | null;
+  note?: string;
+  dense?: boolean;
+}) {
+  const green = tone === "pickup";
   return (
-    <div className="mt-2 flex items-center justify-end gap-2">
-      <button
-        type="button"
-        onClick={onNavigate}
-        className="grid size-9 place-items-center rounded-full border border-border text-text-strong active:bg-muted"
-        aria-label="נווט"
+    <div className="relative flex items-start gap-3">
+      <span
+        className={cn(
+          "z-10 mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-white shadow-sm",
+          green ? "bg-[#35AD29]" : "bg-[#E86B3A]",
+        )}
       >
-        <Navigation className="size-4" />
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          if (phone) window.location.href = `tel:${phone}`;
-        }}
-        disabled={!phone}
-        className="grid size-9 place-items-center rounded-full border border-border text-text-strong active:bg-muted disabled:opacity-40"
-        aria-label="חייג"
-      >
-        <Phone className="size-4" />
-      </button>
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1 text-right">
+        <p className={cn("text-[11px] font-bold", green ? "text-[#35AD29]" : "text-[#E86B3A]")}>
+          {label}
+        </p>
+        <p className={cn("truncate font-extrabold text-text-strong", dense ? "text-[14px]" : "text-[15px]")}>
+          {title}
+        </p>
+        <p className="truncate text-[12px] text-text-subtle">{subtitle}</p>
+        {badge && (
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#E8F8E6] px-2 py-0.5 text-[11px] font-bold text-[#1F7A2E]">
+            <Clock className="size-3.5" aria-hidden />
+            {badge}
+          </span>
+        )}
+        {note ? (
+          <p className="mt-0.5 truncate text-[12px] font-semibold text-text-strong">{note}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -431,11 +402,11 @@ function MetaCell({
   );
 }
 
-function PkgRow({ label, value }: { label: string; value: string }) {
+function PkgChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <dd className="text-[13px] font-bold text-text-strong">{value}</dd>
-      <dt className="text-[12px] font-bold text-text-muted">{label}</dt>
+    <div className="min-w-0 text-right">
+      <p className="text-[10px] font-bold text-text-muted">{label}</p>
+      <p className="truncate text-[12px] font-extrabold text-text-strong">{value}</p>
     </div>
   );
 }
