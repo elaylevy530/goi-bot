@@ -39,7 +39,7 @@ function AdminLoginPage() {
         toast.error("המשתמש אינו מנהל מערכת");
         return;
       }
-      toast.success("ברוך הבא, מנהל");
+      toast.success("ברוך הבא, מנהל", { duration: 1600 });
       navigate({ to: "/dashboard", replace: true });
     } catch (err) {
       const message =

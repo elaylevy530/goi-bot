@@ -9,6 +9,7 @@ import { useMyCourier } from "@/components/CourierShell";
 import { CourierOfferCard } from "@/components/courier/CourierOfferCard";
 import { termsFor } from "@/lib/courier-kind";
 import { fetchDrivingRoute, haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
+import { pickupReadyMapLabel } from "@/lib/pickup-ready";
 
 const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
@@ -41,10 +42,15 @@ export type MapJob = {
   pickup_lng?: number | null;
   pickup_contact_name?: string | null;
   pickup_contact_phone?: string | null;
+  pickup_notes?: string | null;
+  pickup_instructions?: string | null;
+  pickup_ready?: boolean | null;
+  pickup_ready_at?: string | null;
   dropoff_address?: string | null;
   dropoff_area?: string | null;
   dropoff_lat?: number | null;
   dropoff_lng?: number | null;
+  dropoff_notes?: string | null;
   recipient_name?: string | null;
   recipient_phone?: string | null;
   job_type?: string | null;
@@ -70,7 +76,13 @@ export type MapJob = {
 };
 
 
-function stopPinSvg(label: string, fill: string, onFill = "#fff") {
+function stopPinSvg(kind: "store" | "home", fill: string, onFill = "#fff") {
+  const glyph =
+    kind === "store"
+      ? `<path d="M10 14.2h16v1.6H10zm1.2 1.6h13.6V22H11.2zm2 0V22m4.8-6.2V22m4.8-6.2V22" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+         <path d="M10 14.2l1.3-3.4h13.4L26 14.2" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
+      : `<path d="M11 18.5V23h5.2v-3.2h3.6V23H25v-4.5" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+         <path d="M10 18.8L18 12l8 6.8" fill="none" stroke="${onFill}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`;
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
   <defs>
@@ -81,7 +93,29 @@ function stopPinSvg(label: string, fill: string, onFill = "#fff") {
   <g filter="url(#sp)">
     <circle cx="18" cy="16" r="14" fill="${fill}" stroke="${onFill}" stroke-width="3"/>
     <polygon points="12,28 24,28 18,40" fill="${fill}"/>
-    <text x="18" y="21" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial" font-size="13" font-weight="800" fill="${onFill}">${label}</text>
+    ${glyph}
+  </g>
+</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function readyCalloutSvg(label: string) {
+  const safe = label.replace(/[<>&]/g, "");
+  const w = Math.max(178, 36 + safe.length * 7.4);
+  const h = 34;
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + 8}" viewBox="0 0 ${w} ${h + 8}">
+  <defs>
+    <filter id="rc" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#0004"/>
+    </filter>
+  </defs>
+  <g filter="url(#rc)">
+    <rect x="1" y="1" rx="12" ry="12" width="${w - 2}" height="${h}" fill="#fff" stroke="#E6E6E6" stroke-width="1"/>
+    <circle cx="${w - 18}" cy="${h / 2 + 1}" r="8" fill="#E8F8E6"/>
+    <circle cx="${w - 18}" cy="${h / 2 + 1}" r="5.2" fill="none" stroke="#35AD29" stroke-width="1.6"/>
+    <path d="M${w - 18} ${h / 2 - 1.2}v3.2l2.2 1.2" fill="none" stroke="#35AD29" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="${w - 32}" y="${h / 2 + 5}" text-anchor="end" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial" font-size="12" font-weight="700" fill="#1A1A1A">${safe}</text>
   </g>
 </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -134,6 +168,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   const polyRef = useRef<google.maps.Polyline | null>(null);
   const casingRef = useRef<google.maps.Polyline | null>(null);
   const pickupStopRef = useRef<google.maps.Marker | null>(null);
+  const readyCalloutRef = useRef<google.maps.Marker | null>(null);
   const dropMarkerRef = useRef<google.maps.Marker | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -141,6 +176,12 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeRoute, setActiveRoute] = useState<DrivingRoute | null>(null);
   const [filter, setFilter] = useState<"all" | "now" | "schedule" | "quote">("all");
+  const [readyTick, setReadyTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setReadyTick(Date.now()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!BROWSER_KEY) { setMapError("מפת Google לא מוגדרת"); return; }
@@ -422,6 +463,8 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       casingRef.current = null;
       pickupStopRef.current?.setMap(null);
       pickupStopRef.current = null;
+      readyCalloutRef.current?.setMap(null);
+      readyCalloutRef.current = null;
       dropMarkerRef.current?.setMap(null);
       dropMarkerRef.current = null;
     };
@@ -441,11 +484,11 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
 
     const green = tokenColor(el, "--brand-green", tokenColor(el, "--primary", "#35AD29"));
     const navy = tokenColor(el, "--navy", "#101418");
-    const red = tokenColor(el, "--destructive", "#e8265d");
+    const orange = "#E86B3A";
     const onFill = tokenColor(el, "--primary-foreground", "#fff");
 
-    const stopIcon = (label: string, fill: string) => ({
-      url: stopPinSvg(label, fill, onFill),
+    const stopIcon = (kind: "store" | "home", fill: string) => ({
+      url: stopPinSvg(kind, fill, onFill),
       scaledSize: new window.google.maps.Size(36, 44),
       anchor: new window.google.maps.Point(18, 40),
     });
@@ -454,17 +497,34 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       pickupStopRef.current = new window.google.maps.Marker({
         position: pickup,
         map,
-        icon: stopIcon("1", green),
-        title: "איסוף",
+        icon: stopIcon("store", green),
+        title: "בית העסק",
         zIndex: 850,
       });
+
+      const readyLabel = pickupReadyMapLabel(active);
+      if (readyLabel) {
+        const bubbleW = Math.max(178, 36 + readyLabel.length * 7.4);
+        readyCalloutRef.current = new window.google.maps.Marker({
+          position: pickup,
+          map,
+          icon: {
+            url: readyCalloutSvg(readyLabel),
+            scaledSize: new window.google.maps.Size(bubbleW, 42),
+            anchor: new window.google.maps.Point(bubbleW / 2, 52),
+          },
+          title: readyLabel,
+          zIndex: 860,
+          clickable: false,
+        });
+      }
     }
     if (drop) {
       dropMarkerRef.current = new window.google.maps.Marker({
         position: drop,
         map,
-        icon: stopIcon("2", red),
-        title: "מסירה",
+        icon: stopIcon("home", orange),
+        title: "הלקוח",
         zIndex: 850,
       });
     }
@@ -550,9 +610,31 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
     active?.pickup_lng,
     active?.dropoff_lat,
     active?.dropoff_lng,
+    active?.pickup_ready,
+    active?.pickup_ready_at,
     myPos?.lat,
     myPos?.lng,
   ]);
+
+  // Refresh only the ready-countdown callout without redrawing the route.
+  useEffect(() => {
+    const marker = readyCalloutRef.current;
+    const job = active;
+    if (!marker || !job || !window.google) return;
+    const label = pickupReadyMapLabel(job, readyTick);
+    if (!label) {
+      marker.setMap(null);
+      readyCalloutRef.current = null;
+      return;
+    }
+    const bubbleW = Math.max(178, 36 + label.length * 7.4);
+    marker.setIcon({
+      url: readyCalloutSvg(label),
+      scaledSize: new window.google.maps.Size(bubbleW, 42),
+      anchor: new window.google.maps.Point(bubbleW / 2, 52),
+    });
+    marker.setTitle(label);
+  }, [readyTick, active?.id, active?.pickup_ready, active?.pickup_ready_at]);
 
   const zoomBy = (delta: number) => {
     const m = mapRef.current; if (!m) return;
@@ -702,7 +784,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
               className="absolute inset-x-3 bottom-3 z-10 rounded-card bg-surface/95 backdrop-blur-md border border-border shadow-card px-5 py-5 text-center"
             >
               <div className="text-sm font-bold text-text-strong">
-                {t.kind === "mover" ? "אין כרגע הובלות באזורכם" : "אין כרגע משלוחים באזורכם"}
+                אין כרגע משלוחים באזורכם
               </div>
               <div className="text-xs text-text-subtle mt-1 leading-snug">
                 משכו למטה לרענון, או נסעו לאזור עמוס יותר.

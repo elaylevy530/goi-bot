@@ -391,7 +391,7 @@ function PerformancePage() {
               <MetricCard
                 icon={<TrendingUp className="size-4" />}
                 value={`₪ ${fmt(avg, 1)}`}
-                label={t.kind === "mover" ? "להובלה" : "למשלוח"}
+                label="למשלוח"
               />
             </div>
 

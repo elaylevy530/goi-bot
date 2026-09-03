@@ -115,7 +115,7 @@ function CourierForm() {
     setLoading(true);
     try {
       await nestLoginWithPhone(phone, password, "courier");
-      toast.success("ברוך הבא!");
+      toast.success("ברוך הבא!", { duration: 1600 });
       navigate({ to: "/courier/new-jobs", replace: true });
     } catch (err) {
       toast.error(authErrorMessage(err, "טלפון או סיסמה שגויים"));
@@ -173,7 +173,7 @@ function BusinessForm() {
     setLoading(true);
     try {
       const session = await nestLoginWithPhone(phone, password, "business");
-      toast.success("ברוך הבא!");
+      toast.success("ברוך הבא!", { duration: 1600 });
       navigate({ to: nestHomePath(session), replace: true });
     } catch (err) {
       toast.error(authErrorMessage(err, "טלפון או סיסמה שגויים"));

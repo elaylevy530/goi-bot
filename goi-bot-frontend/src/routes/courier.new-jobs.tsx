@@ -18,7 +18,7 @@ import {
 } from "@/lib/nest-jobs";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { nestListConversations } from "@/lib/nest-chat";
-import { Bell, ChevronDown, Loader2, MessageCircle, Search, ShoppingBag } from "lucide-react";
+import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
@@ -657,10 +657,11 @@ function SearchingCard({ available, jobWord }: { available: boolean; jobWord: st
     return (
       <div
         dir="rtl"
-        className="absolute inset-x-3 bottom-3 z-10 rounded-card bg-surface/95 backdrop-blur-md border border-border shadow-card px-5 py-5 text-center"
+        className="absolute inset-x-3 bottom-3 z-10 rounded-[1.75rem] bg-surface border border-border shadow-card-strong px-5 pb-5 pt-3 text-center"
       >
-        <div className="text-sm font-bold text-text-strong">הסטטוס כבוי</div>
-        <div className="text-xs text-text-subtle mt-1 leading-snug">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border-strong/70" aria-hidden />
+        <div className="text-[15px] font-extrabold text-text-strong">הסטטוס כבוי</div>
+        <div className="mt-1.5 text-[13px] text-text-subtle leading-snug">
           הפעילו קבלת עבודות כדי שנחפש {jobWord} באזור.
         </div>
       </div>
@@ -670,26 +671,26 @@ function SearchingCard({ available, jobWord }: { available: boolean; jobWord: st
   return (
     <div
       dir="rtl"
-      className="absolute inset-x-3 bottom-3 z-10 rounded-[1.5rem] bg-surface shadow-card-strong border border-border px-5 pb-4 pt-6 text-center"
+      className="absolute inset-x-3 bottom-3 z-10 rounded-[1.75rem] bg-surface border border-border shadow-card-strong px-5 pb-6 pt-3 text-center"
     >
-      <div className="mx-auto mb-4 grid size-16 place-items-center">
-        <div className="relative size-16">
-          <div className="absolute inset-0 rounded-full border-2 border-dashed border-primary animate-[spin_10s_linear_infinite]" />
-          <div className="absolute inset-2 grid place-items-center rounded-full bg-success-bg">
-            <Search className="size-6 text-primary" strokeWidth={2.2} />
-          </div>
-        </div>
+      <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border-strong/70" aria-hidden />
+
+      <div className="relative mx-auto mb-5 size-[92px]" aria-hidden>
+        <span className="absolute inset-0 rounded-full border border-[#35AD29]/22" />
+        <span className="absolute inset-[14%] rounded-full border border-[#35AD29]/28" />
+        <span className="absolute inset-[28%] rounded-full border border-[#35AD29]/34" />
+        <span className="absolute inset-[42%] rounded-full border border-[#35AD29]/40" />
+        <span className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#35AD29] shadow-[0_0_0_4px_rgba(53,173,41,0.16)]" />
+        <span className="absolute inset-0 animate-[spin_2.8s_linear_infinite]">
+          <span className="absolute left-1/2 top-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F5C518] shadow-[0_1px_3px_rgba(0,0,0,0.18)]" />
+        </span>
       </div>
-      <div className="text-base font-extrabold text-text-strong leading-snug">
-        מחפש {jobWord} זמינים עבורך
+
+      <div className="text-[17px] font-extrabold leading-snug text-text-strong">
+        מחפש משלוחים באזור שלך
       </div>
-      <div className="mt-1.5 text-xs text-text-subtle leading-snug">
-        אנחנו סורקים את האזור ומחפשים {jobWord} שמתאימים עבורך
-      </div>
-      <div className="mt-4 flex items-center justify-center gap-1.5" aria-hidden>
-        <span className="size-1.5 rounded-full bg-border-strong" />
-        <span className="size-1.5 rounded-full bg-primary" />
-        <span className="size-1.5 rounded-full bg-border-strong" />
+      <div className="mt-1.5 text-[13px] leading-snug text-text-subtle">
+        משלוח מתאים יקפוץ אוטומטית על המפה
       </div>
     </div>
   );

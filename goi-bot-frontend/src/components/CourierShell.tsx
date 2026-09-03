@@ -22,7 +22,7 @@ export function useMyCourier() {
   });
 }
 
-function StatusBadge({ status, kind }: { status?: string | null; kind?: "courier" | "mover" }) {
+function StatusBadge({ status }: { status?: string | null }) {
   // System-level approval indicator (read-only). The on/off switch lives in the dashboard.
   const approved = status === "פעיל" || status === "לא פעיל" || status === "מושהה";
   const cls = approved
@@ -33,7 +33,7 @@ function StatusBadge({ status, kind }: { status?: string | null; kind?: "courier
         ? "bg-danger-bg text-danger-text border border-destructive/20"
         : "bg-muted text-text-muted border border-border";
   const label = approved
-    ? (kind === "mover" ? "מאושר להובלות" : "מאושר למשלוחים")
+    ? "מאושר למשלוחים"
     : status === "ממתין לאישור"
       ? "ממתין לאישור מנהל"
       : status ?? "—";
@@ -274,8 +274,6 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
     courierId: me?.id ?? null,
   });
 
-  const kind: "courier" | "mover" = (me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind === "mover" ? "mover" : "courier";
-
   return (
     <div
       dir="rtl"
@@ -294,7 +292,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
                   <CourierMenuButton className="size-11 shadow-card border-0" />
 
                   <div className="flex items-center gap-3 min-w-0">
-                    {me && <StatusBadge status={me?.courier_status} kind={kind} />}
+                    {me && <StatusBadge status={me?.courier_status} />}
                     <div className="min-w-0 text-right">
                       <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">{greetingHe()}</div>
                       <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{me?.full_name ?? "שליח"}</div>

@@ -208,7 +208,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AdminPreviewBanner />
       <Outlet />
-      <Toaster position="top-center" richColors />
+      <Toaster position="bottom-center" richColors />
       <UpdateBanner />
       <InstallBanner />
     </QueryClientProvider>

@@ -7,7 +7,7 @@ export type CourierTerms = {
   /** שליח / מוביל */
   worker: string;
   workerPlural: string;
-  /** משלוח / הובלה */
+  /** משלוח */
   job: string;
   jobPlural: string;
   theJob: string;
@@ -48,26 +48,10 @@ const COURIER_TERMS: CourierTerms = {
   panel: "פאנל שליחים",
 };
 
+// Product is deliveries-only: movers still use courier_kind in DB, but all UI copy says משלוחים.
 const MOVER_TERMS: CourierTerms = {
+  ...COURIER_TERMS,
   kind: "mover",
-  worker: "מוביל",
-  workerPlural: "מובילים",
-  job: "הובלה",
-  jobPlural: "הובלות",
-  theJob: "ההובלה",
-  availableJobs: "הובלות פנויות",
-  availableJobsSub: "הובלות שמחכות לך באזור",
-  activeJobs: "משלוחים פעילים",
-  activeJobsSub: "ההובלות שלך בזמן אמת",
-  myJobs: "ביצועים",
-  myJobsSub: "הכנסות והיסטוריית הובלות",
-  takeJob: "אני לוקח את ההובלה",
-  jobTaken: "⚠️ ההובלה כבר נתפסה על-ידי מוביל אחר",
-  jobClosed: "ההובלה כבר נסגרה",
-  jobRemoved: "ההובלה הוסרה מהרשימה שלך",
-  quotesTitle: "הצעות מחיר ששלחת",
-  quotesSub: "מעקב אחרי הצעות שהגשת ללקוחות הובלה",
-  panel: "פאנל מובילים",
 };
 
 export function termsFor(kind: CourierKind | null | undefined): CourierTerms {
