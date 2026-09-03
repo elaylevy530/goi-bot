@@ -27,6 +27,7 @@ import { ContactBlock } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
 import { PullToRefresh } from "@/components/courier/PullToRefresh";
+import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
 
 export const Route = createFileRoute("/courier/new-jobs")({
   head: () => ({ meta: [{ title: "עבודות חדשות — Goi" }] }),
@@ -376,8 +377,11 @@ function NewJobsPage() {
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
           <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/70 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
             <div className="relative flex items-center justify-center">
-              <CourierMenuButton className="absolute start-0 size-11 shadow-card border-0 shrink-0" />
-              <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
+              <CourierMenuButton className="absolute start-0 size-11 rounded-full border border-border/70 bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)] shrink-0" />
+              {/* Status control only when available — hide offline capsule */}
+              {(isAvailable || showingOffer) && (
+                <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
+              )}
             </div>
           </div>
         </div>
@@ -414,14 +418,14 @@ function NewJobsPage() {
                   <Link
                     to="/courier/notifications"
                     aria-label="התראות"
-                    className="size-10 grid place-items-center rounded-full bg-surface shadow-card border border-border text-text-strong active:scale-95"
+                    className="size-11 grid place-items-center rounded-full bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)] border border-border/70 text-text-strong active:scale-95"
                   >
                     <Bell className="size-4" strokeWidth={2} />
                   </Link>
                 )
               }
               rightExtra={
-                showingOffer ? undefined : (
+                showingOffer || !isAvailable ? undefined : (
                   <>
                     <MapFab
                       to="/courier/active"
@@ -439,7 +443,11 @@ function NewJobsPage() {
                 )
               }
               emptyState={
-                <SearchingCard available={isAvailable} jobWord={t.jobPlural} />
+                <SearchingCard
+                  available={isAvailable}
+                  jobWord={t.jobPlural}
+                  me={me}
+                />
               }
             />
           </div>
@@ -652,17 +660,95 @@ function MapFab({
   );
 }
 
-function SearchingCard({ available, jobWord }: { available: boolean; jobWord: string }) {
+function SearchingCard({
+  available,
+  jobWord,
+  me,
+}: {
+  available: boolean;
+  jobWord: string;
+  me?: any;
+}) {
+  const qc = useQueryClient();
+  const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
+
+  const goOnline = useMutation({
+    mutationFn: async () => {
+      if (!me || !approved) return;
+      if (typeof navigator !== "undefined" && navigator.geolocation) {
+        try {
+          await new Promise<void>((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              () => resolve(),
+              () => resolve(),
+              { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+            );
+          });
+        } catch {}
+      }
+      try {
+        const { enablePushForCourier, pushSupported } = await import("@/lib/push/subscribe");
+        if (pushSupported() && me?.id) {
+          const res = await enablePushForCourier(me.id);
+          if (!res.ok && res.reason === "denied") {
+            toast.error("התראות חסומות — הפעל בהגדרות הדפדפן כדי לקבל הצעות");
+          }
+        }
+      } catch {}
+      await nestUpdateMyCourier({ accepting_jobs: true });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (!available) {
     return (
       <div
         dir="rtl"
-        className="absolute inset-x-3 bottom-3 z-10 rounded-[1.75rem] bg-surface border border-border shadow-card-strong px-5 pb-5 pt-3 text-center"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
       >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border-strong/70" aria-hidden />
-        <div className="text-[15px] font-extrabold text-text-strong">הסטטוס כבוי</div>
-        <div className="mt-1.5 text-[13px] text-text-subtle leading-snug">
-          הפעילו קבלת עבודות כדי שנחפש {jobWord} באזור.
+        <div className="relative mx-auto w-full max-w-lg pt-[9.5rem]">
+          <div className="pointer-events-auto relative rounded-full bg-white p-[10px] shadow-[0_12px_30px_rgba(16,24,40,0.16)]">
+            {/* The mascot's torso ends at 94% of the PNG; the finger fills the rest.
+                Offset so the torso lands on the frame edge and only the finger passes it. */}
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-12px)] z-[-1] flex justify-center"
+              aria-hidden
+            >
+              <img
+                src="/courier/goi-offline-mascot.png?v=9"
+                alt=""
+                draggable={false}
+                className="h-[150px] w-auto max-w-none select-none [animation:mascot-enter_0.4s_ease-out_both]"
+              />
+            </div>
+
+            <SwipeConfirm
+              variant="availability"
+              label="החלק כדי להפוך לזמין"
+              subtitle="והתחל לקבל משלוחים"
+              disabled={!approved || goOnline.isPending}
+              onConfirm={() => {
+                if (!approved || goOnline.isPending) return;
+                goOnline.mutate();
+              }}
+            />
+
+            {/* Same frame, clipped to the finger alone, drawn over the frame */}
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-12px)] z-[2] flex justify-center"
+              aria-hidden
+            >
+              <img
+                src="/courier/goi-offline-mascot.png?v=9"
+                alt=""
+                draggable={false}
+                className="h-[150px] w-auto max-w-none select-none [animation:mascot-enter_0.4s_ease-out_both] [clip-path:inset(92%_80.5%_0_13%)]"
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -671,26 +757,49 @@ function SearchingCard({ available, jobWord }: { available: boolean; jobWord: st
   return (
     <div
       dir="rtl"
-      className="absolute inset-x-3 bottom-3 z-10 rounded-[1.75rem] bg-surface border border-border shadow-card-strong px-5 pb-6 pt-3 text-center"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
     >
-      <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border-strong/70" aria-hidden />
+      <div className="mx-auto w-full max-w-lg pt-[8.5rem]">
+        <div className="relative">
+          {/* The cutout ends flush where the card hid the body in the mock,
+              so tuck it a few pixels behind the card edge. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-8px)] z-0 flex justify-center"
+            aria-hidden
+          >
+            <img
+              src="/courier/goi-searching-mascot.png?v=4"
+              alt=""
+              draggable={false}
+              className="h-[138px] w-auto max-w-none select-none [animation:mascot-enter_0.4s_ease-out_both]"
+            />
+          </div>
 
-      <div className="relative mx-auto mb-5 size-[92px]" aria-hidden>
-        <span className="absolute inset-0 rounded-full border border-[#35AD29]/22" />
-        <span className="absolute inset-[14%] rounded-full border border-[#35AD29]/28" />
-        <span className="absolute inset-[28%] rounded-full border border-[#35AD29]/34" />
-        <span className="absolute inset-[42%] rounded-full border border-[#35AD29]/40" />
-        <span className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#35AD29] shadow-[0_0_0_4px_rgba(53,173,41,0.16)]" />
-        <span className="absolute inset-0 animate-[spin_2.8s_linear_infinite]">
-          <span className="absolute left-1/2 top-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F5C518] shadow-[0_1px_3px_rgba(0,0,0,0.18)]" />
-        </span>
-      </div>
+          <div className="relative z-10 flex min-h-[84px] items-center gap-3 overflow-hidden rounded-[1.6rem] border border-[#BFE3B9] bg-[linear-gradient(105deg,rgba(255,255,255,0.98)_0%,rgba(246,252,245,0.98)_42%,rgba(232,248,228,0.98)_100%)] px-5 py-3 shadow-[0_10px_28px_rgba(16,24,40,0.13),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(53,173,41,0.08)] backdrop-blur-md">
+            <span
+              className="pointer-events-none absolute inset-y-0 right-0 w-28 bg-[radial-gradient(circle_at_center,rgba(53,173,41,0.12),transparent_68%)]"
+              aria-hidden
+            />
+            <div className="relative size-[58px] shrink-0" aria-hidden>
+              <span className="absolute inset-0 rounded-full border border-[#35AD29]/25" />
+              <span className="absolute inset-[18%] rounded-full border border-[#35AD29]/35" />
+              <span className="absolute inset-[36%] rounded-full border border-[#35AD29]/45" />
+              <span className="absolute inset-0 animate-[spin_2.8s_linear_infinite]">
+                <span className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#35AD29] shadow-[0_0_0_3px_rgba(53,173,41,0.12)]" />
+              </span>
+              <span className="absolute bottom-[10%] right-[4%] size-2 rounded-full bg-[#35AD29]/75" />
+            </div>
 
-      <div className="text-[17px] font-extrabold leading-snug text-text-strong">
-        מחפש משלוחים באזור שלך
-      </div>
-      <div className="mt-1.5 text-[13px] leading-snug text-text-subtle">
-        משלוח מתאים יקפוץ אוטומטית על המפה
+            <div className="min-w-0 flex-1 text-right">
+              <div className="text-[16px] font-extrabold leading-snug text-[#111]">
+                מחפש משלוחים באזור שלך
+              </div>
+              <div className="mt-1 text-[12px] leading-snug text-[#6B6B6B]">
+                משלוח מתאים יקפוץ אוטומטית על המפה
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -793,6 +902,9 @@ function AcceptJobsToggle({
       </button>
     );
   }
+
+  // Offline: no top capsule — go-online happens via bottom slide only
+  if (compact && !on) return null;
 
   return (
     <div

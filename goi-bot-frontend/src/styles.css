@@ -338,6 +338,27 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
+  /* Opacity only: the offline mascot is drawn as two clipped copies on either
+     side of the swipe frame, and any translate makes the finger copy slide
+     across the frame edge out of sync with the body. */
+  @keyframes mascot-enter {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes mascot-idle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes availability-arrow-cue {
+    0%, 100% { opacity: 0.55; transform: translateX(-4px) scale(0.94); }
+    45% { opacity: 1; transform: translateX(2px) scale(1.06); }
+  }
+  @keyframes availability-sheen {
+    0% { opacity: 0; transform: translateX(-100%); }
+    18% { opacity: 0.8; }
+    62% { opacity: 0.45; }
+    78%, 100% { opacity: 0; transform: translateX(520%); }
+  }
   @keyframes blob-drift {
     0%, 100% { transform: translate(0, 0) scale(1); }
     33% { transform: translate(20px, -20px) scale(1.08); }

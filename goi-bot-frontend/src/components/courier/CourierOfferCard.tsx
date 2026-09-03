@@ -228,6 +228,33 @@ export function CourierOfferCard({
 }
 
 const CLAIM_TIMER_MS = 60_000;
+const claimTimerStarts = new Map<string, number>();
+
+function getClaimTimerStart(jobId: string): number {
+  const existing = claimTimerStarts.get(jobId);
+  if (existing != null) {
+    // Drop stale timers older than the window so a returning offer can restart fresh
+    if (Date.now() - existing < CLAIM_TIMER_MS + 5_000) return existing;
+  }
+  try {
+    const raw = sessionStorage.getItem(`goi-claim-timer:${jobId}`);
+    const parsed = raw ? Number(raw) : NaN;
+    if (Number.isFinite(parsed) && Date.now() - parsed < CLAIM_TIMER_MS + 5_000) {
+      claimTimerStarts.set(jobId, parsed);
+      return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  const now = Date.now();
+  claimTimerStarts.set(jobId, now);
+  try {
+    sessionStorage.setItem(`goi-claim-timer:${jobId}`, String(now));
+  } catch {
+    /* ignore */
+  }
+  return now;
+}
 
 function claimFillColor(progress: number) {
   // 1 → green, mid → amber, low → urgent orange/red
@@ -249,19 +276,22 @@ function ClaimTimerButton({
   tall?: boolean;
   onClaim: () => void;
 }) {
-  const startedAt = useRef(Date.now());
-  const [progress, setProgress] = useState(1);
-  const [secs, setSecs] = useState(60);
+  const startedAt = useRef(getClaimTimerStart(jobId));
+  const [progress, setProgress] = useState(() => {
+    const left = Math.max(0, CLAIM_TIMER_MS - (Date.now() - startedAt.current));
+    return left / CLAIM_TIMER_MS;
+  });
+  const [secs, setSecs] = useState(() => {
+    const left = Math.max(0, CLAIM_TIMER_MS - (Date.now() - startedAt.current));
+    return Math.ceil(left / 1000);
+  });
 
   useEffect(() => {
-    startedAt.current = Date.now();
-    setProgress(1);
-    setSecs(60);
+    startedAt.current = getClaimTimerStart(jobId);
     let raf = 0;
     const tick = () => {
       const left = Math.max(0, CLAIM_TIMER_MS - (Date.now() - startedAt.current));
-      const p = left / CLAIM_TIMER_MS;
-      setProgress(p);
+      setProgress(left / CLAIM_TIMER_MS);
       setSecs(Math.ceil(left / 1000));
       if (left > 0) raf = requestAnimationFrame(tick);
     };
