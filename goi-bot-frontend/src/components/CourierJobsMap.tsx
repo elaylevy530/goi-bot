@@ -22,7 +22,7 @@ const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_
 const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
 
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
-const MAP_FIT_PAD = { top: 160, right: 40, bottom: 200, left: 48 } as const;
+const MAP_FIT_PAD = { top: 140, right: 40, bottom: 280, left: 48 } as const;
 
 function tokenColor(el: HTMLElement | null, name: string, fallback: string) {
   if (!el) return fallback;
@@ -750,7 +750,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 "absolute z-10 pointer-events-none",
                 offerExpanded
                   ? "inset-0"
-                  : "inset-x-0 bottom-0 flex h-[30%] flex-col justify-end",
+                  : "inset-x-0 bottom-0 flex h-[46%] flex-col justify-end",
               )}
             >
               {offerExpanded && (

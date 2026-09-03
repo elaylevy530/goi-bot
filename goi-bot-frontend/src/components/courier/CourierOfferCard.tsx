@@ -114,17 +114,13 @@ export function CourierOfferCard({
         הגש הצעת מחיר
       </button>
     ) : (
-      <button
-        type="button"
-        disabled={claiming}
-        onClick={() => onClaim(job)}
-        className={cn(
-          "flex w-full items-center justify-center rounded-xl bg-[#2F7A28] text-[16px] font-extrabold text-white shadow-[0_8px_18px_rgba(47,122,40,0.32)] disabled:opacity-60 active:scale-[0.99]",
-          expanded ? "h-14" : "h-11 text-[15px]",
-        )}
-      >
-        לקחתי את {t.theJob}
-      </button>
+      <ClaimTimerButton
+        jobId={job.id}
+        label={`לקחתי את ${t.theJob}`}
+        claiming={claiming}
+        tall={expanded}
+        onClaim={() => onClaim(job)}
+      />
     )
   );
 
@@ -182,7 +178,7 @@ export function CourierOfferCard({
     );
   }
 
-  /* -------- Collapsed: ~30% map height, denser -------- */
+  /* -------- Collapsed: ~46% map height so stops stay visible -------- */
   return (
     <div data-job-id={job.id} dir="rtl" className="h-full min-h-0 w-full min-w-full shrink-0 snap-center">
       <article className="flex h-full max-h-full flex-col overflow-hidden rounded-t-[1.25rem] rounded-b-none border border-b-0 border-border bg-surface shadow-card-strong">
@@ -198,10 +194,10 @@ export function CourierOfferCard({
           <span className="text-[10px] font-bold text-text-muted">החלק למעלה לפרטים נוספים</span>
         </button>
 
-        <div className="flex min-h-0 flex-1 flex-col px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
+        <div className="flex min-h-0 flex-1 flex-col justify-between px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
           <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} compact />
 
-          <div className="mt-1.5 min-h-0 flex-1 overflow-hidden">
+          <div className="mt-1.5 shrink-0">
             <StopsTimeline
               businessName={businessName}
               pickup={pickup}
@@ -228,6 +224,90 @@ export function CourierOfferCard({
         </div>
       </article>
     </div>
+  );
+}
+
+const CLAIM_TIMER_MS = 60_000;
+
+function claimFillColor(progress: number) {
+  // 1 → green, mid → amber, low → urgent orange/red
+  if (progress > 0.45) return "#35AD29";
+  if (progress > 0.2) return "#D4A017";
+  return "#E05A2B";
+}
+
+function ClaimTimerButton({
+  jobId,
+  label,
+  claiming,
+  tall,
+  onClaim,
+}: {
+  jobId: string;
+  label: string;
+  claiming?: boolean;
+  tall?: boolean;
+  onClaim: () => void;
+}) {
+  const startedAt = useRef(Date.now());
+  const [progress, setProgress] = useState(1);
+  const [secs, setSecs] = useState(60);
+
+  useEffect(() => {
+    startedAt.current = Date.now();
+    setProgress(1);
+    setSecs(60);
+    let raf = 0;
+    const tick = () => {
+      const left = Math.max(0, CLAIM_TIMER_MS - (Date.now() - startedAt.current));
+      const p = left / CLAIM_TIMER_MS;
+      setProgress(p);
+      setSecs(Math.ceil(left / 1000));
+      if (left > 0) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [jobId]);
+
+  const fill = claimFillColor(progress);
+  const urgent = progress <= 0.2;
+
+  return (
+    <button
+      type="button"
+      disabled={claiming}
+      onClick={onClaim}
+      className={cn(
+        "relative flex w-full items-center justify-center overflow-hidden rounded-xl text-[16px] font-extrabold text-white shadow-[0_8px_18px_rgba(47,122,40,0.28)] active:scale-[0.99] disabled:opacity-60",
+        tall ? "h-14" : "h-11 text-[15px]",
+        urgent && progress > 0 && "shadow-[0_8px_18px_rgba(224,90,43,0.35)]",
+      )}
+      style={{ backgroundColor: "#1E4F24" }}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 transition-[width,background-color] duration-100 ease-linear"
+        style={{
+          width: `${Math.max(progress * 100, progress > 0 ? 2 : 0)}%`,
+          backgroundColor: fill,
+        }}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0)_55%)]"
+      />
+      <span className="relative z-10 flex items-center gap-2 tabular-nums">
+        <span>{label}</span>
+        <span
+          className={cn(
+            "inline-flex min-w-[2.25rem] items-center justify-center rounded-md px-1.5 py-0.5 text-[13px] font-black",
+            urgent ? "bg-black/25" : "bg-black/20",
+          )}
+        >
+          {secs}
+        </span>
+      </span>
+    </button>
   );
 }
 
