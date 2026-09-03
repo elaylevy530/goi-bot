@@ -287,7 +287,7 @@ function AccountSettingsPage() {
           </div>
           <DialogFooter>
             <Button
-              className="bg-[#35AD29] hover:bg-[#2d9623] text-white"
+              className="bg-primary-deep hover:bg-primary-deep/90"
               onClick={() => changePwd.mutate()}
               disabled={changePwd.isPending || pwd.length < 6}
             >

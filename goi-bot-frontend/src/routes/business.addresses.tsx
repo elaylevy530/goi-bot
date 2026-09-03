@@ -62,7 +62,7 @@ function AddressesPage() {
   return (
     <BusinessShell title="כתובות וסניפים" subtitle="ניהול כתובות איסוף קבועות">
       <div className="flex justify-end mb-4">
-        <Button onClick={() => { setEditing(null); setF(blank); setOpen(true); }} className="bg-[#35AD29] hover:bg-[#2d9623] text-white"><Plus className="size-4" /> הוסף סניף</Button>
+        <Button onClick={() => { setEditing(null); setF(blank); setOpen(true); }} className="bg-primary-deep hover:bg-primary-deep/90"><Plus className="size-4" /> הוסף סניף</Button>
       </div>
 
       {!list || list.length === 0 ? (
@@ -116,7 +116,7 @@ function AddressesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => save.mutate()} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">שמור</Button>
+            <Button onClick={() => save.mutate()} className="bg-primary-deep hover:bg-primary-deep/90">שמור</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

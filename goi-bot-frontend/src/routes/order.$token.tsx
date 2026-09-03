@@ -166,7 +166,7 @@ function PublicOrderPage() {
         <Button
           type="submit"
           disabled={submit.isPending}
-          className="bg-[#35AD29] hover:bg-[#2E9624] text-white h-12 text-base font-bold"
+          className="bg-primary-deep hover:bg-primary-deep/90 h-12 text-base font-bold"
         >
           {submit.isPending ? "שולח…" : "שלח הזמנה"}
         </Button>

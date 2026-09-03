@@ -113,7 +113,7 @@ export function SubmitQuoteDialog({ open, onOpenChange, jobId, jobNumber, existi
         </div>
         <div className="flex gap-2 justify-end pt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>ביטול</Button>
-          <Button className="bg-[#35AD29] hover:bg-[#2d9623] text-white" onClick={() => submit.mutate()} disabled={submit.isPending}>
+          <Button className="bg-primary-deep hover:bg-primary-deep/90" onClick={() => submit.mutate()} disabled={submit.isPending}>
             {submit.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} שלח הצעה
           </Button>
         </div>

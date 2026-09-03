@@ -60,7 +60,7 @@ export function EmptyState({ icon: Icon, title, desc, action, ctaLabel, ctaTo }:
         (ctaLabel && ctaTo ? (
           <Link
             to={ctaTo as never}
-            className="inline-flex h-11 items-center gap-2 rounded-pill bg-primary px-5 font-black text-primary-foreground shadow-fab"
+            className="inline-flex h-11 items-center gap-2 rounded-pill bg-primary-deep px-5 font-black text-primary-foreground shadow-fab"
           >
             {ctaLabel}
           </Link>
@@ -176,7 +176,7 @@ function BusinessDashboard() {
           </div>
           <Link
             to="/business/new-delivery"
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-pill bg-primary px-4 text-sm font-black text-primary-foreground shadow-fab transition active:scale-[0.98]"
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-pill bg-primary-deep px-4 text-sm font-black text-primary-foreground shadow-fab transition active:scale-[0.98]"
           >
             <Plus className="size-4" strokeWidth={2.6} />
             הזמן
@@ -208,7 +208,7 @@ function BusinessDashboard() {
                 tab !== "done" ? (
                   <Link
                     to="/business/new-delivery"
-                    className="inline-flex h-11 items-center gap-2 rounded-pill bg-primary px-5 font-black text-primary-foreground shadow-fab"
+                    className="inline-flex h-11 items-center gap-2 rounded-pill bg-primary-deep px-5 font-black text-primary-foreground shadow-fab"
                   >
                     <Plus className="size-4" /> הזמן משלוח
                   </Link>
@@ -291,7 +291,7 @@ function BusinessDashboard() {
             <button
               type="button"
               onClick={goQuickOrder}
-              className="h-12 w-full rounded-lg bg-primary text-sm font-bold text-primary-foreground transition hover:bg-primary/90"
+              className="h-12 w-full rounded-lg bg-primary-deep text-sm font-bold text-primary-foreground transition hover:bg-primary-deep/90"
             >
               הזמן שליח עכשיו
             </button>

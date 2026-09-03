@@ -72,7 +72,7 @@ function BusinessQuotesPage() {
           <Inbox className="size-10 mx-auto mb-3 opacity-50" />
           <div className="font-bold text-slate-700 mb-1">אין בקשות הצעות מחיר</div>
           <div className="text-sm mb-4">פתח משלוח חדש במצב "מכרז" כדי לקבל הצעות משליחים</div>
-          <Button asChild className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+          <Button asChild className="bg-primary-deep hover:bg-primary-deep/90">
             <Link to="/business/new-delivery">משלוח חדש</Link>
           </Button>
         </CardContent></Card>
@@ -129,7 +129,7 @@ function BusinessQuotesPage() {
                         const isBest = idx === 0;
                         return (
                           <div key={q.id} className={`rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap border bg-white ${isBest ? "border-emerald-300 ring-1 ring-emerald-200" : isTop ? "border-emerald-200" : "border-slate-200"}`}>
-                            <Button size="sm" className="bg-[#35AD29] hover:bg-[#2d9623] text-white"
+                            <Button size="sm" className="bg-primary-deep hover:bg-primary-deep/90"
                               onClick={() => select.mutate(q.id)} disabled={select.isPending}>
                               {select.isPending ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />} בחר שליח זה
                             </Button>

@@ -126,7 +126,7 @@ function QuoteRequestsPage() {
                             {q.note && <div className="text-xs bg-slate-50 rounded p-1 mt-1">{q.note}</div>}
                           </div>
                           {!j.selected_quote_id && (q.status === "pending" || q.status === "shortlisted") && (
-                            <Button size="sm" className="bg-[#35AD29] hover:bg-[#2d9623] text-white"
+                            <Button size="sm" className="bg-primary-deep hover:bg-primary-deep/90"
                               onClick={() => select.mutate(q.id)}
                               disabled={select.isPending}>
                               {select.isPending ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />} בחר ידנית

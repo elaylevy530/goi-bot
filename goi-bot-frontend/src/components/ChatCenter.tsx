@@ -819,7 +819,7 @@ function StartChatPanel({
           type="button"
           className={`w-full flex items-center gap-3 text-right transition-colors ${
             viewerRole === "courier"
-              ? "rounded-card bg-primary text-primary-foreground px-4 py-3 shadow-card min-h-14"
+              ? "rounded-card bg-primary-deep text-primary-foreground px-4 py-3 shadow-card min-h-14"
               : "rounded-lg border border-border bg-surface px-3 py-2.5"
           }`}
           onClick={() => onStart({ kind: viewerRole === "courier" ? "courier_support" : "business_support" })}

@@ -8,7 +8,6 @@ import {
   Headphones,
   Loader2,
   Mail,
-  MapPin,
   MessageCircle,
   MessageSquare,
 } from "lucide-react";
@@ -18,7 +17,6 @@ import { Switch } from "@/components/ui/switch";
 import {
   CarIcon,
   ElectricBikeIcon,
-  IsraelWorkAreasMap,
   ScooterIcon,
   WorkAreaRegionIcon,
 } from "@/components/courier/work-area-visuals";
@@ -182,7 +180,7 @@ function AvailabilityPage() {
                 <span
                   className={cn(
                     "grid size-11 shrink-0 place-items-center rounded-2xl transition-colors",
-                    accepting ? "bg-primary text-white shadow-md shadow-primary/30" : "bg-[#F3F6F4] text-text-muted",
+                    accepting ? "bg-primary-deep text-white shadow-md" : "bg-[#F3F6F4] text-text-muted",
                   )}
                   aria-hidden
                 >
@@ -219,7 +217,7 @@ function AvailabilityPage() {
                     toggleAvailability.mutate(next);
                   }}
                   aria-label="זמין לקבל עבודות"
-                  className="h-8 w-[3.25rem] shrink-0 data-[state=checked]:bg-primary [&>span]:size-7 [&>span]:data-[state=checked]:translate-x-[1.35rem]"
+                  className="h-8 w-[3.25rem] shrink-0 data-[state=checked]:bg-primary-deep [&>span]:size-7 [&>span]:data-[state=checked]:translate-x-[1.35rem]"
                 />
               </div>
             </section>
@@ -253,7 +251,7 @@ function AvailabilityPage() {
                           <span
                             className={cn(
                               "absolute top-2 left-2 grid size-5 place-items-center rounded-full transition-colors",
-                              on ? "bg-primary text-white" : "border border-black/10 bg-white",
+                              on ? "bg-primary-deep text-white" : "border border-black/10 bg-white",
                             )}
                             aria-hidden
                           >
@@ -282,7 +280,7 @@ function AvailabilityPage() {
                   <SectionLabel
                     step={2}
                     title="אזורי עבודה"
-                    subtitle="בחר איפה תרצה לקבל משלוחים"
+                    subtitle="אפשר כמה אזורים. בכל אזור בוחרים את הערים שבהן עובדים"
                   />
                   {selectedAreaLabels.length > 0 && (
                     <div className="mb-3 flex flex-wrap justify-end gap-1.5">
@@ -315,7 +313,7 @@ function AvailabilityPage() {
                           <span
                             className={cn(
                               "absolute top-1.5 left-1.5 grid size-5 place-items-center rounded-full",
-                              on ? "bg-primary text-white" : "border border-black/10 bg-white",
+                              on ? "bg-primary-deep text-white" : "border border-black/10 bg-white",
                             )}
                             aria-hidden
                           >
@@ -332,7 +330,7 @@ function AvailabilityPage() {
                   </div>
 
                   {areas.length > 0 && (
-                    <div className="mt-3 rounded-2xl border border-black/5 bg-[#F7F8F7] p-3">
+                    <div className="mt-3">
                       <WorkAreaCityPicker
                         regions={areas}
                         selected={cities}
@@ -356,19 +354,6 @@ function AvailabilityPage() {
                   )}
                 </div>
               </div>
-
-              <div className="border-t border-black/5 bg-[#FAFBFA] p-3">
-                <div className="overflow-hidden rounded-2xl border border-black/5 bg-white">
-                  <div className="flex items-center justify-between gap-2 border-b border-black/5 px-3 py-2.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold text-[#1f7a1a]">
-                      <MapPin className="size-3" />
-                      {areas.length > 0 ? `${areas.length} נבחרו` : "לחץ על המפה"}
-                    </span>
-                    <p className="text-[12px] font-extrabold text-text-strong">מפת אזורים</p>
-                  </div>
-                  <IsraelWorkAreasMap selected={areas} onToggle={toggleArea} />
-                </div>
-              </div>
             </section>
 
             {/* Tip */}
@@ -379,7 +364,7 @@ function AvailabilityPage() {
               <div className="min-w-0 flex-1 text-right">
                 <h2 className="text-sm font-extrabold text-text-strong">איך זה עובד?</h2>
                 <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
-                  Goi ישלח לך הצעות לפי האזורים שבחרת, כלי התחבורה והמיקום שלך בזמן אמת.
+                  Goi ישלח לך הצעות לפי האזורים והערים שבחרת, כלי התחבורה והמיקום שלך בזמן אמת.
                 </p>
               </div>
             </section>
@@ -447,7 +432,7 @@ function AvailabilityPage() {
               type="button"
               onClick={() => save.mutate()}
               disabled={save.isPending}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-extrabold text-white shadow-fab transition active:scale-[0.99] disabled:opacity-60"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary-deep text-[15px] font-extrabold text-white shadow-fab transition active:scale-[0.99] disabled:opacity-60"
             >
               {save.isPending ? (
                 <Loader2 className="size-5 animate-spin" />

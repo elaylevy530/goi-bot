@@ -337,7 +337,7 @@ function OrderDetailPage() {
                       <Link
                         to="/business/messages"
                         search={{ courierId: courier.id, jobId: j.id }}
-                        className="flex items-center justify-center gap-2 w-full bg-[#35AD29] hover:bg-[#2d9222] text-white font-bold py-2.5 rounded-xl transition-colors"
+                        className="flex items-center justify-center gap-2 w-full bg-primary-deep hover:bg-primary-deep/90 font-bold py-2.5 rounded-xl transition-colors"
                       >
                         <MessageSquare className="size-4" /> צ׳אט עם השליח
                       </Link>
@@ -454,7 +454,7 @@ function OrderDetailPage() {
                           ))}
                         </div>
                       </div>
-                      <Button onClick={() => submitRating.mutate()} disabled={submitRating.isPending || !rating} className="w-full bg-[#35AD29] hover:bg-[#2d9623] text-white">
+                      <Button onClick={() => submitRating.mutate()} disabled={submitRating.isPending || !rating} className="w-full bg-primary-deep hover:bg-primary-deep/90">
                         שלח דירוג
                       </Button>
                     </div>

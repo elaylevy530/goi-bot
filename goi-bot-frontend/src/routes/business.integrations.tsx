@@ -286,7 +286,7 @@ function BusinessIntegrationsPage() {
             <Button
               onClick={() => sendTest.mutate()}
               disabled={sendTest.isPending}
-              className="bg-[#35AD29] hover:bg-[#2E9624]"
+              className="bg-primary-deep hover:bg-primary-deep/90"
             >
               <Send className="size-4 ml-2" />
               {sendTest.isPending ? "שולח…" : "שלח הזמנת בדיקה"}

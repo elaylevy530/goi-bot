@@ -213,7 +213,7 @@ function MultiStopActivePage() {
                     <Button
                       size="sm"
                       disabled={!isCurrent || mutate.isPending}
-                      className="bg-[#35AD29] hover:bg-[#2E9A24] text-white gap-1"
+                      className="bg-primary-deep hover:bg-primary-deep/90 gap-1"
                       onClick={() =>
                         mutate.mutate({ stopId: s.id, status: "done" })
                       }
@@ -241,7 +241,7 @@ function MultiStopActivePage() {
             <CardContent className="p-5 text-center">
               <CheckCircle2 className="size-12 text-[#35AD29] mx-auto mb-2" />
               <div className="font-extrabold text-lg">המשלוח הושלם!</div>
-              <Button asChild className="mt-3 bg-[#35AD29]">
+              <Button asChild className="mt-3">
                 <Link to="/courier/dashboard">חזרה לדאשבורד</Link>
               </Button>
             </CardContent>

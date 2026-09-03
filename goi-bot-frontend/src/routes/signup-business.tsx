@@ -311,7 +311,7 @@ function CategoryStep({
           type="button"
           disabled={!selected}
           onClick={onContinue}
-          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black text-[15px] shadow-lg shadow-primary/25 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full h-14 rounded-2xl bg-primary-deep text-primary-foreground font-black text-[15px] shadow-lg shadow-primary/25 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           המשך לפרטי חשבון <ArrowLeft className="size-5" />
         </button>

@@ -6,6 +6,7 @@ export type CourierSelfRow = {
   full_name?: string | null;
   whatsapp_phone?: string | null;
   email?: string | null;
+  id_number?: string | null;
   avatar_url?: string | null;
   courier_status?: string | null;
   accepting_jobs?: boolean | null;
@@ -27,8 +28,6 @@ export type CourierSelfRow = {
 
 export const COURIER_DOCUMENT_TYPES = [
   { type: "driver_license", label: "רישיון נהיגה" },
-  { type: "vehicle_license", label: "רישיון רכב" },
-  { type: "insurance", label: "ביטוח חובה" },
   { type: "comprehensive_insurance", label: "ביטוח מקיף" },
 ] as const;
 

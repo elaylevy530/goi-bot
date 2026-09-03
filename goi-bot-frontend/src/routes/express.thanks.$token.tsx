@@ -44,14 +44,14 @@ function ThanksPage() {
           <div className="text-xs font-bold uppercase tracking-widest text-[#0d0d0d]/50">קישור מעקב חי</div>
           <div className="flex items-center gap-2">
             <div className="flex-1 truncate text-xs text-[#0d0d0d]/70 font-mono ltr text-left" dir="ltr">{trackUrl}</div>
-            <button onClick={copy} className="size-9 grid place-items-center rounded-lg bg-[#0d0d0d] text-[#f5f3ee] hover:bg-[#35AD29]" aria-label="העתק">
+            <button onClick={copy} className="size-9 grid place-items-center rounded-lg bg-[#0d0d0d] text-[#f5f3ee] hover:bg-primary-deep" aria-label="העתק">
               <Copy className="size-4" />
             </button>
           </div>
           <Link
             to="/track/$token"
             params={{ token }}
-            className="inline-flex items-center gap-2 w-full justify-center py-3 bg-[#35AD29] text-white rounded-xl text-sm font-bold hover:bg-[#2d9623]"
+            className="inline-flex items-center gap-2 w-full justify-center py-3 bg-primary-deep text-white rounded-xl text-sm font-bold hover:bg-primary-deep/90"
           >
             <MapPin className="size-4" /> פתח מסך מעקב
           </Link>

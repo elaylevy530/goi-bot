@@ -357,7 +357,7 @@ function NewMultiDeliveryPage() {
           <Button
             disabled={create.isPending}
             onClick={() => create.mutate()}
-            className="w-full h-14 bg-[#35AD29] hover:bg-[#2E9A24] text-white text-lg font-bold gap-2"
+            className="w-full h-14 bg-primary-deep hover:bg-primary-deep/90 text-lg font-bold gap-2"
           >
             {create.isPending ? (
               <Loader2 className="size-5 animate-spin" />

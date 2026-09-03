@@ -252,7 +252,7 @@ function ExpressOrderPage() {
           <button
             type="submit"
             disabled={create.isPending}
-            className="w-full inline-flex items-center justify-center gap-2 py-4 bg-[#35AD29] text-white rounded-2xl text-base font-bold hover:bg-[#2d9623] disabled:opacity-60 transition-colors"
+            className="w-full inline-flex items-center justify-center gap-2 py-4 bg-primary-deep text-white rounded-2xl text-base font-bold hover:bg-primary-deep/90 disabled:opacity-60 transition-colors"
           >
             {create.isPending ? <Loader2 className="size-5 animate-spin" /> : <>המשך להזמנה <ArrowRight className="size-4 rotate-180" /></>}
           </button>

@@ -100,7 +100,7 @@ function PublicTrackPage() {
               {c.whatsapp_phone && (
                 <>
                   <div dir="ltr" className="text-sm text-slate-700 mt-2 font-mono">{c.whatsapp_phone}</div>
-                  <a href={`tel:${c.whatsapp_phone}`} className="mt-3 flex items-center justify-center gap-2 bg-[#35AD29] text-white rounded-xl py-3 font-bold">
+                  <a href={`tel:${c.whatsapp_phone}`} className="mt-3 flex items-center justify-center gap-2 bg-primary-deep text-white rounded-xl py-3 font-bold">
                     <Phone className="size-4" /> חייג לשליח
                   </a>
                 </>

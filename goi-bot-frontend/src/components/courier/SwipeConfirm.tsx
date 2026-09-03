@@ -127,8 +127,8 @@ export function SwipeConfirm({
         className={cn(
           "absolute grid place-items-center",
           isAvailability
-            ? "top-1 left-1 size-[56px] rounded-full bg-[#35AD29] text-white shadow-[0_6px_16px_rgba(53,173,41,0.4)]"
-            : "top-1 right-1 size-[52px] rounded-full bg-primary text-primary-foreground shadow-fab",
+            ? "top-1 left-1 size-[56px] rounded-full bg-primary-deep text-white shadow-[0_6px_16px_rgba(16,40,22,0.35)]"
+            : "top-1 right-1 size-[52px] rounded-full bg-primary-deep text-primary-foreground shadow-fab",
           dragging ? "transition-none" : "transition-transform duration-150",
         )}
         style={{

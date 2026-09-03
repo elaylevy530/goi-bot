@@ -27,22 +27,22 @@ export function BankDetailsFields({
     <div className={compact ? "grid grid-cols-2 gap-2" : "space-y-3"}>
       <div className={compact ? "col-span-2" : undefined}>
         <Label className={labelCls}>שם בעל החשבון</Label>
-        <Input value={accountOwner} onChange={(e) => onAccountOwner(e.target.value)} className="text-end" autoComplete="name" />
+        <Input value={accountOwner} onChange={(e) => onAccountOwner(e.target.value)} className="min-h-11 text-end" autoComplete="name" />
       </div>
       <div>
         <Label className={labelCls}>בנק</Label>
-        <Input value={bankName} onChange={(e) => onBankName(e.target.value)} className="text-end" />
+        <Input value={bankName} onChange={(e) => onBankName(e.target.value)} className="min-h-11 text-end" />
       </div>
       <div>
         <Label className={labelCls}>סניף</Label>
-        <Input value={bankBranch} onChange={(e) => onBankBranch(e.target.value)} className="text-end" />
+        <Input value={bankBranch} onChange={(e) => onBankBranch(e.target.value)} className="min-h-11 text-end" />
       </div>
       <div className={compact ? "col-span-2" : undefined}>
         <Label className={labelCls}>מספר חשבון</Label>
         <Input
           value={bankAccount}
           onChange={(e) => onBankAccount(e.target.value)}
-          className="text-end"
+          className="min-h-11 text-end"
           dir="ltr"
           inputMode="numeric"
           autoComplete="off"

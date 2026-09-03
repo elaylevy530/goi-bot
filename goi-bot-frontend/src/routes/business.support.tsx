@@ -60,7 +60,7 @@ function SupportPage() {
     <BusinessShell title="תמיכה והודעות" subtitle="פתח קריאה או דבר עם נציג">
       <div className="flex justify-end gap-2 mb-4">
         <Button asChild variant="outline"><a href={SUPPORT_WHATSAPP} target="_blank" rel="noreferrer"><MessageSquare className="size-4" /> פתח וואטסאפ</a></Button>
-        <Button onClick={() => setOpen(true)} className="bg-[#35AD29] hover:bg-[#2d9623] text-white"><Plus className="size-4" /> פתח קריאה חדשה</Button>
+        <Button onClick={() => setOpen(true)} className="bg-primary-deep hover:bg-primary-deep/90"><Plus className="size-4" /> פתח קריאה חדשה</Button>
       </div>
 
       <Card className="rounded-2xl border-slate-200 shadow-sm">
@@ -104,7 +104,7 @@ function SupportPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => submit.mutate()} disabled={!f.message} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">שלח</Button>
+            <Button onClick={() => submit.mutate()} disabled={!f.message} className="bg-primary-deep hover:bg-primary-deep/90">שלח</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

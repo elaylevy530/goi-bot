@@ -103,7 +103,7 @@ function NewRoutePage() {
             <div><Label>הערות</Label><Textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => navigate({ to: "/business/dashboard" })}>ביטול</Button>
-              <Button type="submit" disabled={submit.isPending} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+              <Button type="submit" disabled={submit.isPending} className="bg-primary-deep hover:bg-primary-deep/90">
                 {submit.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} פתח קו חלוקה
               </Button>
             </div>

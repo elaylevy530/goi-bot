@@ -87,7 +87,7 @@ function RecurringPage() {
   return (
     <BusinessShell title="הזמנות קבועות" subtitle="משמרות, קווי חלוקה ומשלוחים חוזרים">
       <div className="flex justify-end mb-4">
-        <Button onClick={openNew} className="bg-[#35AD29] hover:bg-[#2d9623] text-white"><Plus className="size-4" /> הזמנה קבועה חדשה</Button>
+        <Button onClick={openNew} className="bg-primary-deep hover:bg-primary-deep/90"><Plus className="size-4" /> הזמנה קבועה חדשה</Button>
       </div>
 
       {!list || list.length === 0 ? (
@@ -158,7 +158,7 @@ function RecurringPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => save.mutate()} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">שמור</Button>
+            <Button onClick={() => save.mutate()} className="bg-primary-deep hover:bg-primary-deep/90">שמור</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

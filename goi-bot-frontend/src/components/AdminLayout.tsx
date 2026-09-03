@@ -169,7 +169,7 @@ function NavList({
                         "flex items-center gap-3 rounded-card text-sm font-semibold transition-colors",
                         collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
                         active
-                          ? "bg-primary text-primary-foreground shadow-fab"
+                          ? "bg-primary-deep text-primary-foreground shadow-fab"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                     >

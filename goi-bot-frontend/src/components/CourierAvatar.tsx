@@ -42,7 +42,7 @@ export function CourierAvatar({ path, name, size = 64, className = "" }: Props) 
   return (
     <div
       style={style}
-      className={`rounded-full bg-gradient-to-br from-[#35AD29] to-emerald-600 text-white flex items-center justify-center font-extrabold shrink-0 shadow-sm ring-2 ring-white ${className}`}
+      className={`rounded-full bg-primary-deep text-primary-foreground flex items-center justify-center font-extrabold shrink-0 shadow-sm ring-2 ring-white ${className}`}
     >
       {initial}
     </div>

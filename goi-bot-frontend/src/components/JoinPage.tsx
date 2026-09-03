@@ -583,7 +583,7 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
             size="lg"
             disabled={!canSubmit || mut.isPending}
             onClick={() => mut.mutate()}
-            className="w-full h-14 text-base font-bold rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg gap-2"
+            className="w-full h-14 text-base font-bold rounded-xl bg-primary-deep hover:bg-primary-deep/90 text-primary-foreground shadow-lg gap-2"
           >
             {mut.isPending ? <Loader2 className="size-5 animate-spin" /> : <MessageCircle className="size-5" />}
             הצטרף לבוט העבודות

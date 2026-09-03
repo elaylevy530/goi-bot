@@ -44,7 +44,7 @@ export function BusinessLayout({ title, children }: { title: string; children: R
               return (
                 <Link key={t.to} to={t.to}
                   className={`flex items-center gap-1.5 px-3 py-1.5 my-1.5 mx-1 text-sm whitespace-nowrap rounded-pill font-bold transition-colors ${
-                    active ? "bg-primary/90 text-primary-foreground shadow-md" : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    active ? "bg-primary-deep/90 text-primary-foreground shadow-md" : "bg-primary-deep text-primary-foreground hover:bg-primary-deep/90"
                   }`}>
                   <Icon className="size-4" /> {t.label}
                 </Link>

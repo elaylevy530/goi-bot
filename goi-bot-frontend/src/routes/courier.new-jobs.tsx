@@ -551,7 +551,7 @@ function NewJobsPage() {
                 {detail.isOpenQuote ? (
                   <>
                     <Button 
-                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                      className="w-full h-12 bg-primary-deep hover:bg-primary-deep/90 text-white font-bold text-[15px] rounded-xl shadow-sm" 
                       onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number, quote: detail.existingQuote }); setDetail(null); }}
                     >
                       {detail.existingQuote ? "עדכן הצעת מחיר" : "הגש הצעת מחיר"}
@@ -567,14 +567,14 @@ function NewJobsPage() {
                   <>
                     {detail.isQuoteRequest ? (
                       <Button 
-                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                        className="w-full h-12 bg-primary-deep hover:bg-primary-deep/90 text-white font-bold text-[15px] rounded-xl shadow-sm" 
                         onClick={() => { setQuoteFor({ jobId: detail.id, jobNumber: detail.job_number }); setDetail(null); }}
                       >
                         הגש הצעת מחיר
                       </Button>
                     ) : (
                       <Button 
-                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                        className="w-full h-12 bg-primary-deep hover:bg-primary-deep/90 text-white font-bold text-[15px] rounded-xl shadow-sm" 
                         onClick={() => respond.mutate({ id: detail.offerId, response: "accepted", jobId: detail.id })} 
                         disabled={respond.isPending}
                       >
@@ -597,7 +597,7 @@ function NewJobsPage() {
                 ) : (
                   <>
                     <Button 
-                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[15px] rounded-xl shadow-sm" 
+                      className="w-full h-12 bg-primary-deep hover:bg-primary-deep/90 text-white font-bold text-[15px] rounded-xl shadow-sm" 
                       onClick={() => claim.mutate(detail.id)} 
                       disabled={claim.isPending}
                     >
@@ -927,7 +927,7 @@ function AcceptJobsToggle({
           toggle.mutate(next);
         }}
         aria-label={title}
-        className={`shrink-0 overflow-hidden data-[state=checked]:bg-primary ${
+        className={`shrink-0 overflow-hidden data-[state=checked]:bg-primary-deep ${
           compact
             ? "h-7 w-12 [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5"
             : "h-8 w-[3.25rem] [&>span]:size-6 data-[state=checked]:[&>span]:translate-x-[1.35rem]"

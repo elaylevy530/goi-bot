@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -6,6 +6,7 @@ import {
   Building2,
   CalendarDays,
   Check,
+  ChevronDown,
   Clock,
   FileText,
   Heart,
@@ -18,9 +19,11 @@ import {
 import { toast } from "sonner";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
+import { BankDetailsFields } from "@/components/courier/BankDetailsFields";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListWithdrawals, nestUpdateWithdrawal } from "@/lib/nest-domain";
 import { nestUploadFile } from "@/lib/nest-files";
 import { cn } from "@/lib/utils";
@@ -138,6 +141,11 @@ function WalletPage() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceTargetId, setInvoiceTargetId] = useState<string | null>(null);
+  const [bankEditOpen, setBankEditOpen] = useState(false);
+  const [accountOwner, setAccountOwner] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
 
   const { data: rows = [] } = useQuery({
     queryKey: ["wallet", me?.id],
@@ -178,14 +186,28 @@ function WalletPage() {
     bank_name?: string | null;
     bank_branch?: string | null;
     bank_account?: string | null;
+    bank_account_owner?: string | null;
+    full_name?: string | null;
     id?: string;
   } | null;
   const hasBank = !!(bank?.bank_name && bank?.bank_account);
+
+  const fillBankFields = () => {
+    setAccountOwner(bank?.bank_account_owner || bank?.full_name || me?.full_name || "");
+    setBankName(bank?.bank_name || "");
+    setBankBranch(bank?.bank_branch || "");
+    setBankAccount(bank?.bank_account || "");
+  };
+
+  const openBankEdit = () => {
+    fillBankFields();
+    setBankEditOpen(true);
+  };
   const nextWindow = nextWithdrawalWindowDate();
   const requestBlockReason = latestPending
     ? "יש כבר בקשת משיכה ממתינה"
     : !hasBank
-      ? "יש לחבר חשבון בנק באזור האישי"
+      ? "יש למלא פרטי בנק"
       : available < MIN_WITHDRAWAL
         ? currentMonthEarned > 0
           ? `הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}. משלוחי החודש ייפתחו ב-${formatIsraelDate(nextWindow)}`
@@ -247,7 +269,7 @@ function WalletPage() {
       const n = Number(amount);
       if (!me?.id) throw new Error("לא מחובר");
       if (latestPending) throw new Error("יש כבר בקשת משיכה ממתינה");
-      if (!hasBank) throw new Error("יש לחבר חשבון בנק באזור האישי");
+      if (!hasBank) throw new Error("יש למלא פרטי בנק");
       if (!Number.isFinite(n) || n < MIN_WITHDRAWAL) throw new Error(`הסכום המינימלי למשיכה הוא ₪${MIN_WITHDRAWAL}`);
       if (n > available) throw new Error("הסכום גבוה מהיתרה הזמינה");
       return nestCreateWithdrawal({
@@ -288,6 +310,27 @@ function WalletPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const saveBank = useMutation({
+    mutationFn: async () => {
+      const owner = accountOwner.trim();
+      const name = bankName.trim();
+      const account = bankAccount.trim();
+      if (!owner || !name || !account) throw new Error("יש למלא שם בעל החשבון, בנק ומספר חשבון");
+      await nestUpdateMyCourier({
+        bank_account_owner: owner,
+        bank_name: name,
+        bank_branch: bankBranch.trim() || null,
+        bank_account: account,
+      });
+    },
+    onSuccess: () => {
+      toast.success("פרטי הבנק נשמרו");
+      setBankEditOpen(false);
+      qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <CourierShell fullBleed>
       <div dir="rtl" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-bg">
@@ -320,6 +363,11 @@ function WalletPage() {
               <button
                 type="button"
                 onClick={() => {
+                  if (!hasBank) {
+                    openBankEdit();
+                    toast.error("יש למלא פרטי בנק");
+                    return;
+                  }
                   setFieldError(requestBlockReason);
                   setWithdrawOpen(true);
                 }}
@@ -395,22 +443,52 @@ function WalletPage() {
               </section>
             )}
 
-            <Link
-              to="/courier/profile/bank"
-              className="flex min-h-12 items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card"
-            >
-              <div className="grid size-9 place-items-center rounded-pill bg-primary-soft text-primary">
-                <Building2 className="size-4" aria-hidden />
-              </div>
-              <div className="min-w-0 flex-1 text-right">
-                <p className="text-sm font-bold text-text-strong">{hasBank ? "חשבון בנק מחובר" : "חבר חשבון בנק"}</p>
-                <p className="truncate text-xs text-text-muted">
-                  {hasBank
-                    ? `${bank?.bank_name} | סניף ${bank?.bank_branch || "—"} | ${maskAccount(bank?.bank_account)}`
-                    : "נדרש כדי להגיש בקשת משיכה"}
-                </p>
-              </div>
-            </Link>
+            <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+              <button
+                type="button"
+                onClick={() => (bankEditOpen ? setBankEditOpen(false) : openBankEdit())}
+                className="flex min-h-12 w-full items-center gap-3 px-3 py-3"
+                aria-expanded={bankEditOpen}
+              >
+                <div className="grid size-9 place-items-center rounded-pill bg-primary-soft text-primary">
+                  <Building2 className="size-4" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1 text-right">
+                  <p className="text-sm font-bold text-text-strong">{hasBank ? "חשבון בנק מחובר" : "פרטי חשבון בנק"}</p>
+                  <p className="truncate text-xs text-text-muted">
+                    {hasBank
+                      ? `${bank?.bank_name} | סניף ${bank?.bank_branch || "—"} | ${maskAccount(bank?.bank_account)}`
+                      : "מלאו כאן כדי להגיש בקשת משיכה"}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={cn("size-4 shrink-0 text-text-muted transition-transform", bankEditOpen && "rotate-180")}
+                  aria-hidden
+                />
+              </button>
+              {bankEditOpen && (
+                <div className="space-y-3 border-t border-border px-3 pb-3 pt-3">
+                  <BankDetailsFields
+                    accountOwner={accountOwner}
+                    bankName={bankName}
+                    bankBranch={bankBranch}
+                    bankAccount={bankAccount}
+                    onAccountOwner={setAccountOwner}
+                    onBankName={setBankName}
+                    onBankBranch={setBankBranch}
+                    onBankAccount={setBankAccount}
+                  />
+                  <button
+                    type="button"
+                    disabled={saveBank.isPending}
+                    onClick={() => saveBank.mutate()}
+                    className="flex min-h-12 w-full items-center justify-center rounded-pill bg-primary-deep text-sm font-extrabold text-primary-foreground disabled:opacity-60"
+                  >
+                    {saveBank.isPending ? "שומר…" : "שמור"}
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="flex min-h-12 items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
               <div className="grid size-9 place-items-center rounded-pill bg-primary-soft text-primary">
@@ -537,7 +615,7 @@ function WalletPage() {
                 }
                 create.mutate();
               }}
-              className="flex min-h-12 w-full items-center justify-center rounded-pill bg-primary text-sm font-extrabold text-primary-foreground disabled:opacity-60"
+              className="flex min-h-12 w-full items-center justify-center rounded-pill bg-primary-deep text-sm font-extrabold text-primary-foreground disabled:opacity-60"
             >
               שלח בקשה
             </button>
@@ -618,7 +696,7 @@ function InvoiceUploadField({
         type="button"
         disabled={!file || pending}
         onClick={onSubmit}
-        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-pill bg-primary text-sm font-extrabold text-primary-foreground disabled:opacity-60"
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-pill bg-primary-deep text-sm font-extrabold text-primary-foreground disabled:opacity-60"
       >
         <FileText className="size-4" aria-hidden />
         {pending ? "מעלה…" : "העלה חשבונית"}

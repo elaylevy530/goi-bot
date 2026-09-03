@@ -93,6 +93,7 @@ export const Route = createFileRoute("/")({
 
 /* ============ TOKENS ============ */
 const BRAND = "#35AD29";
+const BRAND_DEEP = "color-mix(in oklab, #101418 72%, #35AD29)";
 const BRAND_DARK = "#2E9A24";
 const INK = "#0A0A0A";
 const CANVAS = "#F7F6F2";
@@ -214,7 +215,7 @@ function Nav() {
                 href="#install"
                 onClick={() => setOpen(false)}
                 className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-full text-white font-bold text-[15px]"
-                style={{ background: BRAND }}
+                style={{ background: BRAND_DEEP }}
               >
                 <Download className="w-5 h-5" />
                 התקינו את האפליקציה
@@ -633,7 +634,7 @@ function NewDeliveryScreen() {
       </div>
 
       <div className="mt-auto p-3">
-        <div className="w-full h-11 rounded-full grid place-items-center text-white font-black text-[12.5px]" style={{ background: BRAND }}>
+        <div className="w-full h-11 rounded-full grid place-items-center text-white font-black text-[12.5px]" style={{ background: BRAND_DEEP }}>
           המשך לתשלום
         </div>
       </div>
@@ -1077,7 +1078,7 @@ function FlowScreen({ svc, phase }: { svc: Svc; phase: number }) {
               <div className="text-[8px] font-bold text-black/60">מחיר משוער</div>
               <div className="text-[12px] font-black text-black">{svc.price}</div>
             </div>
-            <button className="w-full mt-1 h-8 rounded-xl text-white text-[11px] font-black shadow-md animate-claim-pulse" style={{ background: BRAND }}>
+            <button className="w-full mt-1 h-8 rounded-xl text-white text-[11px] font-black shadow-md animate-claim-pulse" style={{ background: BRAND_DEEP }}>
               הזמן עכשיו
             </button>
           </div>
@@ -1546,7 +1547,7 @@ function DeliveryPackageScreen() {
 
             {/* CTA — part of the scrolling content so it flows in naturally */}
             <div className="mt-3">
-              <button className="w-full h-11 rounded-full flex items-center justify-center gap-2 text-white font-black text-[13px] shadow-lg" style={{ background: BRAND, boxShadow: "0 6px 16px -4px rgba(53,173,41,0.55)", animation: "ctaPress 8s ease-out forwards", transformOrigin: "center" }}>
+              <button className="w-full h-11 rounded-full flex items-center justify-center gap-2 text-white font-black text-[13px] shadow-lg" style={{ background: BRAND_DEEP, boxShadow: "0 6px 16px -4px rgba(16,40,22,0.45)", animation: "ctaPress 8s ease-out forwards", transformOrigin: "center" }}>
                 <Radar14 /> מצא לי שליח עכשיו
               </button>
               <div className="mt-1.5 flex items-center gap-1.5 text-[8.5px] text-black/60">
@@ -1742,7 +1743,7 @@ function DeliveryOrderScreen() {
 
             {/* CTA — part of the scrolling content */}
             <div className="mt-3">
-              <button className="w-full h-11 rounded-full flex items-center justify-center gap-2 text-white font-black text-[13px] shadow-lg" style={{ background: BRAND, boxShadow: "0 6px 16px -4px rgba(53,173,41,0.55)", animation: "ctaPress 8s ease-out forwards", transformOrigin: "center" }}>
+              <button className="w-full h-11 rounded-full flex items-center justify-center gap-2 text-white font-black text-[13px] shadow-lg" style={{ background: BRAND_DEEP, boxShadow: "0 6px 16px -4px rgba(16,40,22,0.45)", animation: "ctaPress 8s ease-out forwards", transformOrigin: "center" }}>
                 <Radar14 /> מצא לי מוביל עכשיו
               </button>
               <div className="mt-1.5 flex items-center gap-1.5 text-[8.5px] text-black/60">
@@ -1869,8 +1870,8 @@ function MoveQuotesScreen() {
                 <button
                   className={`mt-1.5 w-full h-7 rounded-full text-[10px] font-black flex items-center justify-center gap-1 ${selected ? "text-white" : "text-black/70 bg-black/[0.05]"}`}
                   style={selected ? {
-                    background: BRAND,
-                    boxShadow: "0 4px 10px -3px rgba(53,173,41,0.5)",
+                    background: BRAND_DEEP,
+                    boxShadow: "0 4px 10px -3px rgba(16,40,22,0.4)",
                     animation: "quoteTap 1s ease-out 2400ms 1 both",
                     transformOrigin: "center",
                   } : undefined}
@@ -2489,7 +2490,7 @@ function ShowcaseSection({
                     ? "text-white shadow-[0_18px_36px_-12px_rgba(53,173,41,0.55)] hover:opacity-95"
                     : "bg-black text-white hover:opacity-90"
                 }`}
-                style={primary ? { background: BRAND, height: 52 } : { height: 52 }}
+                style={primary ? { background: BRAND_DEEP, height: 52 } : { height: 52 }}
               >
                 {ctaLabel}
                 <ArrowLeft className="size-4" />
@@ -3101,7 +3102,7 @@ function FinalCTA() {
           <a
             href="#install"
             className="inline-flex items-center justify-center gap-2 h-14 px-8 rounded-full text-white font-bold text-[15.5px] shadow-xl"
-            style={{ background: BRAND }}
+            style={{ background: BRAND_DEEP }}
           >
             <Download className="size-5" />
             התקינו עכשיו

@@ -99,7 +99,7 @@ function WalletPage() {
                   תקבל/י בונוס של <b>₪{bonusVal}</b> ({pct}%) → סה"כ ליתרה: <b>₪{amount + bonusVal}</b>
                 </div>
               )}
-              <Button onClick={() => recharge.mutate()} disabled={recharge.isPending} className="w-full bg-[#35AD29] hover:bg-[#2d9623] text-white">
+              <Button onClick={() => recharge.mutate()} disabled={recharge.isPending} className="w-full bg-primary-deep hover:bg-primary-deep/90">
                 {recharge.isPending ? "טוען..." : "שלם דרך PayPal וטען"}
               </Button>
               <div className="text-[11px] text-slate-400 text-center">הסליקה דרך PayPal Business — תחובר ברגע שתעדכן/י את ה-Credentials.</div>

@@ -159,7 +159,7 @@ function BonusesAdmin() {
               הבונוסים שתוסיף כאן יוצגו בדאשבורד של כל השליחים בזמן אמת.
             </p>
           </div>
-          <Button onClick={openNew} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+          <Button onClick={openNew} className="bg-primary-deep hover:bg-primary-deep/90">
             <Plus className="size-4 ml-2" /> בונוס חדש
           </Button>
         </div>
@@ -171,7 +171,7 @@ function BonusesAdmin() {
             <CardContent className="p-10 text-center">
               <Gift className="size-10 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-600 mb-4">אין בונוסים פעילים כרגע. הוסף את הבונוס הראשון כדי לדרבן את השליחים.</p>
-              <Button onClick={openNew} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+              <Button onClick={openNew} className="bg-primary-deep hover:bg-primary-deep/90">
                 <Plus className="size-4 ml-2" /> בונוס חדש
               </Button>
             </CardContent>
@@ -293,7 +293,7 @@ function BonusesAdmin() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+            <Button onClick={() => save.mutate()} disabled={save.isPending} className="bg-primary-deep hover:bg-primary-deep/90">
               {save.isPending && <Loader2 className="size-4 animate-spin ml-2" />}
               שמירה
             </Button>

@@ -109,7 +109,7 @@ function IncomingJobOverlay({ alert, onOpen, onDismiss }: {
   return (
     <div dir="rtl" className="fixed inset-0 z-[80] flex items-start justify-center bg-black/45 px-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:items-center lg:pt-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10 animate-in zoom-in-95 slide-in-from-top-4 duration-200">
-        <div className="bg-primary px-5 py-4 text-primary-foreground">
+        <div className="bg-primary-deep px-5 py-4 text-primary-foreground">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-xs font-extrabold opacity-90">עבודה חדשה עכשיו</div>
@@ -123,7 +123,7 @@ function IncomingJobOverlay({ alert, onOpen, onDismiss }: {
         <div className="space-y-4 p-5">
           {alert.body && <p className="whitespace-pre-line text-base font-bold leading-relaxed text-slate-900">{alert.body}</p>}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" className="h-13 rounded-2xl bg-primary text-base font-black text-primary-foreground hover:bg-primary/90" onClick={onOpen}>
+            <Button type="button" className="h-13 rounded-2xl bg-primary-deep text-base font-black text-primary-foreground hover:bg-primary-deep/90" onClick={onOpen}>
               פתח פרטים
             </Button>
             <Button type="button" variant="outline" className="h-13 rounded-2xl text-base font-bold" onClick={onDismiss}>
@@ -298,10 +298,10 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
                       <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{me?.full_name ?? "שליח"}</div>
                     </div>
                     <div className="relative shrink-0">
-                      <div className="size-11 rounded-pill bg-primary text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
+                      <div className="size-11 rounded-pill bg-primary-deep text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
                         {initialsOf(me?.full_name)}
                       </div>
-                      <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
+                      <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary-deep animate-pulse" : "bg-border-strong"}`} />
                     </div>
                   </div>
                 </div>

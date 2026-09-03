@@ -435,7 +435,7 @@ function AcceptedStage({
           type="button"
           disabled={pending}
           onClick={onStart}
-          className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] disabled:opacity-60"
+          className="w-full min-h-[51px] rounded-xl bg-primary-deep text-primary-foreground font-bold text-[15px] disabled:opacity-60"
         >
           התחל ניווט במפה
         </button>
@@ -629,7 +629,7 @@ function AtPickupStage({
           type="button"
           disabled={pending}
           onClick={onComplete}
-          className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] disabled:opacity-60"
+          className="w-full min-h-[51px] rounded-xl bg-primary-deep text-primary-foreground font-bold text-[15px] disabled:opacity-60"
         >
           אספתי את ההזמנה 📦
         </button>
@@ -681,7 +681,7 @@ function EnRouteStage({
         <button
           type="button"
           onClick={onArrived}
-          className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px]"
+          className="w-full min-h-[51px] rounded-xl bg-primary-deep text-primary-foreground font-bold text-[15px]"
         >
           הגעתי ללקוח 📍
         </button>
@@ -765,7 +765,7 @@ function ConfirmDeliveryStage({
           type="button"
           disabled={pending}
           onClick={onConfirm}
-          className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px] disabled:opacity-60"
+          className="w-full min-h-[51px] rounded-xl bg-primary-deep text-primary-foreground font-bold text-[15px] disabled:opacity-60"
         >
           אשר מסירה ✔️
         </button>
@@ -806,7 +806,7 @@ function CompleteStage({
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-20 bg-bg/95 backdrop-blur border-t border-border px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">
-        <button type="button" onClick={onMap} className="w-full min-h-[51px] rounded-xl bg-primary text-primary-foreground font-bold text-[15px]">
+        <button type="button" onClick={onMap} className="w-full min-h-[51px] rounded-xl bg-primary-deep text-primary-foreground font-bold text-[15px]">
           חזור למפת משלוחים
         </button>
         <button type="button" onClick={onSummary} className="w-full min-h-11 rounded-xl border border-border font-semibold text-sm">

@@ -212,7 +212,7 @@ export function BusinessNewOrder(props: Props) {
               type="button"
               onClick={step === 2 ? props.onSubmit : goNext}
               disabled={props.pending || (step === 0 && (!props.pickup || !props.dropoff))}
-              className="flex h-12 items-center justify-center rounded-lg bg-primary px-6 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:min-w-56"
+              className="flex h-12 items-center justify-center rounded-lg bg-primary-deep px-6 text-sm font-bold text-primary-foreground hover:bg-primary-deep/90 disabled:opacity-50 sm:min-w-56"
             >
               {props.pending ? <Loader2 className="size-4 animate-spin" /> : ctaLabel}
             </button>

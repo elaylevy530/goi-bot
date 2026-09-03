@@ -69,7 +69,7 @@ function HelpPage() {
               <div className="font-extrabold text-slate-900">לא מצאת תשובה?</div>
               <div className="text-sm text-slate-600 mt-0.5">צוות התמיכה זמין בצ׳אט וביצירת פניות.</div>
             </div>
-            <Link to="/business/support" className="px-4 py-2 rounded-xl bg-[#35AD29] text-white font-bold text-sm flex items-center gap-2 hover:bg-[#2d9623]">
+            <Link to="/business/support" className="px-4 py-2 rounded-xl bg-primary-deep text-white font-bold text-sm flex items-center gap-2 hover:bg-primary-deep/90">
               <MessageSquare className="size-4" /> פתח פנייה לתמיכה
             </Link>
           </CardContent>

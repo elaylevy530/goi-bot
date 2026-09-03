@@ -74,7 +74,7 @@ function CardSubmit({
           setBusy(false);
         }
       }}
-      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+      className="w-full bg-primary-deep text-primary-foreground hover:bg-primary-deep/90"
     >
       {busy ? <Loader2 className="size-4 animate-spin ml-2" /> : <ShieldCheck className="size-4 ml-2" />}
       שלם בכרטיס אשראי

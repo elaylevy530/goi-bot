@@ -368,6 +368,72 @@ export function citiesForWorkArea(area: string): string[] {
   return out.sort((a, b) => a.localeCompare(b, "he"));
 }
 
+function uniqueCities(cities: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const city of cities) {
+    const label = city.trim();
+    const key = citySelectionKey(label);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
+/** Known cities for a region plus courier-added names that should appear there. */
+export function workAreaCityOptions(area: string, extraCities: string[] = []): string[] {
+  return uniqueCities([...citiesForWorkArea(area), ...extraCities]).sort((a, b) =>
+    a.localeCompare(b, "he"),
+  );
+}
+
+export function isListedWorkAreaCity(city: string): boolean {
+  const key = citySelectionKey(city);
+  return Object.keys(CITY_TO_REGION).some((name) => citySelectionKey(name) === key);
+}
+
+/** Custom cities grouped under the region they belong to (or the first selected region). */
+export function extrasByWorkArea(regions: string[], selectedCities: string[]): Record<string, string[]> {
+  const groups = workAreasForCityPicker(regions);
+  const knownKeys = new Set(
+    groups.flatMap((area) => citiesForWorkArea(area).map(citySelectionKey)),
+  );
+  const extras: Record<string, string[]> = {};
+  for (const city of selectedCities) {
+    const label = city.trim();
+    if (!label || knownKeys.has(citySelectionKey(label))) continue;
+    const mapped = workAreaOf(label);
+    const area =
+      groups.find((g) => g === mapped) ??
+      groups.find((g) => coveringWorkAreas(g).includes(mapped ?? "")) ??
+      groups[0];
+    if (!area) continue;
+    extras[area] = uniqueCities([...(extras[area] ?? []), label]);
+  }
+  return extras;
+}
+
+export function selectAllCitiesInWorkArea(
+  selected: string[],
+  area: string,
+  extraCities: string[] = [],
+): string[] {
+  const options = workAreaCityOptions(area, extraCities);
+  const optionKeys = new Set(options.map(citySelectionKey));
+  const kept = selected.filter((city) => !optionKeys.has(citySelectionKey(city)));
+  return uniqueCities([...kept, ...options]);
+}
+
+export function clearCitiesInWorkArea(
+  selected: string[],
+  area: string,
+  extraCities: string[] = [],
+): string[] {
+  const optionKeys = new Set(workAreaCityOptions(area, extraCities).map(citySelectionKey));
+  return selected.filter((city) => !optionKeys.has(citySelectionKey(city)));
+}
+
 export function isCitySelected(selected: string[], city: string): boolean {
   const key = citySelectionKey(city);
   return selected.some((c) => citySelectionKey(c) === key);
@@ -381,7 +447,7 @@ export function toggleCity(selected: string[], city: string): string[] {
   return [...selected, city.trim()];
 }
 
-/** Drop cities that no longer belong to the selected regions. */
+/** Drop cities that no longer belong to the selected regions. Custom names stay. */
 export function filterCitiesToWorkAreas(cities: string[], areas: string[]): string[] {
   if (areas.length === 0) return [];
   const allowedKeys = new Set(
@@ -391,7 +457,7 @@ export function filterCitiesToWorkAreas(cities: string[], areas: string[]): stri
     const key = citySelectionKey(city);
     if (allowedKeys.has(key)) return true;
     const mapped = workAreaOf(city);
-    if (!mapped) return false;
+    if (!mapped) return true;
     return areas.some((area) => coveringWorkAreas(area).includes(mapped) || area === mapped);
   });
 }

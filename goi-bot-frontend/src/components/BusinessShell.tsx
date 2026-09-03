@@ -402,7 +402,7 @@ export function BusinessShell({
                 >
                   <div
                     className={cn(
-                      "absolute -top-5 grid size-[52px] place-items-center rounded-pill bg-primary text-primary-foreground shadow-fab ring-[5px] ring-bg transition active:scale-95",
+                      "absolute -top-5 grid size-[52px] place-items-center rounded-pill bg-primary-deep text-primary-foreground shadow-fab ring-[5px] ring-bg transition active:scale-95",
                       active && "scale-105",
                     )}
                   >

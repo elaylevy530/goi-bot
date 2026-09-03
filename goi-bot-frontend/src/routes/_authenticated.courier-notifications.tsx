@@ -119,7 +119,7 @@ function Page() {
               <Label>קישור (אופציונלי)</Label>
               <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." />
             </div>
-            <Button onClick={() => send.mutate()} disabled={send.isPending} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={() => send.mutate()} disabled={send.isPending} className="bg-primary-deep hover:bg-primary-deep/90">
               {send.isPending ? <Loader2 className="size-4 ml-2 animate-spin" /> : <Send className="size-4 ml-2" />}
               שלח התראה
             </Button>

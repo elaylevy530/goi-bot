@@ -400,7 +400,7 @@ export function ActiveJobs() {
                 type="button"
                 onClick={() => setStep.mutate({ job_id: j.id, step: primary.step })}
                 disabled={setStep.isPending}
-                className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-card bg-primary text-[15px] font-extrabold text-primary-foreground shadow-card-strong active:opacity-90 disabled:opacity-60"
+                className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-card bg-primary-deep text-[15px] font-extrabold text-primary-foreground shadow-card-strong active:opacity-90 disabled:opacity-60"
               >
                 <primary.icon className="size-5" strokeWidth={2.5} />
                 {primary.label}

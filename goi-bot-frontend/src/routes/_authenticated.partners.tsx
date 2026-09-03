@@ -372,7 +372,7 @@ function MessageTemplateEditor({
             onSave(row);
           }}
           disabled={saving || !value.name.trim() || !value.slug.trim()}
-          className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white px-4 py-2 text-sm font-bold disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-full bg-primary-deep text-white px-4 py-2 text-sm font-bold disabled:opacity-50"
         >
           <Save className="w-4 h-4" /> {saving ? "שומר…" : "שמור תבנית"}
         </button>

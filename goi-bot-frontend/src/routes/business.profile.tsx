@@ -181,7 +181,7 @@ function ProfilePage() {
             <label className="flex items-center gap-2"><Switch checked={f.invoice_required} onCheckedChange={(v) => setF({ ...f, invoice_required: v })} /> נדרשת חשבונית כברירת מחדל</label>
             <div><Label>הערות קבועות לשליחים</Label><Textarea rows={3} value={f.permanent_courier_notes} onChange={(e) => setF({ ...f, permanent_courier_notes: e.target.value })} placeholder="לדוגמה: כניסה מאחור, להתקשר בהגעה" /></div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={save.isPending} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">
+              <Button type="submit" disabled={save.isPending} className="bg-primary-deep hover:bg-primary-deep/90">
                 {save.isPending && <Loader2 className="size-4 animate-spin" />} שמור
               </Button>
             </div>

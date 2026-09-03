@@ -41,8 +41,8 @@ export function InstallAppSidebarItem({
 
   const base =
     variant === "dark"
-      ? "bg-[#35AD29] text-white hover:bg-[#2d9623]"
-      : "bg-[#35AD29] text-white hover:bg-[#2d9623]";
+      ? "bg-primary-deep text-white hover:bg-primary-deep/90"
+      : "bg-primary-deep text-white hover:bg-primary-deep/90";
 
   return (
     <>
@@ -84,7 +84,7 @@ export function InstallAppButton({ className }: { className?: string }) {
         onClick={onClick}
         className={
           className ??
-          "h-12 gap-2 rounded-2xl bg-[#35AD29] px-5 text-white shadow-sm hover:bg-[#2E9A24]"
+          "h-12 gap-2 rounded-2xl bg-primary-deep px-5 text-white shadow-sm hover:bg-primary-deep/90"
         }
       >
         <Download className="size-5" />
@@ -149,7 +149,7 @@ export function InstallBanner() {
               <Button
                 size="sm"
                 onClick={handleInstall}
-                className="bg-[#35AD29] text-white hover:bg-[#2E9A24]"
+                className="bg-primary-deep text-white hover:bg-primary-deep/90"
               >
                 התקנה
               </Button>
@@ -217,7 +217,7 @@ function IOSInstallSheet({
         <DialogFooter>
           <Button
             onClick={() => onOpenChange(false)}
-            className="w-full bg-[#35AD29] text-white hover:bg-[#2E9A24]"
+            className="w-full bg-primary-deep text-white hover:bg-primary-deep/90"
           >
             הבנתי
           </Button>
@@ -259,7 +259,7 @@ export function UpdateBanner() {
           <Button
             onClick={() => void onUpdate()}
             disabled={busy}
-            className="w-full min-h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+            className="w-full min-h-11 bg-primary-deep text-primary-foreground hover:bg-primary-deep/90"
           >
             {busy ? "מרענן…" : "עדכון עכשיו"}
           </Button>

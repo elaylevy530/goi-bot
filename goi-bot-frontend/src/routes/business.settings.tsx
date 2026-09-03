@@ -440,7 +440,7 @@ function SettingsPage() {
       </div>
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-20 flex justify-center pb-3 lg:bottom-0 lg:pb-6">
         <div className="pointer-events-auto rounded-xl bg-sidebar px-4 py-3 shadow-panel">
-          <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending} className="min-w-48 rounded-lg bg-primary text-primary-foreground">
+          <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending} className="min-w-48 rounded-lg bg-primary-deep text-primary-foreground">
             {saveProfile.isPending && <Loader2 className="size-4 animate-spin" />} שמור שינויים
           </Button>
         </div>

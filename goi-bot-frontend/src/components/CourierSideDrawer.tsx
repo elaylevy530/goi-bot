@@ -135,7 +135,7 @@ export function CourierMenuProvider({ children }: { children: ReactNode }) {
 function NavBadge({ value }: { value: number }) {
   if (!value || value <= 0) return null;
   return (
-    <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary text-primary-foreground text-[10px] font-extrabold">
+    <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary-deep text-primary-foreground text-[10px] font-extrabold">
       {value > 99 ? "99+" : value}
     </span>
   );
@@ -310,7 +310,7 @@ function CourierSideDrawer() {
                 onCheckedChange={() => void handleToggleAvailability()}
                 disabled={!approved || (accepting && liveJobLocksOffline)}
                 aria-label="זמין לקבלת עבודה"
-                className="shrink-0 data-[state=checked]:bg-primary"
+                className="shrink-0 data-[state=checked]:bg-primary-deep"
               />
               <div className="min-w-0 flex-1 text-right">
                 <p className="text-sm font-semibold text-text-strong">זמין לקבלת עבודה</p>
@@ -338,7 +338,7 @@ function CourierSideDrawer() {
                   className={cn(
                     "flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold transition-colors",
                     active
-                      ? "bg-primary text-primary-foreground shadow-fab"
+                      ? "bg-primary-deep text-primary-foreground shadow-fab"
                       : "text-text-strong hover:bg-muted active:bg-muted",
                   )}
                 >
@@ -409,7 +409,7 @@ export function CourierBellButton({ className = "" }: { className?: string }) {
       <Bell className="size-[18px]" strokeWidth={2} aria-hidden />
       {hasUnread && (
         <span
-          className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-surface"
+          className="absolute top-2 right-2 size-2 rounded-full bg-primary-deep ring-2 ring-surface"
           aria-hidden
         />
       )}

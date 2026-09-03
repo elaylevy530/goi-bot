@@ -93,7 +93,7 @@ function ContactsPage() {
   return (
     <BusinessShell title="אנשי קשר" subtitle="נמענים תכופים — מילוי אוטומטי בהזמנת משלוח" headerExtra={
       <div className="flex justify-end">
-        <Button onClick={openNew} className="bg-[#35AD29] hover:bg-[#2d9623] text-white"><Plus className="size-4" /> הוסף איש קשר</Button>
+        <Button onClick={openNew} className="bg-primary-deep hover:bg-primary-deep/90"><Plus className="size-4" /> הוסף איש קשר</Button>
       </div>
     }>
       <Card className="rounded-2xl border-slate-200 shadow-sm">
@@ -149,7 +149,7 @@ function ContactsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => upsert.mutate()} disabled={!form.contact_name} className="bg-[#35AD29] hover:bg-[#2d9623] text-white">שמור</Button>
+            <Button onClick={() => upsert.mutate()} disabled={!form.contact_name} className="bg-primary-deep hover:bg-primary-deep/90">שמור</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

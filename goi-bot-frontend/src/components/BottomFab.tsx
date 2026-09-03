@@ -24,7 +24,7 @@ export function BottomFab({
       dir="rtl"
       className={cn(
         "fixed z-40 inline-flex items-center justify-center gap-2",
-        "rounded-pill bg-primary text-primary-foreground shadow-fab",
+        "rounded-pill bg-primary-deep text-primary-foreground shadow-fab",
         "font-bold transition hover:bg-primary/90 active:scale-[0.98]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
