@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Coins,
   Copy,
+  Info,
   Share2,
   Store,
   Users,
@@ -14,8 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { CourierAvatar } from "@/components/CourierAvatar";
-import { CourierMenuButton } from "@/components/CourierSideDrawer";
+import { CourierBellButton, CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
+import { ScooterIcon } from "@/components/courier/work-area-visuals";
 import { ApiClientError } from "@/lib/api-client";
 import { getNestAccessToken } from "@/lib/nest-auth";
 import { nestListMyCourierReferrals } from "@/lib/nest-domain";
@@ -68,6 +70,11 @@ function money(n: number) {
   return new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
+function joinDate(iso?: string | null) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("he-IL");
+}
+
 async function fetchReferrals(): Promise<ReferralPayload> {
   const token = getNestAccessToken();
   if (!token) return {};
@@ -83,7 +90,7 @@ function SharePage() {
   const { data: me, isPending: mePending } = useMyCourier();
   const [tab, setTab] = useState<"courier" | "business">("courier");
   const [showAll, setShowAll] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
   const code = referralCode(me);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://goi.co.il";
   const courierLink = code ? `${origin}/join?ref=${encodeURIComponent(code)}` : "";
@@ -136,82 +143,90 @@ function SharePage() {
   const couriersActive = totals.couriers_active ?? couriers.filter((c) => c.status === "פעיל").length;
   const businessesRegistered = totals.businesses_registered ?? businesses.length;
   const businessesActive = totals.businesses_active ?? businesses.filter((b) => b.status === "פעיל").length;
+  const referredTotal = couriersRegistered + businessesRegistered;
   const stats = useMemo(() => ([
-    { icon: Coins, value: `₪ ${money(Number(totals.profit ?? 0))}`, label: "רווח ממשלוחים", hint: "₪1.50 לשליח או לעסק — ₪3 אם שניהם" },
-    { icon: Wallet, value: `₪ ${money(Number(totals.pending ?? 0))}`, label: "יועבר בקרוב", hint: "עמלות החודש ייפתחו בארנק ב-1 לחודש" },
-    { icon: Users, value: String(couriersRegistered), label: "שליחים שהצטרפו", hint: `${couriersActive} פעילים עכשיו` },
+    { icon: Users, value: String(referredTotal), label: "סה״כ הפניות", hint: "שליחים ועסקים" },
     { icon: Bike, value: String(couriersActive), label: "שליחים פעילים", hint: `מתוך ${couriersRegistered} שנרשמו` },
-    { icon: Building2, value: String(businessesRegistered), label: "עסקים שהצטרפו", hint: `${businessesActive} פעילים עכשיו` },
     { icon: Store, value: String(businessesActive), label: "עסקים פעילים", hint: `מתוך ${businessesRegistered} שנרשמו` },
-  ]), [totals.profit, totals.pending, couriersRegistered, couriersActive, businessesRegistered, businessesActive]);
+    { icon: Coins, value: `₪ ${money(Number(totals.profit ?? 0))}`, label: "סה״כ רווח", hint: "מכל המשלוחים שהושלמו" },
+    { icon: Wallet, value: `₪ ${money(Number(totals.pending ?? 0))}`, label: "ממתין לתשלום", hint: "ייפתח בארנק ב-1 לחודש" },
+  ]), [referredTotal, couriersActive, couriersRegistered, businessesActive, businessesRegistered, totals.profit, totals.pending]);
 
   return (
     <CourierShell fullBleed>
-      <div dir="rtl" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-bg">
-        <header className="shrink-0 border-b border-border bg-surface/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-lg">
-          <div className="flex items-center justify-between gap-3">
-            <CourierMenuButton className="size-11 border-0 shadow-card" />
+      <div dir="rtl" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#F3F6F4]">
+        <header className="relative z-20 shrink-0 border-b border-black/5 bg-white/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+            <CourierMenuButton className="size-11 border-0 bg-[#F3F6F4] shadow-none" />
             <h1 className="min-w-0 flex-1 text-center text-lg font-extrabold text-text-strong">שתף והרוויח</h1>
-            <div className="size-11 shrink-0" aria-hidden />
+            <CourierBellButton className="size-11 border-0 bg-[#F3F6F4] shadow-none" />
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
-          <div className="mx-auto flex max-w-lg flex-col gap-4">
-            <section className="overflow-hidden rounded-card bg-primary-deep p-4 text-primary-foreground shadow-card-strong">
-              <p className="text-xl font-black">צרף שליחים ועסקים — והרוויח קבוע</p>
-              <p className="mt-1 text-sm leading-relaxed text-primary-foreground/80">
-                ₪1.50 על כל משלוח ששליח שגייסת ביצע, ו־₪1.50 על כל משלוח שעסק שגייסת שיגר. אם שניהם שלך על אותו משלוח — ₪3.
-              </p>
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 rounded-card bg-black/20 px-3 py-2">
-                  <p className="w-14 shrink-0 text-[11px] font-bold text-primary-foreground/70">שליחים</p>
-                  <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">
-                    {linkReady ? courierLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+            <section className="relative overflow-hidden rounded-[1.5rem] bg-[#164A28] text-primary-foreground shadow-[0_16px_40px_rgba(12,40,18,0.28)]">
+              <div className="pointer-events-none absolute -left-10 top-6 size-40 rounded-full bg-white/10 blur-2xl" aria-hidden />
+              <div className="pointer-events-none absolute -right-8 -top-10 size-36 rounded-full bg-black/20 blur-2xl" aria-hidden />
+              <div className="relative flex items-stretch gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1 p-4 sm:p-5 lg:p-7">
+                  <p className="text-[1.65rem] font-black leading-tight sm:text-3xl lg:text-4xl">תרוויח מכל הפניה!</p>
+                  <p className="mt-2 max-w-md text-[13px] leading-relaxed text-primary-foreground/80 sm:text-sm">
+                    שתף שליחים ועסקים — ₪1.50 על כל משלוח שהושלם, ו־₪3 אם גייסת את שני הצדדים לאותו משלוח.
                   </p>
+                  <div className="mt-4 max-w-lg space-y-2">
+                    <LinkRow
+                      label="שליחים"
+                      value={linkReady ? courierLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+                      onCopy={() => void copy(courierLink)}
+                      disabled={!linkReady}
+                      copyLabel="העתק קישור לשליחים"
+                    />
+                    {moreOpen && (
+                      <LinkRow
+                        label="עסקים"
+                        value={linkReady ? businessLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+                        onCopy={() => void copy(businessLink)}
+                        disabled={!linkReady}
+                        copyLabel="העתק קישור לעסקים"
+                      />
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => void copy(courierLink)}
-                    disabled={!linkReady}
-                    className="grid size-10 place-items-center rounded-pill bg-surface text-primary disabled:opacity-50"
-                    aria-label="העתק קישור לשליחים"
+                    onClick={() => setMoreOpen((v) => !v)}
+                    className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-primary-foreground/90"
                   >
-                    <Copy className="size-4" />
+                    עוד אפשרויות לשיתוף
+                    <ChevronDown className={cn("size-4 transition-transform", moreOpen && "rotate-180")} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2 rounded-card bg-black/20 px-3 py-2">
-                  <p className="w-14 shrink-0 text-[11px] font-bold text-primary-foreground/70">עסקים</p>
-                  <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">
-                    {linkReady ? businessLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void copy(businessLink)}
-                    disabled={!linkReady}
-                    className="grid size-10 place-items-center rounded-pill bg-surface text-primary disabled:opacity-50"
-                    aria-label="העתק קישור לעסקים"
-                  >
-                    <Copy className="size-4" />
-                  </button>
+                <div className="relative min-h-[158px] w-[38%] min-w-[132px] max-w-[280px] shrink-0 self-stretch sm:min-h-[200px] sm:w-[42%] lg:min-h-[240px] lg:w-[300px]">
+                  <img
+                    src="/courier/share-hero.png?v=2"
+                    alt=""
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[118%] w-full object-contain object-bottom drop-shadow-[0_18px_24px_rgba(0,0,0,0.28)]"
+                  />
                 </div>
               </div>
-              <button type="button" onClick={() => setMoreOpen((v) => !v)} className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-primary-foreground/90">
-                עוד אפשרויות לשיתוף
-                <ChevronDown className={cn("size-4 transition-transform", moreOpen && "rotate-180")} />
-              </button>
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-extrabold text-text-strong">הרשת שלך</h2>
-              <div className="grid grid-cols-2 gap-2">
-                {stats.map((s) => {
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                {stats.map((s, i) => {
                   const Icon = s.icon;
                   return (
-                    <div key={s.label} className="rounded-card border border-border bg-surface p-3 shadow-card">
+                    <div
+                      key={s.label}
+                      className={cn(
+                        "rounded-[1.15rem] border border-black/5 bg-white p-3 shadow-[0_8px_20px_rgba(16,24,40,0.06)]",
+                        i === stats.length - 1 && "col-span-2 sm:col-span-1",
+                      )}
+                    >
                       <span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary">
                         <Icon className="size-4" aria-hidden />
                       </span>
-                      <p className="mt-2 break-words text-lg font-black tabular-nums leading-tight text-text-strong">
+                      <p className="mt-2 break-words text-[17px] font-black tabular-nums leading-tight text-text-strong sm:text-lg">
                         {s.value}
                       </p>
                       <p className="mt-1 text-[12px] font-bold text-text-strong">{s.label}</p>
@@ -227,18 +242,18 @@ function SharePage() {
                 type="button"
                 onClick={() => { setTab("courier"); setShowAll(false); }}
                 className={cn(
-                  "flex min-h-12 items-center justify-center gap-2 rounded-card border text-sm font-extrabold",
-                  tab === "courier" ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface text-text-subtle",
+                  "flex min-h-12 items-center justify-center gap-2 rounded-[1.15rem] border text-sm font-extrabold",
+                  tab === "courier" ? "border-primary/30 bg-primary-soft text-primary" : "border-black/5 bg-white text-text-subtle",
                 )}
               >
-                <Bike className="size-4" /> שליחים
+                <ScooterIcon className="size-5" /> שליחים
               </button>
               <button
                 type="button"
                 onClick={() => { setTab("business"); setShowAll(false); }}
                 className={cn(
-                  "flex min-h-12 items-center justify-center gap-2 rounded-card border text-sm font-extrabold",
-                  tab === "business" ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface text-text-subtle",
+                  "flex min-h-12 items-center justify-center gap-2 rounded-[1.15rem] border text-sm font-extrabold",
+                  tab === "business" ? "border-primary/30 bg-primary-soft text-primary" : "border-black/5 bg-white text-text-subtle",
                 )}
               >
                 <Store className="size-4" /> עסקים
@@ -246,7 +261,7 @@ function SharePage() {
             </div>
 
             {isError && (
-              <p className="rounded-card border border-border bg-surface py-4 text-center text-sm text-destructive">
+              <p className="rounded-[1.15rem] border border-border bg-white py-4 text-center text-sm text-destructive">
                 לא הצלחנו לטעון את ההפניות. נסו שוב מאוחר יותר.
               </p>
             )}
@@ -263,27 +278,31 @@ function SharePage() {
                 )}
               </div>
               {visible.length === 0 ? (
-                <p className="rounded-card border border-border bg-surface py-10 text-center text-sm text-text-muted">
+                <p className="rounded-[1.15rem] border border-black/5 bg-white py-10 text-center text-sm text-text-muted">
                   עדיין אין הצטרפויות דרך הקישור שלך
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {visible.map((row) => (
-                    <li key={row.id ?? row.full_name} className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
+                    <li
+                      key={row.id ?? row.full_name}
+                      className="flex items-center gap-3 rounded-[1.15rem] border border-black/5 bg-white px-3 py-3 shadow-[0_8px_20px_rgba(16,24,40,0.05)]"
+                    >
                       {tab === "courier" ? (
-                        <CourierAvatar path={row.avatar_url} name={row.full_name} size={40} />
+                        <CourierAvatar path={row.avatar_url} name={row.full_name} size={44} />
                       ) : (
-                        <div className="grid size-10 place-items-center rounded-pill bg-primary-soft text-primary">
+                        <div className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary">
                           <Building2 className="size-4" />
                         </div>
                       )}
                       <div className="min-w-0 flex-1 text-right">
                         <p className="truncate text-sm font-bold text-text-strong">{row.full_name || "—"}</p>
-                        <p className="text-[11px] text-text-muted">
-                          {row.created_at ? new Date(row.created_at).toLocaleDateString("he-IL") : ""}
+                        <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                          {tab === "courier" && row.vehicle_type ? row.vehicle_type : joinDate(row.created_at)}
                           {row.jobs_completed != null ? ` · ${row.jobs_completed} משלוחים` : ""}
                         </p>
                       </div>
+                      <p className="hidden shrink-0 text-[11px] text-text-muted sm:block">{joinDate(row.created_at)}</p>
                       <div className="shrink-0 text-left">
                         <StatusPill status={row.status} />
                         <p className="mt-1 text-sm font-extrabold tabular-nums text-primary">₪ {money(Number(row.your_profit ?? 0))}</p>
@@ -293,7 +312,7 @@ function SharePage() {
                 </ul>
               )}
               {tab === "courier" && businesses.length > 0 && (
-                <div className="flex items-center justify-between rounded-card border border-border bg-muted px-3 py-3">
+                <div className="flex items-center justify-between rounded-[1.15rem] border border-black/5 bg-white px-3 py-3">
                   <div className="flex items-center gap-2 text-sm font-bold text-text-strong">
                     <Store className="size-4 text-primary" />
                     {totals.businesses_active ?? businesses.length} עסקים פעילים
@@ -305,18 +324,41 @@ function SharePage() {
               )}
             </section>
 
-            {moreOpen && (
-              <section className="space-y-2">
-                <h2 className="text-sm font-extrabold text-text-strong">דרכים לשיתוף</h2>
-                <div className="flex justify-center gap-3">
-                  <ShareCircle label="עוד" onClick={() => void share()} icon={<Share2 className="size-4" />} />
-                  <ShareCircle label="אינסטגרם" onClick={() => void share("ig")} icon={<span className="text-[10px] font-black">IG</span>} />
-                  <ShareCircle label="פייסבוק" onClick={() => void share("fb")} icon={<span className="text-[10px] font-black">f</span>} />
-                  <ShareCircle label="וואטסאפ" onClick={() => void share("wa")} icon={<span className="text-[10px] font-black">WA</span>} />
-                  <ShareCircle label="העתק" onClick={() => void copy()} icon={<Copy className="size-4" />} />
-                </div>
-              </section>
-            )}
+            <section className="space-y-3">
+              <h2 className="text-sm font-extrabold text-text-strong">דרכים לשיתוף</h2>
+              <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
+                <ShareCircle label="עוד אפשרויות" onClick={() => void share()} icon={<Share2 className="size-5" />} />
+                <ShareCircle
+                  label="אינסטגרם"
+                  onClick={() => void share("ig")}
+                  icon={<span className="text-[11px] font-black">IG</span>}
+                  className="bg-[linear-gradient(135deg,#f9ce34,#ee2a7b,#6228d7)] text-white"
+                />
+                <ShareCircle
+                  label="פייסבוק"
+                  onClick={() => void share("fb")}
+                  icon={<span className="text-sm font-black">f</span>}
+                  className="bg-[#1877F2] text-white"
+                />
+                <ShareCircle
+                  label="וואטסאפ"
+                  onClick={() => void share("wa")}
+                  icon={<span className="text-[11px] font-black">WA</span>}
+                  className="bg-[#25D366] text-white"
+                />
+                <ShareCircle label="העתק קישור" onClick={() => void copy()} icon={<Copy className="size-5" />} />
+              </div>
+            </section>
+
+            <div className="flex items-start gap-2 rounded-[1.15rem] bg-white px-3 py-3 text-[12px] text-text-muted shadow-[0_8px_20px_rgba(16,24,40,0.04)]">
+              <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+              <div>
+                <p className="font-extrabold text-text-strong">איך זה עובד?</p>
+                <p className="mt-0.5 leading-relaxed">
+                  ₪1.50 לכל משלוח ששליח שגייסת ביצע · ₪1.50 לכל משלוח שעסק שגייסת שיגר · ₪3 אם שניהם שלך על אותו משלוח
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -324,17 +366,63 @@ function SharePage() {
   );
 }
 
-function StatusPill({ status }: { status?: string | null }) {
-  const s = status || "ממתין";
-  const tone = s === "פעיל" ? "bg-success-bg text-success-text" : s.includes("אימות") || s.includes("ממתין") ? "bg-warning-bg text-warning-text" : "bg-danger-bg text-danger-text";
-  return <span className={cn("inline-flex rounded-pill px-2 py-0.5 text-[10px] font-bold", tone)}>{s}</span>;
+function LinkRow({
+  label,
+  value,
+  onCopy,
+  disabled,
+  copyLabel,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  disabled: boolean;
+  copyLabel: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-2xl bg-black/25 px-3 py-2">
+      <p className="w-14 shrink-0 text-[11px] font-bold text-primary-foreground/70">{label}</p>
+      <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">{value}</p>
+      <button
+        type="button"
+        onClick={onCopy}
+        disabled={disabled}
+        className="grid size-10 place-items-center rounded-full bg-white text-primary disabled:opacity-50"
+        aria-label={copyLabel}
+      >
+        <Copy className="size-4" />
+      </button>
+    </div>
+  );
 }
 
-function ShareCircle({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
+function StatusPill({ status }: { status?: string | null }) {
+  const s = status || "ממתין";
+  const tone = s === "פעיל"
+    ? "bg-success-bg text-success-text"
+    : s.includes("אימות") || s.includes("ממתין")
+      ? "bg-warning-bg text-warning-text"
+      : "bg-danger-bg text-danger-text";
+  return <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", tone)}>{s}</span>;
+}
+
+function ShareCircle({
+  label,
+  icon,
+  onClick,
+  className,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  className?: string;
+}) {
   return (
-    <button type="button" onClick={onClick} className="flex w-14 flex-col items-center gap-1">
-      <span className="grid size-11 place-items-center rounded-pill border border-border bg-surface text-primary shadow-card">{icon}</span>
-      <span className="text-[10px] font-semibold text-text-subtle">{label}</span>
+    <button type="button" onClick={onClick} className="flex w-[4.5rem] flex-col items-center gap-1.5">
+      <span className={cn("grid size-12 place-items-center rounded-2xl border border-black/5 bg-white text-primary shadow-[0_8px_18px_rgba(16,24,40,0.08)]", className)}>
+        {icon}
+      </span>
+      <span className="text-center text-[10px] font-semibold leading-tight text-text-subtle">{label}</span>
     </button>
   );
 }
