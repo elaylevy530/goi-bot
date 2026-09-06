@@ -44,6 +44,28 @@ function hasFreshGps(courier?: any | null) {
   return new Date(courier.last_location_at).getTime() >= Date.now() - 30 * 60 * 1000;
 }
 
+export type CourierJobSkip = {
+  job_id: string;
+  declined_price?: string | number | null;
+};
+
+export function jobOfferPay(job: any): number {
+  const n = Number(job?.suggested_courier_payment ?? job?.payment ?? job?.customer_price ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Skip is per job only. Same job can return if its pay is strictly higher than the skipped price. */
+export function isJobSkippedAtCurrentPrice(job: any, skips?: CourierJobSkip[] | null) {
+  const jobId = String(job?.id ?? "");
+  if (!jobId || !skips?.length) return false;
+  const row = skips.find((s) => String(s.job_id) === jobId);
+  if (!row) return false;
+  if (row.declined_price == null || row.declined_price === "") return true;
+  const skippedAt = Number(row.declined_price);
+  if (!Number.isFinite(skippedAt)) return true;
+  return jobOfferPay(job) <= skippedAt;
+}
+
 export function isCourierReceivingJobs(courier?: any | null) {
   if (courier?.courier_status !== "פעיל") return false;
   if (courier?.is_paused === true) return false;

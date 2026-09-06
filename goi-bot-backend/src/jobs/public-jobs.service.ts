@@ -829,7 +829,15 @@ export class PublicJobsService {
     await this.ensureShortCode(job);
     await this.jobs.save(job);
 
-    const whatsapp = await this.whatsappDispatch.notifyJobDispatched(job);
+    const [whatsapp] = await Promise.all([
+      this.whatsappDispatch.notifyJobDispatched(job),
+      this.jobsService.reofferAfterHigherPrice(job).catch((e) => {
+        this.logger.warn(
+          `guest reprice reoffer failed for ${job.id}: ${e instanceof Error ? e.message : e}`,
+        );
+        return { sent: 0 };
+      }),
+    ]);
     return { ok: true as const, whatsapp };
   }
 

@@ -45,6 +45,7 @@ export type NestJobDecline = {
   courier_id: string;
   job_id: string;
   declined_at: string;
+  declined_price?: string | number | null;
 };
 
 function token() {
@@ -119,11 +120,14 @@ export function nestListCourierDeclines() {
   return apiFetch<NestJobDecline[]>("/api/jobs/courier/declines", { accessToken: token() });
 }
 
-export function nestAddCourierDecline(jobId: string) {
+export function nestAddCourierDecline(jobId: string, declinedPrice?: number | null) {
   return apiFetch<NestJobDecline>("/api/jobs/courier/declines", {
     method: "POST",
     accessToken: token(),
-    body: JSON.stringify({ job_id: jobId }),
+    body: JSON.stringify({
+      job_id: jobId,
+      ...(declinedPrice != null ? { declined_price: declinedPrice } : {}),
+    }),
   });
 }
 

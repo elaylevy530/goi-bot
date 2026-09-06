@@ -12,7 +12,7 @@ import {
 } from "@/lib/courier-theme";
 import { toast } from "sonner";
 import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob, signOutCourierSession } from "@/lib/courier-session";
-import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
+import { isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
 import { nestListMyCourierNotifications, nestMyNotificationUnreadCount } from "@/lib/nest-domain";
 import {
   nestCourierActiveJobCount,
@@ -65,16 +65,16 @@ function useDrawerNavCounts(courier?: { id?: string } | null) {
         nestListCourierDeclines(),
         nestListMyCourierNotifications().catch(() => []),
       ]);
-      const declined = new Set(declinedRows.map((r) => r.job_id));
       const unique = new Set<string>();
       for (const o of pendingOffers) {
         if (isLivePendingOffer(o, courier)) {
-          const jobId = (o.jobs as { id?: string } | null)?.id ?? o.job_id;
-          if (jobId && !declined.has(jobId)) unique.add(jobId);
+          const job = o.jobs as { id?: string } | null;
+          const jobId = job?.id ?? o.job_id;
+          if (jobId && !isJobSkippedAtCurrentPrice(job ?? { id: jobId }, declinedRows)) unique.add(jobId);
         }
       }
       for (const j of openJobs) {
-        if (declined.has(j.id)) continue;
+        if (isJobSkippedAtCurrentPrice(j, declinedRows)) continue;
         if (isOpenBroadcastJobForCourier(j, courier)) unique.add(j.id);
       }
       const unreadNotifications = (notifications as { read_at?: string | null }[]).filter((n) => !n.read_at).length;

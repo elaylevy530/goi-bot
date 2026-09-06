@@ -69,7 +69,7 @@ export class JobsController {
     @CurrentUser() auth: AuthUserContext,
     @Body() dto: CourierDeclineDto,
   ) {
-    return this.jobs.addCourierDecline(auth.userId, dto.job_id);
+    return this.jobs.addCourierDecline(auth.userId, dto.job_id, dto.declined_price);
   }
 
   @Delete("courier/declines/:jobId")

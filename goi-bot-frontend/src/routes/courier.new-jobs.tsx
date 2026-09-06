@@ -23,7 +23,7 @@ import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-r
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
-import { isCourierApproved, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind } from "@/lib/courier-live-jobs";
+import { isCourierApproved, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay } from "@/lib/courier-live-jobs";
 import { ContactBlock } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
@@ -72,10 +72,10 @@ function NewJobsPage() {
     enabled: isAvailable,
     queryFn: async () => {
       const rows = await nestListCourierDeclines();
-      return rows.map((r) => ({ job_id: r.job_id }));
+      return rows.map((r) => ({ job_id: r.job_id, declined_price: r.declined_price }));
     },
   });
-  const declinedSet = useMemo(() => new Set(declinedRows.map((r: any) => r.job_id)), [declinedRows]);
+  const declinedRowsSafe = declinedRows as { job_id: string; declined_price?: string | number | null }[];
 
   const { data: offers = [] } = useQuery({
     queryKey: ["new-jobs", me?.id, "pending"],
@@ -83,12 +83,17 @@ function NewJobsPage() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListCourierOffers("pending");
+      const skips = qc.getQueryData<typeof declinedRowsSafe>(["courier-job-declines", me?.id]) ?? [];
       return data
         .filter((offer: any) => {
           const job = offer?.jobs;
           return job ? jobMatchesKind(job, me) : false;
         })
-        .filter((offer: any) => isLivePendingOffer(offer, me));
+        .filter((offer: any) => isLivePendingOffer(offer, me))
+        .filter((offer: any) => {
+          const job = Array.isArray(offer?.jobs) ? offer.jobs[0] : offer?.jobs;
+          return !isJobSkippedAtCurrentPrice(job ?? { id: offer?.job_id }, skips);
+        });
     },
   });
 
@@ -98,7 +103,8 @@ function NewJobsPage() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenQuoteJobs();
-      return data.filter((j: any) => isOpenQuoteJobForCourier(j, me));
+      const skips = qc.getQueryData<typeof declinedRowsSafe>(["courier-job-declines", me?.id]) ?? [];
+      return data.filter((j: any) => isOpenQuoteJobForCourier(j, me) && !isJobSkippedAtCurrentPrice(j, skips));
     },
   });
 
@@ -116,7 +122,8 @@ function NewJobsPage() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenBroadcastJobs();
-      return data.filter((j: any) => isOpenBroadcastJobForCourier(j, me));
+      const skips = qc.getQueryData<typeof declinedRowsSafe>(["courier-job-declines", me?.id]) ?? [];
+      return data.filter((j: any) => isOpenBroadcastJobForCourier(j, me) && !isJobSkippedAtCurrentPrice(j, skips));
     },
   });
 
@@ -156,14 +163,15 @@ function NewJobsPage() {
       }
     },
     onSuccess: (_, v) => {
-      toast.success(v.response === "accepted" ? "קיבלת את העבודה ✓" : "ההצעה נדחתה");
+      if (v.response === "declined") return;
+      toast.success("קיבלת את העבודה ✓");
       setDetail(null);
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["accepted-jobs"] });
       qc.invalidateQueries({ queryKey: ["active-jobs"] });
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
-      if (v.response === "accepted" && v.jobId) {
+      if (v.jobId) {
         navigate({ to: "/courier/active" });
       }
     },
@@ -222,45 +230,80 @@ function NewJobsPage() {
     },
   });
 
-  const persistDecline = async (jobId: string) => {
-    if (!me?.id) return false;
-    try {
-      await nestAddCourierDecline(jobId);
-      qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
-      return true;
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "שגיאה");
-      return false;
-    }
+  const hideJobLocally = (job: { id: string; suggested_courier_payment?: unknown; payment?: unknown; customer_price?: unknown }) => {
+    if (!me?.id || !job.id) return;
+    const price = jobOfferPay(job);
+    qc.setQueryData(
+      ["courier-job-declines", me.id],
+      (old: { job_id: string; declined_price?: string | number | null }[] | undefined) => {
+        const rows = old ?? [];
+        if (rows.some((r) => r.job_id === job.id)) {
+          return rows.map((r) => (r.job_id === job.id ? { ...r, declined_price: price } : r));
+        }
+        return [
+          ...rows,
+          { id: `local-${job.id}`, courier_id: me.id, job_id: job.id, declined_at: new Date().toISOString(), declined_price: price },
+        ];
+      },
+    );
+    qc.setQueryData(["new-jobs", me.id, "pending"], (old: any[] | undefined) =>
+      (old ?? []).filter((offer) => {
+        const j = Array.isArray(offer?.jobs) ? offer.jobs[0] : offer?.jobs;
+        return String(j?.id ?? offer?.job_id ?? "") !== job.id;
+      }),
+    );
+    qc.setQueryData(["courier-open-jobs", me.id], (old: any[] | undefined) =>
+      (old ?? []).filter((j) => j.id !== job.id),
+    );
+    qc.setQueryData(["courier-quote-requests", me.id], (old: any[] | undefined) =>
+      (old ?? []).filter((j) => j.id !== job.id),
+    );
+    setDetail(null);
   };
 
-  const declineOpenJob = async (jobId: string) => {
-    const ok = await persistDecline(jobId);
-    if (!ok) return;
-    setDetail(null);
+  const persistSkip = (job: { id: string; offerId?: string }, price: number) => {
+    if (!me?.id) return;
+    void (async () => {
+      try {
+        await Promise.all([
+          nestAddCourierDecline(job.id, price),
+          job.offerId ? nestRespondOffer(job.offerId, "declined") : Promise.resolve(),
+        ]);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "שגיאה");
+        qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
+        qc.invalidateQueries({ queryKey: ["new-jobs"] });
+        qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
+        qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
+      }
+    })();
+  };
+
+  const skipJob = (job: {
+    id: string;
+    offerId?: string;
+    suggested_courier_payment?: unknown;
+    payment?: unknown;
+    customer_price?: unknown;
+  }) => {
+    hideJobLocally(job);
+    persistSkip({ id: job.id, offerId: job.offerId }, jobOfferPay(job));
     toast(t.jobRemoved);
   };
 
-  const declineQuoteJob = async (jobId: string) => {
-    const ok = await persistDecline(jobId);
-    if (!ok) return;
-    setDetail(null);
-    toast("הבקשה הוסרה מהרשימה שלך");
-  };
-
   const visibleOpenJobs = useMemo(
-    () => (openJobs as any[]).filter((j) => !declinedSet.has(j.id)),
-    [openJobs, declinedSet],
+    () => (openJobs as any[]).filter((j) => !isJobSkippedAtCurrentPrice(j, declinedRowsSafe)),
+    [openJobs, declinedRowsSafe],
   );
 
   const visibleQuoteJobs = useMemo(
     () => (quoteJobs as any[]).filter((j) => {
-      if (declinedSet.has(j.id)) return false;
+      if (isJobSkippedAtCurrentPrice(j, declinedRowsSafe)) return false;
       const q = quoteByJob[j.id];
       if (q && !["rejected", "cancelled", "expired"].includes(q.status)) return false;
       return true;
     }),
-    [quoteJobs, declinedSet, quoteByJob],
+    [quoteJobs, declinedRowsSafe, quoteByJob],
   );
 
   const mapJobs: MapJob[] = useMemo(() => {
@@ -273,13 +316,14 @@ function NewJobsPage() {
       const j = Array.isArray(o?.jobs) ? o.jobs[0] : o?.jobs;
       const jobId = String(j?.id ?? o?.job_id ?? "");
       if (!j || !jobId || offerJobIds.has(jobId)) continue;
+      if (isJobSkippedAtCurrentPrice(j, declinedRowsSafe)) continue;
       offerJobIds.add(jobId);
       out.push({ ...j, __kind: "offer", __raw: { offer: o, job: j } });
     }
 
     for (const j of visibleOpenJobs as any[]) {
       const jobId = String(j?.id ?? "");
-      if (!jobId || offerJobIds.has(jobId) || declinedSet.has(jobId)) continue;
+      if (!jobId || offerJobIds.has(jobId) || isJobSkippedAtCurrentPrice(j, declinedRowsSafe)) continue;
       out.push({ ...j, __kind: "open", __raw: j });
     }
 
@@ -290,7 +334,7 @@ function NewJobsPage() {
     }
 
     return out;
-  }, [visibleOpenJobs, visibleQuoteJobs, offers, declinedSet]);
+  }, [visibleOpenJobs, visibleQuoteJobs, offers, declinedRowsSafe]);
 
   const openDetails = (job: MapJob) => {
     if (job.__kind === "offer") {
@@ -318,16 +362,13 @@ function NewJobsPage() {
   };
 
   const handleDecline = (job: MapJob) => {
-    if (job.__kind === "offer") {
-      const offerId = job.__raw?.offer?.id;
-      if (offerId) respond.mutate({ id: offerId, response: "declined" });
-      return;
-    }
-    if (job.__kind === "quote") {
-      void declineQuoteJob(job.id);
-      return;
-    }
-    void declineOpenJob(job.id);
+    skipJob({
+      id: job.id,
+      offerId: job.__kind === "offer" ? job.__raw?.offer?.id : undefined,
+      suggested_courier_payment: job.suggested_courier_payment,
+      payment: job.payment,
+      customer_price: (job as { customer_price?: unknown }).customer_price,
+    });
   };
 
   const handleQuote = (job: MapJob) => {
@@ -404,7 +445,7 @@ function NewJobsPage() {
                   <button
                     type="button"
                     onClick={() => activeOffer && handleDecline(activeOffer)}
-                    disabled={!activeOffer || claim.isPending || respond.isPending}
+                    disabled={!activeOffer || claim.isPending}
                     className="size-10 rounded-full bg-surface shadow-card border border-border text-xs font-extrabold text-destructive disabled:opacity-50 active:scale-95"
                   >
                     דלג
@@ -558,7 +599,7 @@ function NewJobsPage() {
                     </Button>
                     <div className="flex gap-2">
                       {!detail.existingQuote && (
-                        <Button variant="outline" className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" onClick={() => declineQuoteJob(detail.id)}>דחה</Button>
+                        <Button variant="outline" className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" onClick={() => skipJob(detail)}>דחה</Button>
                       )}
                       <Button variant="outline" className="flex-1 h-10 rounded-xl font-semibold" onClick={() => setDetail(null)}>סגור</Button>
                     </div>
@@ -586,8 +627,7 @@ function NewJobsPage() {
                       <Button 
                         variant="outline" 
                         className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" 
-                        onClick={() => respond.mutate({ id: detail.offerId, response: "declined" })} 
-                        disabled={respond.isPending}
+                        onClick={() => skipJob(detail)}
                       >
                         דחה
                       </Button>
@@ -605,7 +645,7 @@ function NewJobsPage() {
                       {!claim.isPending && "אני לוקח את המשלוח"}
                     </Button>
                     <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" onClick={() => declineOpenJob(detail.id)}>דחה</Button>
+                      <Button variant="outline" className="flex-1 h-10 border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold" onClick={() => skipJob(detail)}>דחה</Button>
                       <Button variant="outline" className="flex-1 h-10 rounded-xl font-semibold" onClick={() => setDetail(null)}>סגור</Button>
                     </div>
                   </>

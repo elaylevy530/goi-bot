@@ -79,6 +79,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     void this.jobs.query(
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS scheduled_online_notified_at timestamptz`,
     );
+    void this.jobs.query(
+      `ALTER TABLE courier_job_declines ADD COLUMN IF NOT EXISTS declined_price numeric`,
+    );
     this.scheduledGoOnlineTimer = setInterval(() => {
       void this.activateCouriersForUpcomingScheduledJobs();
     }, 60_000);
@@ -557,7 +560,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       job.short_code = code;
     }
     await this.jobs.save(job);
-    const whatsapp = await this.whatsappDispatch.notifyJobDispatched(job);
+    const [whatsapp] = await Promise.all([
+      this.whatsappDispatch.notifyJobDispatched(job),
+      this.reofferAfterHigherPrice(job).catch((e) => {
+        this.logger.warn(
+          `reprice reoffer failed for ${job.id}: ${e instanceof Error ? e.message : e}`,
+        );
+        return { sent: 0 };
+      }),
+    ]);
     return { ok: true as const, whatsapp };
   }
 
@@ -822,14 +833,31 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async addCourierDecline(userId: string, jobId: string) {
+  async addCourierDecline(userId: string, jobId: string, declinedPrice?: number | null) {
     const courier = await this.requireCourier(userId);
+    const job = await this.jobs.findOne({
+      where: { id: jobId },
+      select: ["id", "suggested_courier_payment", "payment", "customer_price"],
+    });
+    const price =
+      declinedPrice != null && Number.isFinite(Number(declinedPrice))
+        ? Number(declinedPrice)
+        : job
+          ? this.jobPayAmount(job)
+          : null;
     const existing = await this.declines.findOne({
       where: { courier_id: courier.id, job_id: jobId },
     });
-    if (existing) return existing;
+    if (existing) {
+      if (price != null) existing.declined_price = String(price);
+      return this.declines.save(existing);
+    }
     return this.declines.save(
-      this.declines.create({ courier_id: courier.id, job_id: jobId }),
+      this.declines.create({
+        courier_id: courier.id,
+        job_id: jobId,
+        declined_price: price != null ? String(price) : null,
+      }),
     );
   }
 
@@ -837,6 +865,83 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     const courier = await this.requireCourier(userId);
     await this.declines.delete({ courier_id: courier.id, job_id: jobId });
     return { ok: true as const };
+  }
+
+  private jobPayAmount(job: Pick<Job, "suggested_courier_payment" | "payment" | "customer_price">) {
+    const n = Number(job.suggested_courier_payment ?? job.payment ?? job.customer_price ?? 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /**
+   * After a price increase, re-open this job only for couriers who skipped it
+   * at a lower (or unknown) price. Does not touch other jobs or businesses.
+   */
+  async reofferAfterHigherPrice(job: Job) {
+    const newPrice = this.jobPayAmount(job);
+    if (!(newPrice > 0)) return { sent: 0 };
+
+    const skips = await this.declines.find({ where: { job_id: job.id } });
+    const courierIds = [
+      ...new Set(
+        skips
+          .filter((s) => {
+            if (s.declined_price == null || s.declined_price === "") return true;
+            const skippedAt = Number(s.declined_price);
+            return !Number.isFinite(skippedAt) || skippedAt < newPrice;
+          })
+          .map((s) => s.courier_id),
+      ),
+    ];
+    if (!courierIds.length) return { sent: 0 };
+
+    const now = new Date();
+    const expires = new Date(now.getTime() + OFFER_TTL_MS);
+    const existing = await this.offers.find({
+      where: { job_id: job.id, courier_id: In(courierIds) },
+    });
+    const byCourier = new Map(existing.map((o) => [o.courier_id, o]));
+    const toSave: OfferEvent[] = [];
+    for (const courierId of courierIds) {
+      const offer = byCourier.get(courierId);
+      if (offer) {
+        if (offer.response === "accepted") continue;
+        offer.response = "pending";
+        offer.sent_at = now;
+        offer.expires_at = expires;
+        offer.responded_at = null;
+        offer.metadata = { ...(offer.metadata ?? {}), source: "reprice" };
+        toSave.push(offer);
+      } else {
+        toSave.push(
+          this.offers.create({
+            job_id: job.id,
+            courier_id: courierId,
+            channel: "app",
+            response: "pending",
+            sent_at: now,
+            expires_at: expires,
+            metadata: { source: "reprice" },
+          }),
+        );
+      }
+    }
+    if (toSave.length) await this.offers.save(toSave);
+
+    const notifyIds = toSave.map((o) => o.courier_id);
+    if (notifyIds.length) {
+      await this.offerPush.notifyCouriers(job, notifyIds).catch((e) => {
+        this.logger.warn(
+          `reofferAfterHigherPrice push failed for ${job.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+        return { sent: 0, failed: 0, skipped: "error" };
+      });
+    }
+    this.logger.log(
+      `reofferAfterHigherPrice ${job.id}: price=${newPrice} reopened=${notifyIds.length}`,
+    );
+    return { sent: notifyIds.length };
   }
 
   async listOpenQuoteJobs(userId: string) {
@@ -1037,6 +1142,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         offer.responded_at = new Date();
         await this.offers.save(offer);
       }
+      await this.addCourierDecline(userId, job.id);
       return { ok: true as const, response: "declined" as const };
     }
 

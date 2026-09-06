@@ -65,6 +65,8 @@ export type MapJob = {
   job_time?: string | null;
   delivery_deadline?: string | null;
   payment?: number | null;
+  suggested_courier_payment?: number | string | null;
+  customer_price?: number | string | null;
   pricing_type?: string | null;
   requires_cash?: boolean | null;
   description?: string | null;
