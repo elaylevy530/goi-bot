@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useCourierGpsTracker } from "@/hooks/useCourierGpsTracker";
-import { CourierMenuButton } from "@/components/CourierSideDrawer";
+import { CourierDesktopNav, CourierMenuButton } from "@/components/CourierSideDrawer";
 import { isLivePendingOffer } from "@/lib/courier-live-jobs";
 import { nestGetJob, nestListCourierOffers } from "@/lib/nest-jobs";
 
@@ -217,7 +217,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
           if (jobId && isLivePendingOffer(offer, me)) void showJobAlert(jobId);
         }
       }).catch(() => {});
-    }, 8_000);
+    }, 2_000);
     ready = true;
     return () => {
       window.clearInterval(timer);
@@ -243,6 +243,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
       dir="rtl"
       className={`rtl-panel flex h-dvh w-full overflow-hidden bg-bg`}
     >
+      <CourierDesktopNav />
       <main
         className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
       >

@@ -1,3 +1,4 @@
+import { courierVehicleFitsJob } from "@/lib/courier-vehicle";
 import { isWorkAreaLabel, locationMatchesWorkAreas, NATIONWIDE_WORK_AREA } from "@/lib/regions";
 
 const OPEN_JOB_STATUSES = new Set(["נשלחה לשליחים", "ממתינה לתגובות", "יש שליחים שאישרו"]);
@@ -166,10 +167,7 @@ function courierSupportsJobType(job: any, courier?: any | null) {
 export function matchesCourier(job: any, courier?: any | null) {
   if (!courier) return false;
   if (!courierSupportsJobType(job, courier)) return false;
-  if (job?.vehicle_required) {
-    const vehicles = textList(courier.vehicle_type, courier.vehicle_types);
-    if (vehicles.length > 0 && !vehicles.includes(job.vehicle_required)) return false;
-  }
+  if (!courierVehicleFitsJob(job, courier)) return false;
 
   const personalRadius = radiusKmFromLabel(courier.work_distance_from_base);
   const pickup = String(job?.pickup_area || job?.pickup_address || "").trim();

@@ -41,7 +41,6 @@ import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 type Mutable = Record<string, unknown>;
 
 const ISRAEL_TZ = "Asia/Jerusalem";
-const MIN_COURIER_WITHDRAWAL = 400;
 
 @Injectable()
 export class DomainService {
@@ -372,8 +371,8 @@ export class DomainService {
       throw new BadRequestException("סכום משיכה לא תקין");
     }
     if (!isStaff) {
-      if (amount < MIN_COURIER_WITHDRAWAL) {
-        throw new BadRequestException(`הסכום המינימלי למשיכה הוא ₪${MIN_COURIER_WITHDRAWAL}`);
+      if (amount < 1) {
+        throw new BadRequestException("סכום משיכה לא תקין");
       }
       const existing = await this.withdrawals.find({ where: { courier_id: courierId } });
       const hasPending = existing.some((w) => w.status !== "נדחתה" && w.status !== "שולמה");

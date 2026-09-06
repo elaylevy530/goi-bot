@@ -40,6 +40,7 @@ import {
   OPEN_STATUSES,
   isClaimableStatus as statusIsClaimable,
 } from "./job-statuses";
+import { pickDispatchCouriers } from "./courier-job-match";
 
 function generateTrackingToken(): string {
   return randomBytes(16).toString("hex");
@@ -261,9 +262,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         is_paused: false,
         admin_jobs_blocked: false,
       },
-      select: ["id"],
       take: 500,
     });
+    const targets = pickDispatchCouriers(job, eligible);
 
     const existing = await this.offers.find({
       where: { job_id: jobId },
@@ -272,7 +273,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     const already = new Set(existing.map((o) => o.courier_id));
     const now = new Date();
     const expires = new Date(now.getTime() + OFFER_TTL_MS);
-    const toCreate = eligible
+    const toCreate = targets
       .filter((c) => !already.has(c.id))
       .map((c) =>
         this.offers.create({
@@ -306,7 +307,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     // External channels: fail soft. `sent` remains offer-row count only.
     const notifyCourierIds = [
       ...new Set([
-        ...eligible.map((c) => c.id),
+        ...targets.map((c) => c.id),
         ...existing.map((o) => o.courier_id),
       ]),
     ];
@@ -435,7 +436,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     }
 
     let customerId = dto.customer_id ?? null;
-    let customer = customerId
+    let customer: { id: string; name?: string | null; delivery_minutes?: number | null } | null = customerId
       ? await this.customers.findOne({ where: { id: customerId } })
       : null;
     if (!customerId && (roles.includes("business") || roles.includes("customer"))) {

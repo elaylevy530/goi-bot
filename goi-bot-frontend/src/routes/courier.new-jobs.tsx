@@ -83,6 +83,7 @@ function NewJobsPage() {
   const { data: offers = [], isFetched: offersFetched, isError: offersError, isFetching: offersFetching } = useQuery({
     queryKey: ["new-jobs", me?.id, "pending"],
     enabled: isAvailable,
+    refetchInterval: 2_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListCourierOffers("pending");
@@ -103,6 +104,7 @@ function NewJobsPage() {
   const { data: quoteJobs = [], isFetched: quotesFetched, isError: quotesError, isFetching: quotesFetching } = useQuery({
     queryKey: ["courier-quote-requests", me?.id],
     enabled: isAvailable,
+    refetchInterval: 2_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenQuoteJobs();
@@ -122,6 +124,7 @@ function NewJobsPage() {
   const { data: openJobs = [], isFetched: openFetched, isError: openError, isFetching: openFetching } = useQuery({
     queryKey: ["courier-open-jobs", me?.id],
     enabled: isAvailable,
+    refetchInterval: 2_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenBroadcastJobs();
@@ -136,7 +139,7 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
-    }, 8_000);
+    }, 2_000);
     return () => window.clearInterval(timer);
   }, [me?.id, isAvailable, qc]);
 
@@ -794,18 +797,9 @@ function SearchingCard({
             : "החשבון ממתין לאישור",
         );
       }
+      const { goCourierOnlineWithGps } = await import("@/lib/courier-location");
+      await goCourierOnlineWithGps();
       void (async () => {
-        if (typeof navigator !== "undefined" && navigator.geolocation) {
-          try {
-            await new Promise<void>((resolve) => {
-              navigator.geolocation.getCurrentPosition(
-                () => resolve(),
-                () => resolve(),
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
-              );
-            });
-          } catch {}
-        }
         try {
           const { enablePushForCourier, pushSupported } = await import("@/lib/push/subscribe");
           if (pushSupported() && courier.id) {
@@ -816,7 +810,6 @@ function SearchingCard({
           }
         } catch {}
       })();
-      await nestUpdateMyCourier({ accepting_jobs: true });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-courier-me"] });
@@ -830,7 +823,7 @@ function SearchingCard({
         dir="rtl"
         className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
       >
-        <div className="relative mx-auto w-full max-w-lg pt-[9.5rem]">
+        <div className="relative mx-auto w-full max-w-lg pt-[9.5rem] lg:max-w-3xl">
           <div className="pointer-events-auto relative rounded-full bg-white p-[10px] shadow-[0_12px_30px_rgba(16,24,40,0.16)]">
             {/* The mascot's torso ends at 94% of the PNG; the finger fills the rest.
                 Offset so the torso lands on the frame edge and only the finger passes it. */}
@@ -880,7 +873,7 @@ function SearchingCard({
       dir="rtl"
       className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
     >
-      <div className="mx-auto w-full max-w-lg">
+      <div className="mx-auto w-full max-w-lg lg:max-w-3xl">
         <div className="relative flex min-h-[84px] items-center gap-3 overflow-hidden rounded-[1.6rem] border border-[#BFE3B9] bg-[linear-gradient(105deg,rgba(255,255,255,0.98)_0%,rgba(246,252,245,0.98)_42%,rgba(232,248,228,0.98)_100%)] px-5 py-3 shadow-[0_10px_28px_rgba(16,24,40,0.13),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(53,173,41,0.08)] backdrop-blur-md">
           <span
             className="pointer-events-none absolute inset-y-0 right-0 w-28 bg-[radial-gradient(circle_at_center,rgba(53,173,41,0.12),transparent_68%)]"
@@ -977,7 +970,12 @@ function AcceptJobsToggle({
       if (!next && liveJobLocksOffline) {
         throw new Error(LIVE_JOB_OFFLINE_ERROR);
       }
-      if (next) await requestPermissionsOnce();
+      if (next) {
+        const { goCourierOnlineWithGps } = await import("@/lib/courier-location");
+        await goCourierOnlineWithGps();
+        await requestPermissionsOnce();
+        return;
+      }
       await nestUpdateMyCourier({ accepting_jobs: next });
     },
     onSuccess: () => {

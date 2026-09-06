@@ -191,7 +191,12 @@ function CourierSideDrawer() {
     }
     const { nestUpdateMyCourier } = await import("@/lib/nest-accounts");
     try {
-      await nestUpdateMyCourier({ accepting_jobs: !accepting });
+      if (!accepting) {
+        const { goCourierOnlineWithGps } = await import("@/lib/courier-location");
+        await goCourierOnlineWithGps();
+      } else {
+        await nestUpdateMyCourier({ accepting_jobs: false });
+      }
       await qc.invalidateQueries({ queryKey: ["my-courier-me"] });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "לא הצלחנו לעדכן זמינות");
@@ -213,6 +218,13 @@ function CourierSideDrawer() {
       to: "/courier/active",
       icon: Navigation,
       badge: counts?.activeJobs ?? 0,
+    },
+    {
+      key: "messages",
+      label: "צ׳אט עם עסקים",
+      to: "/courier/messages",
+      icon: MessageSquare,
+      badge: counts?.unreadChat ?? 0,
     },
     {
       key: "history",
@@ -252,13 +264,6 @@ function CourierSideDrawer() {
       to: "/courier/notifications",
       icon: Bell,
       badge: counts?.unreadNotifications ?? 0,
-    },
-    {
-      key: "messages",
-      label: "צ׳אט",
-      to: "/courier/messages",
-      icon: MessageSquare,
-      badge: counts?.unreadChat ?? 0,
     },
     {
       key: "my-profile",
@@ -385,6 +390,66 @@ function CourierSideDrawer() {
 }
 
 /** Round menu button used in PWA headers (opens the side drawer). */
+export function CourierDesktopNav() {
+  const { data: me } = useDrawerCourier();
+  const { data: counts } = useDrawerNavCounts(me);
+  const path = useRouterState({ select: (r) => r.location.pathname });
+  const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
+  const items: NavItem[] = [
+    { key: "new-jobs", label: "עבודות חדשות", to: "/courier/new-jobs", icon: Inbox, badge: counts?.pendingOffers ?? 0, match: (p) => p === "/courier/new-jobs" || p === "/courier" || p === "/courier/dashboard" },
+    { key: "active", label: t.activeJobs, to: "/courier/active", icon: Navigation, badge: counts?.activeJobs ?? 0 },
+    { key: "messages", label: "צ׳אט עם עסקים", to: "/courier/messages", icon: MessageSquare, badge: counts?.unreadChat ?? 0 },
+    { key: "history", label: t.myJobs, to: "/courier/performance", icon: TrendingUp, match: (p) => p === "/courier/performance" || p === "/courier/history" },
+    { key: "wallet", label: "ארנק", to: "/courier/wallet", icon: Wallet },
+    { key: "share", label: "שתף והרוויח", to: "/courier/share", icon: Gift },
+    { key: "ratings", label: "דירוגים וביצועים", to: "/courier/ratings", icon: Star },
+    { key: "work-area", label: "אזורי עבודה", to: "/courier/availability", icon: MapPin, match: (p) => p === "/courier/availability" },
+    { key: "notifications", label: "הודעות ועדכונים", to: "/courier/notifications", icon: Bell, badge: counts?.unreadNotifications ?? 0 },
+    { key: "my-profile", label: "הפרופיל שלי", to: "/courier/my-profile", icon: User },
+    { key: "account-settings", label: "הגדרות חשבון", to: "/courier/account-settings", icon: Settings },
+  ];
+
+  return (
+    <aside className="hidden h-full w-72 shrink-0 flex-col border-l border-border bg-surface lg:flex">
+      <div className="border-b border-border px-5 py-5">
+        <p className="text-lg font-extrabold text-text-strong">Goi שליח</p>
+        <p className="mt-1 truncate text-sm text-text-muted">{me?.full_name?.trim() || t.worker}</p>
+      </div>
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="תפריט מחשב">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = item.match ? item.match(path) : path === item.to;
+          const badge = item.badge ?? 0;
+          return (
+            <Link
+              key={item.key}
+              to={item.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-11 w-full items-center gap-3 rounded-card px-3 py-2.5 text-sm font-semibold transition-colors",
+                active
+                  ? "bg-primary-deep text-primary-foreground shadow-fab"
+                  : "text-text-strong hover:bg-muted",
+              )}
+            >
+              <Icon className="size-4 shrink-0" strokeWidth={active ? 2.5 : 2} />
+              <span className="min-w-0 flex-1 truncate text-right">{item.label}</span>
+              {badge > 0 && (
+                <span className={cn(
+                  "inline-flex h-5 min-w-5 items-center justify-center rounded-pill px-1.5 text-[10px] font-extrabold",
+                  active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary-deep text-primary-foreground",
+                )}>
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
 export function CourierMenuButton({ className = "" }: { className?: string }) {
   const { openMenu } = useCourierMenu();
   return (
@@ -392,7 +457,7 @@ export function CourierMenuButton({ className = "" }: { className?: string }) {
       type="button"
       onClick={openMenu}
       aria-label="תפריט"
-      className={`size-[38px] min-h-11 min-w-11 grid place-items-center rounded-full bg-surface border border-border text-text-strong active:bg-muted transition-colors shrink-0 ${className}`}
+      className={`size-[38px] min-h-11 min-w-11 grid place-items-center rounded-full bg-surface border border-border text-text-strong active:bg-muted transition-colors shrink-0 lg:hidden ${className}`}
     >
       <Menu className="size-[18px]" strokeWidth={2} aria-hidden />
     </button>

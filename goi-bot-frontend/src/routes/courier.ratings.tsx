@@ -205,7 +205,7 @@ function RatingsPage() {
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
-          <div className="mx-auto flex max-w-lg flex-col gap-4">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
             <section className="overflow-hidden rounded-card bg-primary-deep p-4 text-primary-foreground shadow-card-strong">
               <div className="flex items-center gap-3">
                 <CourierAvatar

@@ -176,7 +176,7 @@ function SharePage() {
                   <p className="mt-2 max-w-md text-[13px] leading-relaxed text-primary-foreground/80 sm:text-sm">
                     שתף שליחים ועסקים — ₪1.50 על כל משלוח שהושלם, ו־₪3 אם גייסת את שני הצדדים לאותו משלוח.
                   </p>
-                  <div className="mt-4 max-w-lg space-y-2">
+                  <div className="mt-4 max-w-lg space-y-2 lg:max-w-5xl">
                     <LinkRow
                       label="שליחים"
                       value={linkReady ? courierLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}

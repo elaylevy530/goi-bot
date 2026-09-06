@@ -27,11 +27,13 @@ export type CourierSelfRow = {
   business_type?: string | null;
   tax_id?: string | null;
   invoice_name?: string | null;
+  id_photo_url?: string | null;
+  id_photo_back_url?: string | null;
 };
 
 export const COURIER_DOCUMENT_TYPES = [
   { type: "driver_license", label: "רישיון נהיגה" },
-  { type: "comprehensive_insurance", label: "ביטוח מקיף" },
+  { type: "comprehensive_insurance", label: "ביטוח חובה" },
 ] as const;
 
 export type CourierDocumentType = (typeof COURIER_DOCUMENT_TYPES)[number]["type"];

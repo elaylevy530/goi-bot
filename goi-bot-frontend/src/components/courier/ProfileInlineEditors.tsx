@@ -221,9 +221,18 @@ export function OsekInlineEditor({ me, onDone }: { me: CourierSelfRow; onDone: (
   );
 }
 
-export function DocumentsInlineEditor({ courierId, onDone }: { courierId?: string; onDone: () => void }) {
+export function DocumentsInlineEditor({
+  courierId,
+  me,
+  onDone,
+}: {
+  courierId?: string;
+  me?: CourierSelfRow | null;
+  onDone: () => void;
+}) {
   const qc = useQueryClient();
-  const [idFile, setIdFile] = useState<File | null>(null);
+  const [idFrontFile, setIdFrontFile] = useState<File | null>(null);
+  const [idBackFile, setIdBackFile] = useState<File | null>(null);
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({});
   const [docExpiry, setDocExpiry] = useState<Record<string, string>>({});
 
@@ -246,9 +255,17 @@ export function DocumentsInlineEditor({ courierId, onDone }: { courierId?: strin
 
   const save = useMutation({
     mutationFn: async () => {
-      if (idFile) {
-        const uploaded = await nestUploadFile("courier-ids", idFile);
-        await nestUpdateMyCourier({ id_photo_url: uploaded.path });
+      const idPatch: { id_photo_url?: string; id_photo_back_url?: string } = {};
+      if (idFrontFile) {
+        const uploaded = await nestUploadFile("courier-ids", idFrontFile);
+        idPatch.id_photo_url = uploaded.path;
+      }
+      if (idBackFile) {
+        const uploaded = await nestUploadFile("courier-ids", idBackFile);
+        idPatch.id_photo_back_url = uploaded.path;
+      }
+      if (Object.keys(idPatch).length) {
+        await nestUpdateMyCourier(idPatch);
       }
       for (const meta of COURIER_DOCUMENT_TYPES) {
         const file = docFiles[meta.type];
@@ -268,7 +285,8 @@ export function DocumentsInlineEditor({ courierId, onDone }: { courierId?: strin
     },
     onSuccess: () => {
       toast.success("המסמכים עודכנו");
-      setIdFile(null);
+      setIdFrontFile(null);
+      setIdBackFile(null);
       setDocFiles({});
       qc.invalidateQueries({ queryKey: ["my-courier-me"] });
       qc.invalidateQueries({ queryKey: ["my-courier-documents"] });
@@ -285,13 +303,27 @@ export function DocumentsInlineEditor({ courierId, onDone }: { courierId?: strin
         save.mutate();
       }}
     >
-      <div>
-        <Label className={fieldLabel()}>תעודת זהות</Label>
-        <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-3 text-sm">
-          <Camera className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">{idFile?.name ?? "העלה תמונה / PDF"}</span>
-          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setIdFile(e.target.files?.[0] ?? null)} />
-        </label>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Label className={fieldLabel()}>תעודת זהות — צד קדמי</Label>
+          <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-3 text-sm">
+            <Camera className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">
+              {idFrontFile?.name ?? (me?.id_photo_url ? "קובץ קיים — ניתן להחליף" : "העלה צד קדמי")}
+            </span>
+            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setIdFrontFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+        <div>
+          <Label className={fieldLabel()}>תעודת זהות — צד אחורי</Label>
+          <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-3 text-sm">
+            <Camera className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">
+              {idBackFile?.name ?? (me?.id_photo_back_url ? "קובץ קיים — ניתן להחליף" : "העלה צד אחורי")}
+            </span>
+            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setIdBackFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
       </div>
       {COURIER_DOCUMENT_TYPES.map((meta) => {
         const existing = documents.find((doc) => doc.type === meta.type);

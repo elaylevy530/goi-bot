@@ -17,6 +17,7 @@ import {
 import {
   Bell,
   ChevronLeft,
+  FileText,
   Lock,
   LogOut,
   Headphones,
@@ -24,6 +25,11 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import {
+  COURIER_AGREEMENT_SECTIONS,
+  COURIER_AGREEMENT_TITLE,
+  COURIER_AGREEMENT_VERSION,
+} from "@/lib/courier-agreement";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { nestUpdatePassword, isNestPreviewReadOnly } from "@/lib/nest-auth";
@@ -63,6 +69,7 @@ function AccountSettingsPage() {
   const { data: me, isPending } = useMyCourier();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [termsOpen, setTermsOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwd, setPwd] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
@@ -145,6 +152,15 @@ function AccountSettingsPage() {
       title: "עזרה ותמיכה",
       items: [
         {
+          icon: FileText,
+          title: "תנאי הצטרפות ושימוש",
+          subtitle: "ההסכם מול השליח — מה שחתמת בהצטרפות",
+          iconColor: "text-green-600",
+          iconBg: "bg-green-50",
+          showArrow: true,
+          onClick: () => setTermsOpen(true),
+        },
+        {
           icon: Headphones,
           title: "צור קשר עם התמיכה",
           subtitle: "אנחנו כאן לעזור",
@@ -174,7 +190,7 @@ function AccountSettingsPage() {
 
   return (
     <CourierShell title="הגדרות חשבון" subtitle="">
-      <div className="pb-6 space-y-4">
+      <div className="mx-auto w-full max-w-lg space-y-4 pb-6 lg:max-w-3xl">
         {sections.map((section, sectionIndex) => (
           <div key={sectionIndex} className="space-y-3">
             {section.title && (
@@ -261,6 +277,23 @@ function AccountSettingsPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+        <DialogContent dir="rtl" className="max-h-[85vh] max-w-lg overflow-y-auto text-right">
+          <DialogHeader>
+            <DialogTitle>{COURIER_AGREEMENT_TITLE}</DialogTitle>
+            <DialogDescription>גרסה {COURIER_AGREEMENT_VERSION} · ההסכם בין Goi לשליח</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm leading-relaxed text-slate-700">
+            {COURIER_AGREEMENT_SECTIONS.map((section) => (
+              <section key={section.heading}>
+                <h3 className="mb-1 font-bold text-slate-900">{section.heading}</h3>
+                <p>{section.body}</p>
+              </section>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={pwdOpen}

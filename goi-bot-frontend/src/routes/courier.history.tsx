@@ -74,12 +74,10 @@ function deliveryMinutesOf(job: { delivery_minutes?: number | null }) {
 }
 
 function DeliverySlaTimer({
-  acceptedAt,
-  createdAt,
+  pickedUpAt,
   minutes,
 }: {
-  acceptedAt?: string | null;
-  createdAt?: string | null;
+  pickedUpAt?: string | null;
   minutes: number;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -87,7 +85,14 @@ function DeliverySlaTimer({
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
-  const start = new Date(acceptedAt || createdAt || now).getTime();
+  if (!pickedUpAt) {
+    return (
+      <div className="mt-2 rounded-card bg-muted px-2.5 py-1.5 text-[10px] font-bold text-text-muted">
+        הטיימר יתחיל בלחיצה על אספתי
+      </div>
+    );
+  }
+  const start = new Date(pickedUpAt).getTime();
   if (!Number.isFinite(start)) return null;
   const totalMs = Math.max(1, minutes) * 60_000;
   const left = start + totalMs - now;
@@ -333,7 +338,7 @@ export function ActiveJobs() {
   }, [visible, statusFilter, lastSteps]);
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto w-full max-w-lg space-y-3 lg:max-w-5xl">
       <div className="grid grid-cols-2 gap-2">
         {tabs.map((tabItem) => {
           const Icon = tabItem.icon;
@@ -437,8 +442,10 @@ export function ActiveJobs() {
 
             <CourierActiveTimeline stage={stage} />
             <DeliverySlaTimer
-              acceptedAt={(j as { accepted_at?: string | null }).accepted_at}
-              createdAt={(j as { created_at?: string | null }).created_at}
+              pickedUpAt={
+                (outcome as { picked_up_at?: string | null } | null)?.picked_up_at
+                || (j as { picked_up_at?: string | null }).picked_up_at
+              }
               minutes={deliveryMinutesOf(j as { delivery_minutes?: number | null })}
             />
 

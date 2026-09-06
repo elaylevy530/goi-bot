@@ -132,6 +132,11 @@ function AvailabilityPage() {
       if (!next && liveJobLocksOffline) {
         throw new Error(LIVE_JOB_OFFLINE_ERROR);
       }
+      if (next) {
+        const { goCourierOnlineWithGps } = await import("@/lib/courier-location");
+        await goCourierOnlineWithGps();
+        return;
+      }
       await nestUpdateMyCourier({ accepting_jobs: next });
     },
     onSuccess: () => {
@@ -180,7 +185,7 @@ function AvailabilityPage() {
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-5">
-          <div className="mx-auto flex max-w-lg flex-col gap-4">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
             {/* Availability */}
             <section
               className={cn(
@@ -433,7 +438,7 @@ function AvailabilityPage() {
 
         {/* Sticky save bar */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-[#F3F6F4] via-[#F3F6F4]/95 to-transparent px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-8">
-          <div className="pointer-events-auto mx-auto max-w-lg">
+          <div className="pointer-events-auto mx-auto w-full max-w-lg lg:max-w-5xl">
             <button
               type="button"
               onClick={() => save.mutate()}

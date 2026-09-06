@@ -95,7 +95,7 @@ function MyProfilePage() {
 
   return (
     <CourierShell title="הפרופיל שלי" subtitle="">
-      <div className="pb-6 space-y-4">
+      <div className="mx-auto w-full max-w-lg space-y-4 pb-6 lg:max-w-5xl">
         {isCourierJobsRestricted(me) && (
           <div className="rounded-card border border-warning/30 bg-warning-bg px-4 py-3 text-sm font-semibold text-warning-text">
             {COURIER_JOBS_RESTRICTED_MESSAGE}
@@ -274,10 +274,11 @@ function MyProfilePage() {
           </div>
           <Card className="p-0 overflow-hidden">
             {editing === "docs" ? (
-              <DocumentsInlineEditor courierId={me.id} onDone={() => setEditing(null)} />
+              <DocumentsInlineEditor me={me} courierId={me.id} onDone={() => setEditing(null)} />
             ) : (
               <div className="p-4">
                 <DocumentsGrid
+                  me={me}
                   documents={documents}
                   onAdd={() => setEditing("docs")}
                 />
@@ -452,21 +453,32 @@ function formatDocExpiry(raw?: string | Date | null) {
 }
 
 function DocumentsGrid({
+  me,
   documents,
   onAdd,
 }: {
+  me: CourierSelfRow;
   documents: NestCourierDocument[];
   onAdd: () => void;
 }) {
   const byType = new Map(documents.map((doc) => [doc.type, doc]));
   const visibleTypes = new Set<string>(COURIER_DOCUMENT_TYPES.map((meta) => meta.type));
-  const hasAny = documents.some((doc) => visibleTypes.has(doc.type) && (doc.file_url || doc.expires_at));
+  const hasId = !!(me.id_photo_url || me.id_photo_back_url);
+  const hasAny = hasId || documents.some((doc) => visibleTypes.has(doc.type) && (doc.file_url || doc.expires_at));
   if (!hasAny) {
     return <EmptyHint action="העלאת מסמכים" onAction={onAdd} />;
   }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="rounded-xl border border-slate-100 p-3 text-end space-y-1">
+        <div className="text-sm font-bold text-slate-900">תעודת זהות — צד קדמי</div>
+        {me.id_photo_url ? <DocumentFileLink path={me.id_photo_url} bucket="courier-ids" /> : <div className="text-xs text-slate-500">טרם הועלה</div>}
+      </div>
+      <div className="rounded-xl border border-slate-100 p-3 text-end space-y-1">
+        <div className="text-sm font-bold text-slate-900">תעודת זהות — צד אחורי</div>
+        {me.id_photo_back_url ? <DocumentFileLink path={me.id_photo_back_url} bucket="courier-ids" /> : <div className="text-xs text-slate-500">טרם הועלה</div>}
+      </div>
       {COURIER_DOCUMENT_TYPES.map((meta) => {
         const row = byType.get(meta.type);
         const expiry = formatDocExpiry(row?.expires_at ?? null);
@@ -494,10 +506,10 @@ function DocumentsGrid({
   );
 }
 
-function DocumentFileLink({ path }: { path: string }) {
+function DocumentFileLink({ path, bucket = "courier-documents" }: { path: string; bucket?: "courier-documents" | "courier-ids" }) {
   const { data: url, isPending } = useQuery({
-    queryKey: ["courier-document-signed", path],
-    queryFn: () => nestSignedFileUrlResolved("courier-documents", path, 60 * 60),
+    queryKey: ["courier-document-signed", bucket, path],
+    queryFn: () => nestSignedFileUrlResolved(bucket, path, 60 * 60),
     staleTime: 1000 * 60 * 20,
   });
   if (isPending) return <div className="text-xs text-slate-500">הועלה</div>;

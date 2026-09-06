@@ -280,7 +280,7 @@ function PerformancePage() {
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
-          <div className="mx-auto flex max-w-lg flex-col gap-4">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
             <Select
               value={period}
               onValueChange={(value) => {

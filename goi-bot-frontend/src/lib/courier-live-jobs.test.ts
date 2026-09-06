@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { courierVehicleFitsJob } from "./courier-vehicle";
 import {
   isCourierJobsRestricted,
   isCourierReceivingJobs,
@@ -52,5 +53,32 @@ describe("courier receiving jobs vs restricted UI", () => {
     const paused = { ...live, is_paused: true };
     expect(isCourierReceivingJobs(paused)).toBe(false);
     expect(isCourierJobsRestricted(paused)).toBe(true);
+  });
+});
+
+describe("vehicle size hierarchy", () => {
+  it("lets a car take motorcycle and bicycle jobs", () => {
+    expect(courierVehicleFitsJob({ vehicle_required: "אופנוע" }, { vehicle_type: "רכב" })).toBe(true);
+    expect(courierVehicleFitsJob({ vehicle_required: "אופניים" }, { vehicle_type: "רכב" })).toBe(true);
+  });
+
+  it("lets a motorcycle take bicycle jobs but not car jobs", () => {
+    expect(courierVehicleFitsJob({ vehicle_required: "אופניים חשמליים" }, { vehicle_type: "קטנוע" })).toBe(true);
+    expect(courierVehicleFitsJob({ vehicle_required: "רכב" }, { vehicle_type: "אופנוע" })).toBe(false);
+  });
+
+  it("blocks a motorcycle from oversized cargo like a pet-food sack", () => {
+    expect(
+      courierVehicleFitsJob(
+        { vehicle_required: "אופנוע", item_category: "שק מזון חיות", package_size: "גדול" },
+        { vehicle_type: "קטנוע" },
+      ),
+    ).toBe(false);
+    expect(
+      courierVehicleFitsJob(
+        { item_category: "שק מזון חיות", package_size: "גדול" },
+        { vehicle_type: "רכב" },
+      ),
+    ).toBe(true);
   });
 });
