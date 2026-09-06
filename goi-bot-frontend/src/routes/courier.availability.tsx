@@ -37,6 +37,13 @@ export const Route = createFileRoute("/courier/availability")({
 
 type VehicleChoice = "רכב" | "קטנוע" | "אופניים חשמליים" | "";
 
+const DISTANCE_OPTIONS = [
+  { value: "בתוך העיר", label: "בתוך העיר" },
+  { value: "15 ק״מ", label: "15 ק״מ" },
+  { value: "המרכז", label: "אזור רחב" },
+  { value: "כל הארץ", label: "כל הארץ" },
+] as const;
+
 const VEHICLE_OPTIONS = [
   { value: "רכב", label: "רכב", Icon: CarIcon },
   { value: "קטנוע", label: "קטנוע", Icon: ScooterIcon },
@@ -85,6 +92,8 @@ function AvailabilityPage() {
   const [cities, setCities] = useState<string[]>([]);
   const [vehicle, setVehicle] = useState<VehicleChoice>("");
   const [areasError, setAreasError] = useState<string | null>(null);
+  const [distance, setDistance] = useState("15 ק״מ");
+  const [shareLocation, setShareLocation] = useState(true);
 
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
   const accepting = approved && me?.accepting_jobs !== false;
@@ -92,10 +101,18 @@ function AvailabilityPage() {
 
   useEffect(() => {
     if (!me) return;
-    const row = me as { working_areas?: string[] | null; vehicle_type?: string | null };
+    const row = me as {
+      working_areas?: string[] | null;
+      vehicle_type?: string | null;
+      work_distance_from_base?: string | null;
+      location_sharing_enabled?: boolean | null;
+    };
     setAreas(expandWorkAreasForCards(row.working_areas));
     setCities(splitWorkingAreas(row.working_areas).legacy);
     setVehicle(normalizeVehicle(row.vehicle_type));
+    const dist = String(row.work_distance_from_base ?? "").trim();
+    setDistance(DISTANCE_OPTIONS.some((o) => o.value === dist) ? dist : dist || "15 ק״מ");
+    setShareLocation(row.location_sharing_enabled !== false);
     setAreasError(null);
   }, [me]);
 
@@ -134,11 +151,16 @@ function AvailabilityPage() {
         working_areas: areas.length > 0 ? composeWorkingAreas(areas, cities) : cities,
       };
       if (vehicle) payload.vehicle_type = vehicle;
+      payload.work_distance_from_base = distance;
+      payload.location_sharing_enabled = shareLocation;
       await nestUpdateMyCourier(payload);
     },
     onSuccess: () => {
       toast.success("ההגדרות נשמרו");
       qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+      qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
+      qc.invalidateQueries({ queryKey: ["new-jobs"] });
+      qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -344,6 +366,52 @@ function AvailabilityPage() {
                       {areasError}
                     </p>
                   )}
+                </div>
+              </div>
+            </section>
+
+            <section className="overflow-hidden rounded-[1.5rem] border border-black/5 bg-white p-4 shadow-sm space-y-4">
+              <div>
+                <SectionLabel
+                  step={3}
+                  title="רדיוס מהמיקום שלך"
+                  subtitle="כמה רחוק לקבל הצעות לפי GPS"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  {DISTANCE_OPTIONS.map((option) => {
+                    const on = distance === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setDistance(option.value)}
+                        className={cn(
+                          "min-h-11 rounded-2xl border text-sm font-extrabold transition-colors",
+                          on
+                            ? "border-primary bg-primary-soft text-primary"
+                            : "border-black/5 bg-[#F7F8F7] text-text-strong",
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="h-px bg-black/5" />
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={shareLocation}
+                  onCheckedChange={setShareLocation}
+                  aria-label="שיתוף מיקום"
+                  className="shrink-0 data-[state=checked]:bg-primary-deep"
+                />
+                <div className="min-w-0 flex-1 text-right">
+                  <p className="text-sm font-extrabold text-text-strong">שיתוף מיקום בזמן אמת</p>
+                  <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
+                    בלי מיקום, ההצעות מתאימות רק לפי אזורי העבודה שבחרת
+                  </p>
                 </div>
               </div>
             </section>

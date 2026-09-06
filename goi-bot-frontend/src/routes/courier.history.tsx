@@ -214,6 +214,14 @@ export function ActiveJobs() {
   const [contactJob, setContactJob] = useState<any>(null);
   const [tab, setTab] = useState<ActiveTab>("today");
   const [statusFilter, setStatusFilter] = useState<"all" | Stage>("all");
+  const [delivered, setDelivered] = useState<{
+    id: string;
+    job_number?: string | number | null;
+    payment: number;
+    customer_name?: string | null;
+    customer_id?: string | null;
+    conversation_id?: string | null;
+  } | null>(null);
 
 
   const { data: jobs = [] } = useQuery({
@@ -273,14 +281,24 @@ export function ActiveJobs() {
       }));
     },
     onSuccess: (_d, v) => {
-      toast.success("הסטטוס עודכן");
       qc.invalidateQueries({ queryKey: ["active-jobs"] });
       qc.invalidateQueries({ queryKey: ["active-job-steps"] });
       qc.invalidateQueries({ queryKey: ["courier-active-count"] });
       if (v.step === "נמסר") {
+        const job = jobs.find((j) => j.id === v.job_id);
+        setDelivered({
+          id: v.job_id,
+          job_number: job?.job_number,
+          payment: Number(job?.payment ?? 0),
+          customer_name: job?.customer_name,
+          customer_id: job?.customer_id,
+          conversation_id: (job as { conversation_id?: string | null } | undefined)?.conversation_id,
+        });
         qc.invalidateQueries({ queryKey: ["chat-conversations"] });
         qc.invalidateQueries({ queryKey: ["chat-start-active-jobs"] });
+        return;
       }
+      toast.success("הסטטוס עודכן");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -351,7 +369,7 @@ export function ActiveJobs() {
           <option value="all">סינון לפי סטטוס</option>
           <option value="assigned">אושר</option>
           <option value="to_pickup">בדרך לאיסוף</option>
-          <option value="picked_up">נאסף</option>
+          <option value="picked_up">אספתי</option>
         </select>
         <ChevronDown className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" aria-hidden />
       </div>
@@ -532,6 +550,17 @@ export function ActiveJobs() {
               </button>
             </div>
 
+            {(j as { is_multi_stop?: boolean }).is_multi_stop && (
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/courier/multi-stop/$id", params: { id: j.id } })}
+                className="mt-2 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-card border border-border bg-surface text-[12px] font-bold text-text-strong"
+              >
+                <MapPin className="size-3.5 text-primary" />
+                מסלול מרובה נקודות
+              </button>
+            )}
+
             {primary && (
               <button
                 type="button"
@@ -558,6 +587,61 @@ export function ActiveJobs() {
           else toast.error("אין מספר לקוח");
         }}
       />
+
+      {delivered && (
+        <div className="fixed inset-0 z-40 grid place-items-end bg-black/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:place-items-center">
+          <div className="w-full max-w-sm rounded-card border border-border bg-surface p-5 text-center shadow-card-strong" dir="rtl">
+            <div className="mx-auto grid size-14 place-items-center rounded-full bg-primary-soft text-primary">
+              <CheckCircle2 className="size-8" />
+            </div>
+            <h2 className="mt-3 text-xl font-extrabold text-text-strong">נמסר בהצלחה</h2>
+            <p className="mt-1 text-sm text-text-subtle">
+              {delivered.customer_name ? `${delivered.customer_name} · ` : ""}
+              {delivered.job_number ? `#${delivered.job_number}` : "המשלוח הושלם"}
+            </p>
+            <p className="mt-3 text-3xl font-black tabular-nums text-primary">
+              ₪{delivered.payment.toFixed(0)}
+            </p>
+            <p className="mt-1 text-xs text-text-muted">התגמול נוסף לארנק. אפשר עדיין לפתוח צ׳אט עם העסק.</p>
+            <div className="mt-4 grid gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const id = delivered.id;
+                  setDelivered(null);
+                  void openBusinessChat({
+                    id,
+                    customer_id: delivered.customer_id,
+                    conversation_id: delivered.conversation_id,
+                    selected_courier_id: me?.id,
+                  });
+                }}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-card border border-border text-sm font-bold"
+              >
+                <MessageCircle className="size-4 text-primary" />
+                צ׳אט עם העסק
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDelivered(null);
+                  navigate({ to: "/courier/new-jobs" });
+                }}
+                className="flex min-h-11 items-center justify-center rounded-card bg-primary-deep text-sm font-extrabold text-primary-foreground"
+              >
+                חזרה למפה
+              </button>
+              <button
+                type="button"
+                onClick={() => setDelivered(null)}
+                className="min-h-10 text-sm font-semibold text-text-muted"
+              >
+                להישאר בפעילים
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

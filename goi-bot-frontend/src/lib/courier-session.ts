@@ -12,6 +12,9 @@ export type CourierSelfRow = {
   accepting_jobs?: boolean | null;
   has_live_active_job?: boolean | null;
   is_paused?: boolean | null;
+  admin_jobs_blocked?: boolean | null;
+  location_sharing_enabled?: boolean | null;
+  work_distance_from_base?: string | null;
   courier_number?: string | null;
   vehicle_type?: string | null;
   vehicle_label?: string | null;

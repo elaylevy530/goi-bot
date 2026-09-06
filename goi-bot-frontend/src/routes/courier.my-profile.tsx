@@ -17,6 +17,7 @@ import {
   FileText,
   Headphones,
   ChevronLeft,
+  Settings,
   Pen,
   Loader2,
   Hash,
@@ -38,6 +39,7 @@ import {
   displayOrDash,
   formatCourierWorkAreas,
 } from "@/lib/courier-session";
+import { COURIER_JOBS_RESTRICTED_MESSAGE, isCourierJobsRestricted } from "@/lib/courier-live-jobs";
 import {
   AvatarCameraButton,
   DocumentsInlineEditor,
@@ -94,6 +96,11 @@ function MyProfilePage() {
   return (
     <CourierShell title="הפרופיל שלי" subtitle="">
       <div className="pb-6 space-y-4">
+        {isCourierJobsRestricted(me) && (
+          <div className="rounded-card border border-warning/30 bg-warning-bg px-4 py-3 text-sm font-semibold text-warning-text">
+            {COURIER_JOBS_RESTRICTED_MESSAGE}
+          </div>
+        )}
         <div className="relative overflow-hidden rounded-2xl bg-primary-deep p-6 text-primary-foreground shadow-card-strong">
           <div className="relative z-10">
             <div className="flex items-start justify-between mb-6">
@@ -301,6 +308,19 @@ function MyProfilePage() {
             )}
           </Card>
         </div>
+
+        <Link
+          to="/courier/account-settings"
+          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-4"
+        >
+          <ChevronLeft className="size-5 text-slate-400" />
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-slate-900">הגדרות חשבון</span>
+            <span className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-700">
+              <Settings className="size-5" />
+            </span>
+          </div>
+        </Link>
 
         <div className="bg-slate-50 rounded-2xl p-6 mt-6">
           <div className="flex items-center justify-between">

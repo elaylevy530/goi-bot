@@ -1076,21 +1076,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async hideCourierBusinessConversation(jobId: string) {
-    try {
-      await this.conversations.update(
-        { kind: "courier_business", job_id: jobId },
-        { hidden_from_participants: true },
-      );
-    } catch (e) {
-      this.logger.warn(
-        `hideCourierBusinessConversation failed for ${jobId}: ${
-          e instanceof Error ? e.message : e
-        }`,
-      );
-    }
-  }
-
   async claimJob(userId: string, jobId: string, _source = "app") {
     const courier = await this.requireCourier(userId);
     if (courier.courier_status !== "פעיל" || courier.is_paused) {
@@ -1415,7 +1400,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       outcome.delivered_at = now;
       outcome.courier_id = courier.id;
       await this.outcomes.save(outcome);
-      await this.hideCourierBusinessConversation(jobId);
     }
     await this.jobs.save(job);
     if (step === "נמסר") {

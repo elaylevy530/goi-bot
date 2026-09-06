@@ -377,7 +377,7 @@ function RewardBanner({
             </p>
           )}
           <p className={cn("font-semibold text-white/90", compact ? "mt-0.5 text-[11px]" : "mt-1 text-[12px]")}>
-            התגמול שלך עבור המשלוח
+            {isQuote ? "הצעת מחיר — אתה קובע את הסכום" : "התגמול שלך עבור המשלוח"}
           </p>
         </div>
         <img

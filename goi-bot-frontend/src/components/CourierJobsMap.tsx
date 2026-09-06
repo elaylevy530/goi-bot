@@ -170,9 +170,10 @@ type Props = {
   rightExtra?: ReactNode;
   emptyState?: ReactNode;
   onActiveChange?: (job: MapJob | null) => void;
+  focusJobId?: string | null;
 };
 
-export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, belowControls, rightExtra, emptyState, onActiveChange }: Props) {
+export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, belowControls, rightExtra, emptyState, onActiveChange, focusJobId }: Props) {
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -194,6 +195,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
   const [filter, setFilter] = useState<"all" | "now" | "schedule" | "quote">("all");
   const [readyTick, setReadyTick] = useState(() => Date.now());
   const [offerExpanded, setOfferExpanded] = useState(false);
+  const appliedFocusRef = useRef<string | null>(null);
 
   useEffect(() => {
     setOfferExpanded(false);
@@ -336,6 +338,13 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
       })
       .sort((a, b) => a.score - b.score);
   }, [visibleJobs, myPos]);
+
+  useEffect(() => {
+    if (!focusJobId || appliedFocusRef.current === focusJobId) return;
+    if (!scoredJobs.some((s) => s.job.id === focusJobId)) return;
+    setActiveId(focusJobId);
+    appliedFocusRef.current = focusJobId;
+  }, [focusJobId, scoredJobs]);
 
   // Auto-select best-scored job if none selected
   useEffect(() => {

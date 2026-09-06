@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   nestAddCourierDecline,
   nestClaimJob,
+  nestRemoveCourierDecline,
   nestCourierActiveJobCount,
   nestListCourierDeclines,
   nestListCourierOffers,
@@ -19,11 +20,12 @@ import {
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob } from "@/lib/courier-session";
 import { nestListConversations } from "@/lib/nest-chat";
-import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
+import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag, MapPin } from "lucide-react";
+import { useGpsLiveStatus } from "@/hooks/useCourierGpsTracker";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
-import { isCourierApproved, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay } from "@/lib/courier-live-jobs";
+import { COURIER_JOBS_RESTRICTED_MESSAGE, isCourierApproved, isCourierJobsRestricted, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay } from "@/lib/courier-live-jobs";
 import { ContactBlock } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
@@ -66,6 +68,7 @@ function NewJobsPage() {
   const [detail, setDetail] = useState<any>(null);
   const [quoteFor, setQuoteFor] = useState<any>(null);
   const [activeOffer, setActiveOffer] = useState<MapJob | null>(null);
+  const [stickyFocusId, setStickyFocusId] = useState<string | undefined>();
 
   const { data: declinedRows = [] } = useQuery({
     queryKey: ["courier-job-declines", me?.id],
@@ -77,7 +80,7 @@ function NewJobsPage() {
   });
   const declinedRowsSafe = declinedRows as { job_id: string; declined_price?: string | number | null }[];
 
-  const { data: offers = [] } = useQuery({
+  const { data: offers = [], isFetched: offersFetched, isError: offersError, isFetching: offersFetching } = useQuery({
     queryKey: ["new-jobs", me?.id, "pending"],
     enabled: isAvailable,
     refetchOnWindowFocus: true,
@@ -97,7 +100,7 @@ function NewJobsPage() {
     },
   });
 
-  const { data: quoteJobs = [] } = useQuery({
+  const { data: quoteJobs = [], isFetched: quotesFetched, isError: quotesError, isFetching: quotesFetching } = useQuery({
     queryKey: ["courier-quote-requests", me?.id],
     enabled: isAvailable,
     refetchOnWindowFocus: true,
@@ -116,7 +119,7 @@ function NewJobsPage() {
     queryFn: () => nestListCourierQuotes(quoteJobIds),
   });
 
-  const { data: openJobs = [] } = useQuery({
+  const { data: openJobs = [], isFetched: openFetched, isError: openError, isFetching: openFetching } = useQuery({
     queryKey: ["courier-open-jobs", me?.id],
     enabled: isAvailable,
     refetchOnWindowFocus: true,
@@ -133,7 +136,7 @@ function NewJobsPage() {
       qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
       qc.invalidateQueries({ queryKey: ["new-jobs"] });
       qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
-    }, 20_000);
+    }, 8_000);
     return () => window.clearInterval(timer);
   }, [me?.id, isAvailable, qc]);
 
@@ -145,11 +148,6 @@ function NewJobsPage() {
     }
     return map;
   }, [myQuotes]);
-
-  useEffect(() => {
-    if (!focusJobId) return;
-    navigate({ to: "/courier/new-jobs", search: {}, replace: true });
-  }, [focusJobId, navigate]);
 
   const respond = useMutation({
     mutationFn: async ({ id, response, jobId }: { id: string; response: "accepted" | "declined"; jobId?: string }) => {
@@ -288,7 +286,26 @@ function NewJobsPage() {
   }) => {
     hideJobLocally(job);
     persistSkip({ id: job.id, offerId: job.offerId }, jobOfferPay(job));
-    toast(t.jobRemoved);
+    toast(t.jobRemoved, {
+      action: {
+        label: "בטל דילוג",
+        onClick: () => {
+          if (!me?.id) return;
+          qc.setQueryData(
+            ["courier-job-declines", me.id],
+            (old: { job_id: string }[] | undefined) => (old ?? []).filter((r) => r.job_id !== job.id),
+          );
+          void nestRemoveCourierDecline(job.id)
+            .then(() => {
+              qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
+              qc.invalidateQueries({ queryKey: ["new-jobs"] });
+              qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
+              qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
+            })
+            .catch((e) => toast.error(e instanceof Error ? e.message : "לא הצלחנו לבטל"));
+        },
+      },
+    });
   };
 
   const visibleOpenJobs = useMemo(
@@ -336,7 +353,7 @@ function NewJobsPage() {
     return out;
   }, [visibleOpenJobs, visibleQuoteJobs, offers, declinedRowsSafe]);
 
-  const openDetails = (job: MapJob) => {
+  const openDetails = useCallback((job: MapJob) => {
     if (job.__kind === "offer") {
       const j = job.__raw?.job;
       const offer = job.__raw?.offer;
@@ -346,7 +363,24 @@ function NewJobsPage() {
     } else {
       setDetail({ ...job });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!focusJobId) return;
+    const job = mapJobs.find((j) => String(j.id) === focusJobId);
+    if (job) {
+      setStickyFocusId(job.id);
+      openDetails(job);
+      setActiveOffer(job);
+      navigate({ to: "/courier/new-jobs", search: {}, replace: true });
+      return;
+    }
+    if (!isAvailable) return;
+    if (offersFetched && quotesFetched && openFetched) {
+      toast.error("המשלוח כבר לא זמין");
+      navigate({ to: "/courier/new-jobs", search: {}, replace: true });
+    }
+  }, [focusJobId, mapJobs, isAvailable, offersFetched, quotesFetched, openFetched, navigate, openDetails]);
 
   const handleClaim = (job: MapJob) => {
     if (job.__kind === "offer") {
@@ -397,6 +431,13 @@ function NewJobsPage() {
 
   const availableCount = mapJobs.length;
   const showingOffer = availableCount > 0;
+  const jobsError = isAvailable && (offersError || quotesError || openError);
+  const jobsLoading =
+    isAvailable &&
+    !showingOffer &&
+    !jobsError &&
+    (offersFetching || quotesFetching || openFetching) &&
+    !(offersFetched && quotesFetched && openFetched);
 
   const refreshJobs = useCallback(async () => {
     await Promise.all([
@@ -426,6 +467,9 @@ function NewJobsPage() {
                   <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
                 </div>
               )}
+              <div className="absolute inset-y-0 left-0 z-10 flex items-center">
+                <GpsStatusChip />
+              </div>
             </div>
           </div>
         </div>
@@ -433,6 +477,7 @@ function NewJobsPage() {
         <div className="flex-1 min-h-0">
             <CourierJobsMap
               jobs={mapJobs}
+              focusJobId={stickyFocusId ?? focusJobId}
               onClaim={handleClaim}
               onDecline={handleDecline}
               onQuote={handleQuote}
@@ -453,39 +498,38 @@ function NewJobsPage() {
                 ) : undefined
               }
               leftExtra={
-                showingOffer ? undefined : (
-                  <Link
-                    to="/courier/notifications"
-                    aria-label="התראות"
-                    className="size-11 grid place-items-center rounded-full bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)] border border-border/70 text-text-strong active:scale-95"
-                  >
-                    <Bell className="size-4" strokeWidth={2} />
-                  </Link>
-                )
+                <Link
+                  to="/courier/notifications"
+                  aria-label="התראות"
+                  className="size-11 grid place-items-center rounded-full bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)] border border-border/70 text-text-strong active:scale-95"
+                >
+                  <Bell className="size-4" strokeWidth={2} />
+                </Link>
               }
               rightExtra={
-                showingOffer || !isAvailable ? undefined : (
-                  <>
-                    <MapFab
-                      to="/courier/active"
-                      label="פעילים"
-                      icon={ShoppingBag}
-                      count={Number(activeCount) || 0}
-                    />
-                    <MapFab
-                      to="/courier/messages"
-                      label="צ'אט"
-                      icon={MessageCircle}
-                      count={unreadChat}
-                    />
-                  </>
-                )
+                <>
+                  <MapFab
+                    to="/courier/active"
+                    label="פעילים"
+                    icon={ShoppingBag}
+                    count={Number(activeCount) || 0}
+                  />
+                  <MapFab
+                    to="/courier/messages"
+                    label="צ'אט"
+                    icon={MessageCircle}
+                    count={unreadChat}
+                  />
+                </>
               }
               emptyState={
                 <SearchingCard
                   available={isAvailable}
                   jobWord={t.jobPlural}
                   me={me}
+                  loading={jobsLoading}
+                  error={jobsError}
+                  onRetry={() => { void refreshJobs(); }}
                 />
               }
             />
@@ -697,17 +741,42 @@ function MapFab({
   );
 }
 
+function GpsStatusChip() {
+  const gps = useGpsLiveStatus();
+  if (!gps.enabled && gps.permission !== "denied") return null;
+  const denied = gps.permission === "denied";
+  const live = gps.permission === "granted" && !gps.error && gps.lastFixAt != null;
+  const label = denied ? "מיקום חסום" : live ? "מיקום פעיל" : "מחפש מיקום";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-pill bg-surface/95 px-2.5 py-1 text-[10px] font-extrabold shadow-card ${
+        denied ? "text-destructive" : live ? "text-primary" : "text-text-muted"
+      }`}
+    >
+      <MapPin className="size-3" aria-hidden />
+      {label}
+    </span>
+  );
+}
+
 function SearchingCard({
   available,
   jobWord,
   me,
+  loading = false,
+  error = false,
+  onRetry,
 }: {
   available: boolean;
   jobWord: string;
   me?: any;
+  loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
 }) {
   const qc = useQueryClient();
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
+  const restricted = isCourierJobsRestricted(me);
 
   const goOnline = useMutation({
     mutationFn: async () => {
@@ -719,7 +788,11 @@ function SearchingCard({
       }
       const canGoOnline = courier?.courier_status === "פעיל" && courier?.is_paused !== true;
       if (!courier || !canGoOnline) {
-        throw new Error("החשבון ממתין לאישור או מושהה");
+        throw new Error(
+          isCourierJobsRestricted(courier)
+            ? COURIER_JOBS_RESTRICTED_MESSAGE
+            : "החשבון ממתין לאישור",
+        );
       }
       void (async () => {
         if (typeof navigator !== "undefined" && navigator.geolocation) {
@@ -776,7 +849,7 @@ function SearchingCard({
             <SwipeConfirm
               variant="availability"
               label="החלק כדי להפוך לזמין"
-              subtitle="והתחל לקבל משלוחים"
+              subtitle={restricted ? COURIER_JOBS_RESTRICTED_MESSAGE : "והתחל לקבל משלוחים"}
               disabled={goOnline.isPending || (me != null && !approved)}
               onConfirm={() => {
                 if (goOnline.isPending || (me != null && !approved)) return;
@@ -825,11 +898,30 @@ function SearchingCard({
 
           <div className="min-w-0 flex-1 text-right">
             <div className="text-[16px] font-extrabold leading-snug text-[#111]">
-              מחפש משלוחים באזור שלך
+              {restricted
+                ? "אין משלוחים זמינים עכשיו"
+                : error
+                  ? "לא הצלחנו לטעון משלוחים"
+                  : loading
+                    ? "טוען משלוחים…"
+                    : "מחפש משלוחים באזור שלך"}
             </div>
             <div className="mt-1 text-[12px] leading-snug text-[#6B6B6B]">
-              משלוח מתאים יקפוץ אוטומטית על המפה
+              {restricted
+                ? COURIER_JOBS_RESTRICTED_MESSAGE
+                : error
+                  ? "בדקו את הרשת ונסו שוב"
+                  : "משלוח מתאים יקפוץ אוטומטית על המפה"}
             </div>
+            {error && onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="pointer-events-auto mt-2 text-[12px] font-extrabold text-primary"
+              >
+                נסה שוב
+              </button>
+            )}
           </div>
         </div>
       </div>

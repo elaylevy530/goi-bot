@@ -901,6 +901,16 @@ export class DomainService {
     return { ok: true as const };
   }
 
+  async markAllCourierNotificationsRead(courierId: string) {
+    const rows = await this.listCourierNotifications(courierId);
+    const unread = rows.filter((n) => !n.read_at);
+    if (unread.length === 0) return { ok: true as const };
+    const now = new Date();
+    for (const n of unread) n.read_at = now;
+    await this.notifications.save(unread);
+    return { ok: true as const };
+  }
+
   private async requireBusinessId(userId: string) {
     const previewId = previewCustomerId();
     const customer = previewId

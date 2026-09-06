@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isJobSkippedAtCurrentPrice, jobOfferPay } from "./courier-live-jobs";
+import {
+  isCourierJobsRestricted,
+  isCourierReceivingJobs,
+  isJobSkippedAtCurrentPrice,
+  jobOfferPay,
+} from "./courier-live-jobs";
 
 describe("job skip is per delivery, not per business", () => {
   it("reads courier pay from the job", () => {
@@ -26,5 +31,26 @@ describe("job skip is per delivery, not per business", () => {
   it("keeps a legacy skip hidden until a priced re-offer", () => {
     const skips = [{ job_id: "job-a", declined_price: null }];
     expect(isJobSkippedAtCurrentPrice({ id: "job-a", payment: 50 }, skips)).toBe(true);
+  });
+});
+
+describe("courier receiving jobs vs restricted UI", () => {
+  const live = { courier_status: "פעיל", accepting_jobs: true, is_paused: false };
+
+  it("receives jobs when approved and available", () => {
+    expect(isCourierReceivingJobs(live)).toBe(true);
+    expect(isCourierJobsRestricted(live)).toBe(false);
+  });
+
+  it("hides jobs when admin blocked without treating the courier as offline", () => {
+    const blocked = { ...live, admin_jobs_blocked: true };
+    expect(isCourierReceivingJobs(blocked)).toBe(false);
+    expect(isCourierJobsRestricted(blocked)).toBe(true);
+  });
+
+  it("hides jobs when paused", () => {
+    const paused = { ...live, is_paused: true };
+    expect(isCourierReceivingJobs(paused)).toBe(false);
+    expect(isCourierJobsRestricted(paused)).toBe(true);
   });
 });

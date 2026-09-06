@@ -137,9 +137,9 @@ export function useCourierGpsTracker({
     };
 
     watchIdRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
-      enableHighAccuracy: false,
-      maximumAge: 60_000,
-      timeout: 60_000,
+      enableHighAccuracy: true,
+      maximumAge: 15_000,
+      timeout: 20_000,
     });
 
     return () => {

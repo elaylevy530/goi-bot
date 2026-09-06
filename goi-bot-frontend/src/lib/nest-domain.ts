@@ -172,6 +172,13 @@ export function nestMarkCourierNotificationRead(id: string) {
   });
 }
 
+export function nestMarkAllCourierNotificationsRead() {
+  return apiFetch<{ ok: true }>("/api/accounts/couriers/me/notifications/read-all", {
+    method: "PATCH",
+    ...options(),
+  });
+}
+
 export function nestListMyBranches() {
   return apiFetch<Record<string, unknown>[]>("/api/accounts/customers/me/branches", options());
 }

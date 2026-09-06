@@ -5,7 +5,7 @@ import { ChatCenter } from "@/components/ChatCenter";
 type Search = { c?: string };
 
 export const Route = createFileRoute("/courier/messages")({
-  head: () => ({ meta: [{ title: "הודעות · Goi" }] }),
+  head: () => ({ meta: [{ title: "צ׳אט — Goi" }] }),
   validateSearch: (s: Record<string, unknown>): Search => ({
     c: typeof s.c === "string" ? s.c : undefined,
   }),
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/courier/messages")({
 function CourierMessagesPage() {
   const { c } = Route.useSearch();
   return (
-    <CourierShell title="הודעות">
+    <CourierShell>
       <ChatCenter viewerRole="courier" initialConversationId={c} />
     </CourierShell>
   );

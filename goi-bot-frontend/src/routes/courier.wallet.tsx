@@ -534,13 +534,42 @@ function WalletPage() {
             </div>
 
             <section className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-extrabold text-text-strong">תנועות אחרונות</h2>
-                {tx.length > 5 && (
-                  <button type="button" onClick={() => setShowAll((v) => !v)} className="min-h-11 text-sm font-bold text-primary">
-                    {showAll ? "הצג פחות" : "הצג את כל התנועות"}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {tx.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const header = "תאריך,סוג,תיאור,סכום,סטטוס";
+                        const lines = tx.map((item) =>
+                          [
+                            item.at,
+                            item.kind,
+                            `"${item.title.replace(/"/g, "\"\"")}"`,
+                            item.amount,
+                            item.status ?? "",
+                          ].join(","),
+                        );
+                        const blob = new Blob([`\uFEFF${[header, ...lines].join("\n")}`], { type: "text/csv;charset=utf-8" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "goi-wallet.csv";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="min-h-11 text-sm font-bold text-primary"
+                    >
+                      ייצוא
+                    </button>
+                  )}
+                  {tx.length > 5 && (
+                    <button type="button" onClick={() => setShowAll((v) => !v)} className="min-h-11 text-sm font-bold text-primary">
+                      {showAll ? "הצג פחות" : "הצג את כל התנועות"}
+                    </button>
+                  )}
+                </div>
               </div>
               {visibleTx.length === 0 ? (
                 <p className="rounded-card border border-border bg-surface py-10 text-center text-sm text-text-muted">אין תנועות עדיין</p>

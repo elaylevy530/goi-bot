@@ -101,11 +101,13 @@ function SharePage() {
   const { data, isError } = useQuery({
     queryKey: ["courier-referrals", me?.id],
     enabled: !!me?.id,
+    refetchInterval: 30_000,
     queryFn: fetchReferrals,
   });
 
   const couriers = data?.couriers ?? [];
   const businesses = data?.businesses ?? [];
+  const commissions = data?.commissions ?? [];
   const list = tab === "courier" ? couriers : businesses;
   const visible = showAll ? list : list.slice(0, 4);
   const totals = data?.totals ?? {};
@@ -323,6 +325,36 @@ function SharePage() {
                 </div>
               )}
             </section>
+
+            <section className="rounded-[1.15rem] border border-black/5 bg-white px-4 py-3 text-sm text-text-subtle">
+              משיכה מהארנק החל מ־₪400. העמלות נכנסות אחרי שמשלוח מסומן כנמסר.
+            </section>
+
+            {commissions.length > 0 && (
+              <section className="space-y-2">
+                <h2 className="text-sm font-extrabold text-text-strong">עמלות לפי משלוח</h2>
+                <ul className="flex flex-col gap-2">
+                  {commissions.slice(0, 12).map((row) => (
+                    <li
+                      key={row.id ?? `${row.job_id}-${row.created_at}`}
+                      className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-black/5 bg-white px-3 py-3"
+                    >
+                      <div className="min-w-0 text-right">
+                        <p className="text-sm font-bold text-text-strong">
+                          {row.kind === "business" ? "הפניית עסק" : "הפניית שליח"}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-text-muted">
+                          {row.created_at ? new Date(row.created_at).toLocaleDateString("he-IL") : ""}
+                        </p>
+                      </div>
+                      <p className="text-sm font-extrabold tabular-nums text-primary">
+                        ₪ {money(Number(row.amount ?? 0))}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section className="space-y-3">
               <h2 className="text-sm font-extrabold text-text-strong">דרכים לשיתוף</h2>

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CourierShell } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   nestListMyCourierNotifications,
+  nestMarkAllCourierNotificationsRead,
   nestMarkCourierNotificationRead,
 } from "@/lib/nest-domain";
 import { Bell, CheckCheck, ExternalLink, Inbox } from "lucide-react";
@@ -25,14 +26,29 @@ function NotificationsPage() {
     refetchInterval: 30_000,
   });
 
+  const invalidateNotificationBadges = () => {
+    qc.invalidateQueries({ queryKey: ["my-courier-notifications"] });
+    qc.invalidateQueries({ queryKey: ["courier-notification-unread"] });
+    qc.invalidateQueries({ queryKey: ["courier-nav-counts"] });
+    qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+  };
+
   const markRead = useMutation({
     mutationFn: (id: string) => nestMarkCourierNotificationRead(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["my-courier-notifications"] });
-      qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+      invalidateNotificationBadges();
       toast.success("סומן כנקרא");
     },
     onError: () => toast.error("שגיאה בסימון ההודעה"),
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: nestMarkAllCourierNotificationsRead,
+    onSuccess: () => {
+      invalidateNotificationBadges();
+      toast.success("כל ההודעות סומנו כנקראו");
+    },
+    onError: () => toast.error("שגיאה בסימון ההודעות"),
   });
 
   const unreadCount = notifications.filter((n: any) => !n.read_at).length;
@@ -61,6 +77,16 @@ function NotificationsPage() {
                   לחץ על הודעה כדי לסמן כנקרא
                 </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 h-9 text-xs"
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+              >
+                <CheckCheck className="size-3.5 ml-1" />
+                סמן הכל כנקרא
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -88,9 +114,21 @@ function NotificationsPage() {
               return (
                 <Card
                   key={notification.id}
+                  role={isUnread ? "button" : undefined}
+                  tabIndex={isUnread ? 0 : undefined}
+                  onClick={() => {
+                    if (isUnread && !markRead.isPending) markRead.mutate(notification.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (!isUnread || markRead.isPending) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      markRead.mutate(notification.id);
+                    }
+                  }}
                   className={`rounded-2xl shadow-sm transition-all ${
                     isUnread
-                      ? "border-primary/30 bg-primary/5"
+                      ? "border-primary/30 bg-primary/5 cursor-pointer"
                       : "border-border bg-surface"
                   }`}
                 >
@@ -153,6 +191,7 @@ function NotificationsPage() {
                                   href={notification.link_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <ExternalLink className="size-3 ml-1" />
                                   פתח קישור
@@ -165,7 +204,10 @@ function NotificationsPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 text-xs"
-                                onClick={() => markRead.mutate(notification.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markRead.mutate(notification.id);
+                                }}
                                 disabled={markRead.isPending}
                               >
                                 <CheckCheck className="size-3 ml-1" />

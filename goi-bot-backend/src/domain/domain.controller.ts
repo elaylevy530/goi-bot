@@ -227,6 +227,12 @@ export class AccountDomainController {
     return this.domain.listCourierNotifications(courierId);
   }
 
+  @Patch("couriers/me/notifications/read-all")
+  async markAllMyNotificationsRead(@CurrentUser() auth: AuthUserContext) {
+    const courierId = await this.domain["requireCourierId"](auth.userId);
+    return this.domain.markAllCourierNotificationsRead(courierId);
+  }
+
   @Patch("couriers/me/notifications/:id/read")
   async markMyNotificationRead(
     @CurrentUser() auth: AuthUserContext,

@@ -251,7 +251,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
           <div className="space-y-3 pb-3">
             <div className="flex items-center justify-end gap-3 px-1">
               <div className="min-w-0 text-right">
-                <h1 className="text-xl font-extrabold text-text-strong leading-tight">הודעות</h1>
+                <h1 className="text-xl font-extrabold text-text-strong leading-tight">צ׳אט</h1>
                 <p className="text-xs text-text-muted mt-0.5">
                   {courierCounts.unreadAll > 0 ? `${courierCounts.unreadAll} הודעות חדשות` : "הכל מעודכן"}
                 </p>
@@ -472,7 +472,11 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
 
   useEffect(() => {
     nestMarkConversationRead(conv.id)
-      .then(() => qc.invalidateQueries({ queryKey: ["chat-conversations", viewerRole] }))
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["chat-conversations", viewerRole] });
+        qc.invalidateQueries({ queryKey: ["courier-chat-unread"] });
+        qc.invalidateQueries({ queryKey: ["courier-nav-counts"] });
+      })
       .catch(() => {});
   }, [conv.id, messages.length, viewerRole, qc]);
 

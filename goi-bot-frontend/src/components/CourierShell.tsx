@@ -1,7 +1,6 @@
 import { useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useCourierGpsTracker } from "@/hooks/useCourierGpsTracker";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
@@ -99,41 +98,6 @@ function parseJobIdFromUrl(url: string) {
   } catch {
     return null;
   }
-}
-
-function IncomingJobOverlay({ alert, onOpen, onDismiss }: {
-  alert: IncomingJobAlert;
-  onOpen: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <div dir="rtl" className="fixed inset-0 z-[80] flex items-start justify-center bg-black/45 px-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:items-center lg:pt-4">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10 animate-in zoom-in-95 slide-in-from-top-4 duration-200">
-        <div className="bg-primary-deep px-5 py-4 text-primary-foreground">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-extrabold opacity-90">עבודה חדשה עכשיו</div>
-              <div className="mt-1 text-xl font-black leading-tight">{alert.title}</div>
-            </div>
-            <button type="button" onClick={onDismiss} className="size-9 shrink-0 rounded-full bg-white/15 grid place-items-center active:bg-white/25" aria-label="סגור">
-              <X className="size-5" />
-            </button>
-          </div>
-        </div>
-        <div className="space-y-4 p-5">
-          {alert.body && <p className="whitespace-pre-line text-base font-bold leading-relaxed text-slate-900">{alert.body}</p>}
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" className="h-13 rounded-2xl bg-primary-deep text-base font-black text-primary-foreground hover:bg-primary-deep/90" onClick={onOpen}>
-              פתח פרטים
-            </Button>
-            <Button type="button" variant="outline" className="h-13 rounded-2xl text-base font-bold" onClick={onDismiss}>
-              אחר כך
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function CourierShell({ children, title, subtitle, headerExtra, fullBleed = false }: {
@@ -253,7 +217,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
           if (jobId && isLivePendingOffer(offer, me)) void showJobAlert(jobId);
         }
       }).catch(() => {});
-    }, 20_000);
+    }, 8_000);
     ready = true;
     return () => {
       window.clearInterval(timer);

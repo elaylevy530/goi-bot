@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob, signOutCourierSession } from "@/lib/courier-session";
 import { isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
 import { nestListMyCourierNotifications, nestMyNotificationUnreadCount } from "@/lib/nest-domain";
+import { nestListConversations } from "@/lib/nest-chat";
 import {
   nestCourierActiveJobCount,
   nestListCourierDeclines,
@@ -58,12 +59,13 @@ function useDrawerNavCounts(courier?: { id?: string } | null) {
     refetchInterval: 15_000,
     staleTime: 5_000,
     queryFn: async () => {
-      const [pendingOffers, openJobs, activeJobs, declinedRows, notifications] = await Promise.all([
+      const [pendingOffers, openJobs, activeJobs, declinedRows, notifications, conversations] = await Promise.all([
         nestListCourierOffers("pending"),
         nestListOpenBroadcastJobs(),
         nestCourierActiveJobCount(),
         nestListCourierDeclines(),
         nestListMyCourierNotifications().catch(() => []),
+        nestListConversations().catch(() => []),
       ]);
       const unique = new Set<string>();
       for (const o of pendingOffers) {
@@ -78,10 +80,15 @@ function useDrawerNavCounts(courier?: { id?: string } | null) {
         if (isOpenBroadcastJobForCourier(j, courier)) unique.add(j.id);
       }
       const unreadNotifications = (notifications as { read_at?: string | null }[]).filter((n) => !n.read_at).length;
+      const unreadChat = (conversations as { unread_courier?: number }[]).reduce(
+        (n, c) => n + Number(c.unread_courier ?? 0),
+        0,
+      );
       return {
         pendingOffers: unique.size,
         activeJobs,
         unreadNotifications,
+        unreadChat,
       };
     },
   });
@@ -194,7 +201,7 @@ function CourierSideDrawer() {
   const items: NavItem[] = [
     {
       key: "new-jobs",
-      label: "עבודה זמינה",
+      label: "עבודות חדשות",
       to: "/courier/new-jobs",
       icon: Inbox,
       badge: counts?.pendingOffers ?? 0,
@@ -251,6 +258,7 @@ function CourierSideDrawer() {
       label: "צ׳אט",
       to: "/courier/messages",
       icon: MessageSquare,
+      badge: counts?.unreadChat ?? 0,
     },
     {
       key: "my-profile",

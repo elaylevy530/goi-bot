@@ -66,6 +66,14 @@ export function isJobSkippedAtCurrentPrice(job: any, skips?: CourierJobSkip[] | 
   return jobOfferPay(job) <= skippedAt;
 }
 
+/** Shown when dispatch is blocked (pause / admin) without naming the flag. */
+export const COURIER_JOBS_RESTRICTED_MESSAGE =
+  "לא ניתן לקבל משלוחים כרגע — פנה לתמיכה";
+
+export function isCourierJobsRestricted(courier?: any | null) {
+  return courier?.admin_jobs_blocked === true || courier?.is_paused === true;
+}
+
 export function isCourierReceivingJobs(courier?: any | null) {
   if (courier?.courier_status !== "פעיל") return false;
   if (courier?.is_paused === true) return false;
