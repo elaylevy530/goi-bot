@@ -57,6 +57,66 @@ function stageOf(j: any, currentStep?: string): Stage {
 
 function stageIndex(s: Stage) { return STAGES.findIndex(x => x.key === s); }
 
+const ACTIVE_TIMELINE = ["יצאתי לאיסוף", "אספתי", "נמסר"] as const;
+
+function timelineDoneCount(stage: Stage) {
+  if (stage === "to_pickup") return 1;
+  if (stage === "picked_up") return 2;
+  if (stage === "delivered") return 3;
+  return 0;
+}
+
+function CourierActiveTimeline({ stage }: { stage: Stage }) {
+  const done = timelineDoneCount(stage);
+  return (
+    <div className="mt-3 px-0.5" dir="rtl" aria-label="התקדמות משלוח">
+      <div className="flex items-start">
+        {ACTIVE_TIMELINE.map((label, i) => {
+          const isDone = i < done;
+          const isCurrent = i === done && done < ACTIVE_TIMELINE.length;
+          return (
+            <div key={label} className="contents">
+              {i > 0 && (
+                <div
+                  className={cn(
+                    "mx-1 mt-[9px] h-0.5 min-w-3 flex-1 rounded-full transition-colors duration-300",
+                    i <= done ? "bg-primary" : "bg-border",
+                  )}
+                  aria-hidden
+                />
+              )}
+              <div className="flex w-[4.6rem] shrink-0 flex-col items-center gap-1">
+                <span
+                  className={cn(
+                    "grid size-[19px] place-items-center rounded-full border-2 transition-colors duration-300",
+                    isDone && "border-primary bg-primary text-primary-foreground",
+                    isCurrent && "border-primary bg-surface",
+                    !isDone && !isCurrent && "border-border bg-muted",
+                  )}
+                >
+                  {isDone ? (
+                    <Check className="size-3" strokeWidth={3} />
+                  ) : (
+                    <span className={cn("size-1.5 rounded-full", isCurrent ? "bg-primary" : "bg-border-strong")} />
+                  )}
+                </span>
+                <span
+                  className={cn(
+                    "text-center text-[10px] font-extrabold leading-tight",
+                    isDone || isCurrent ? "text-text-strong" : "text-text-muted",
+                  )}
+                >
+                  {label}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 type ActiveTab = "today" | "scheduled";
 
 function todayYmd() {
@@ -144,6 +204,16 @@ export function ActiveJobs() {
           console.error("[notify-customer-status] client dispatch failed", e);
         }
       }
+    },
+    onMutate: async ({ job_id, step }) => {
+      await qc.cancelQueries({ queryKey: ["active-jobs"] });
+      qc.setQueryData(["active-jobs", me?.id], (old: { id: string; courier_step?: string | null }[] | undefined) =>
+        (old ?? []).map((j) => (j.id === job_id ? { ...j, courier_step: step } : j)),
+      );
+      qc.setQueriesData({ queryKey: ["active-job-steps"] }, (old: Record<string, string> | undefined) => ({
+        ...(old ?? {}),
+        [job_id]: step,
+      }));
     },
     onSuccess: (_d, v) => {
       toast.success("הסטטוס עודכן");
@@ -237,7 +307,10 @@ export function ActiveJobs() {
       )}
 
       {filtered.map((j) => {
-        const step = (lastSteps as Record<string, string>)[j.id];
+        const pendingStep = setStep.isPending && setStep.variables?.job_id === j.id
+          ? setStep.variables.step
+          : null;
+        const step = pendingStep ?? (lastSteps as Record<string, string>)[j.id] ?? (j as { courier_step?: string | null }).courier_step;
         const stage = stageOf(j, step);
         const outcome = Array.isArray((j as any).job_outcomes) ? (j as any).job_outcomes[0] : (j as any).job_outcomes;
         const pickedUp = !!outcome?.picked_up_at;
@@ -286,6 +359,8 @@ export function ActiveJobs() {
                 <p className="mt-1 max-w-[4.5rem] text-[10px] font-semibold leading-tight text-success-text">תגמול עבור המשלוח</p>
               </div>
             </div>
+
+            <CourierActiveTimeline stage={stage} />
 
             <div className="mt-3 rounded-card border border-border px-3 py-3">
               <div className="relative pr-1">
