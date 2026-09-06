@@ -93,6 +93,10 @@ export class Customer {
   @Column({ type: "int", default: 10 })
   favorites_fallback_minutes!: number;
 
+  /** Courier countdown after the job becomes active. */
+  @Column({ type: "int", default: 35 })
+  delivery_minutes!: number;
+
   @Column({ type: "boolean", default: false })
   invoice_required!: boolean;
 

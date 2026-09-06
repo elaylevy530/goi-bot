@@ -35,6 +35,7 @@ function SettingsPage() {
   const [notifyRecipient, setNotifyRecipient] = useState(true);
   const [favFirst, setFavFirst] = useState(true);
   const [favFallback, setFavFallback] = useState(3);
+  const [deliveryMin, setDeliveryMin] = useState(35);
   const [bizName, setBizName] = useState("");
   const [taxId, setTaxId] = useState("");
   const [phone, setPhone] = useState("");
@@ -54,6 +55,7 @@ function SettingsPage() {
       setNotifyRecipient((me as any).notify_recipient_enabled ?? true);
       setFavFirst((me as any).favorites_first_enabled ?? true);
       setFavFallback((me as any).favorites_fallback_minutes ?? 3);
+      setDeliveryMin((me as any).delivery_minutes ?? 35);
       setBizName((me as any).business_name || me.name || "");
       setTaxId((me as any).business_tax_id || "");
       setPhone(me.phone || "");
@@ -92,7 +94,7 @@ function SettingsPage() {
   });
 
   const savePrefs = useMutation({
-    mutationFn: async (next: { notify_wa?: boolean; notify_email?: boolean; account_mode?: "private" | "business"; pickup_watchdog_enabled?: boolean; pickup_reminder_minutes?: number; pickup_redispatch_minutes?: number; notify_recipient_enabled?: boolean; favorites_first_enabled?: boolean; favorites_fallback_minutes?: number }) => {
+    mutationFn: async (next: { notify_wa?: boolean; notify_email?: boolean; account_mode?: "private" | "business"; pickup_watchdog_enabled?: boolean; pickup_reminder_minutes?: number; pickup_redispatch_minutes?: number; notify_recipient_enabled?: boolean; favorites_first_enabled?: boolean; favorites_fallback_minutes?: number; delivery_minutes?: number }) => {
       if (!me) return;
       const patch: any = {};
       if (next.notify_wa !== undefined) patch.notify_wa = next.notify_wa;
@@ -104,6 +106,7 @@ function SettingsPage() {
       if (next.notify_recipient_enabled !== undefined) patch.notify_recipient_enabled = next.notify_recipient_enabled;
       if (next.favorites_first_enabled !== undefined) patch.favorites_first_enabled = next.favorites_first_enabled;
       if (next.favorites_fallback_minutes !== undefined) patch.favorites_fallback_minutes = next.favorites_fallback_minutes;
+      if (next.delivery_minutes !== undefined) patch.delivery_minutes = next.delivery_minutes;
       await nestUpdateMyCustomer(patch);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["business-me"] }); toast.success("ההעדפות נשמרו"); },
@@ -366,6 +369,26 @@ function SettingsPage() {
                   ))}
                 </ul>
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-slate-200 shadow-sm lg:col-span-2">
+          <CardHeader><CardTitle>זמן מסירה</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-slate-600">
+              אחרי שהשליח לוקח משלוח, בכרטיס הפעיל רץ טיימר לאחור לפי הזמן הזה. ברירת המחדל היא 35 דקות.
+            </p>
+            <div>
+              <Label>זמן מסירה (דקות)</Label>
+              <Input
+                type="number"
+                min={5}
+                max={240}
+                value={deliveryMin}
+                onChange={(e) => setDeliveryMin(Math.max(5, Math.min(240, Number(e.target.value) || 35)))}
+                onBlur={() => savePrefs.mutate({ delivery_minutes: deliveryMin })}
+              />
             </div>
           </CardContent>
         </Card>

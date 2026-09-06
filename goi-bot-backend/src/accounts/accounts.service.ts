@@ -188,6 +188,9 @@ export class AccountsService implements OnModuleInit {
       `ALTER TABLE customers ADD COLUMN IF NOT EXISTS referred_by_courier_id uuid`,
     );
     await this.dataSource.query(
+      `ALTER TABLE customers ADD COLUMN IF NOT EXISTS delivery_minutes int DEFAULT 35`,
+    );
+    await this.dataSource.query(
       `CREATE INDEX IF NOT EXISTS IDX_customers_referred_by_courier_id ON customers (referred_by_courier_id)`,
     );
     await this.dataSource.query(`

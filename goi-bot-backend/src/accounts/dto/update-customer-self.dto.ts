@@ -6,6 +6,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from "class-validator";
@@ -104,6 +105,12 @@ export class UpdateCustomerSelfDto {
   @IsInt()
   @Min(0)
   favorites_fallback_minutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  delivery_minutes?: number;
 
   @IsOptional()
   @IsBoolean()

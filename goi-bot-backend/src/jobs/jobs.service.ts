@@ -46,6 +46,13 @@ function generateTrackingToken(): string {
 }
 
 const OFFER_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_DELIVERY_MINUTES = 35;
+
+function clampDeliveryMinutes(value?: number | null) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_DELIVERY_MINUTES;
+  return Math.max(5, Math.min(240, Math.round(n)));
+}
 
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
@@ -81,6 +88,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     );
     void this.jobs.query(
       `ALTER TABLE courier_job_declines ADD COLUMN IF NOT EXISTS declined_price numeric`,
+    );
+    void this.jobs.query(
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_minutes int`,
     );
     this.scheduledGoOnlineTimer = setInterval(() => {
       void this.activateCouriersForUpcomingScheduledJobs();
@@ -425,13 +435,17 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     }
 
     let customerId = dto.customer_id ?? null;
+    let customer = customerId
+      ? await this.customers.findOne({ where: { id: customerId } })
+      : null;
     if (!customerId && (roles.includes("business") || roles.includes("customer"))) {
-      const customer = await this.findCustomerForUser(userId);
+      customer = await this.findCustomerForUser(userId);
       customerId = customer?.id ?? null;
       if (!dto.customer_name && customer?.name) {
         dto.customer_name = customer.name;
       }
     }
+    const deliveryMinutes = clampDeliveryMinutes(customer?.delivery_minutes);
 
     const jobNumber =
       dto.job_number ??
@@ -503,6 +517,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
           Object.keys(pricingSnapshot).length > 0 ? pricingSnapshot : null,
         guest_name: dto.guest_name ?? null,
         guest_phone: dto.guest_phone ?? null,
+        delivery_minutes: deliveryMinutes,
       }),
     );
   }

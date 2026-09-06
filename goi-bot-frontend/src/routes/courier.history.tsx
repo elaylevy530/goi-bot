@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMyCourier } from "@/components/CourierShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,10 +66,67 @@ function timelineDoneCount(stage: Stage) {
   return 0;
 }
 
+const DEFAULT_DELIVERY_MINUTES = 35;
+
+function deliveryMinutesOf(job: { delivery_minutes?: number | null }) {
+  const n = Number(job.delivery_minutes);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_DELIVERY_MINUTES;
+}
+
+function DeliverySlaTimer({
+  acceptedAt,
+  createdAt,
+  minutes,
+}: {
+  acceptedAt?: string | null;
+  createdAt?: string | null;
+  minutes: number;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const start = new Date(acceptedAt || createdAt || now).getTime();
+  if (!Number.isFinite(start)) return null;
+  const totalMs = Math.max(1, minutes) * 60_000;
+  const left = start + totalMs - now;
+  const overdue = left < 0;
+  const abs = Math.abs(left);
+  const mm = Math.floor(abs / 60_000);
+  const ss = Math.floor((abs % 60_000) / 1000);
+  const clock = `${overdue ? "+" : ""}${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  const pct = Math.max(0, Math.min(100, (left / totalMs) * 100));
+  const urgent = !overdue && left <= 5 * 60_000;
+  return (
+    <div
+      className={cn(
+        "mt-2 rounded-card px-2.5 py-1.5",
+        overdue ? "bg-danger-bg text-danger-text" : urgent ? "bg-warning-bg text-warning-text" : "bg-primary-soft text-primary",
+      )}
+      aria-label={`זמן מסירה ${clock}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold">
+          <Clock className="size-3" />
+          זמן מסירה
+        </span>
+        <span className="tabular-nums text-sm font-black leading-none">{clock}</span>
+      </div>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-black/10">
+        <div
+          className={cn("h-full rounded-full", overdue ? "bg-danger-text" : urgent ? "bg-warning-text" : "bg-primary")}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function CourierActiveTimeline({ stage }: { stage: Stage }) {
   const done = timelineDoneCount(stage);
   return (
-    <div className="mt-3 px-0.5" dir="rtl" aria-label="התקדמות משלוח">
+    <div className="mt-2 px-0.5" dir="rtl" aria-label="התקדמות משלוח">
       <div className="flex items-start">
         {ACTIVE_TIMELINE.map((label, i) => {
           const isDone = i < done;
@@ -79,30 +136,30 @@ function CourierActiveTimeline({ stage }: { stage: Stage }) {
               {i > 0 && (
                 <div
                   className={cn(
-                    "mx-1 mt-[9px] h-0.5 min-w-3 flex-1 rounded-full transition-colors duration-300",
+                    "mx-1 mt-[7px] h-0.5 min-w-3 flex-1 rounded-full transition-colors duration-300",
                     i <= done ? "bg-primary" : "bg-border",
                   )}
                   aria-hidden
                 />
               )}
-              <div className="flex w-[4.6rem] shrink-0 flex-col items-center gap-1">
+              <div className="flex w-[4.2rem] shrink-0 flex-col items-center gap-0.5">
                 <span
                   className={cn(
-                    "grid size-[19px] place-items-center rounded-full border-2 transition-colors duration-300",
+                    "grid size-4 place-items-center rounded-full border-2 transition-colors duration-300",
                     isDone && "border-primary bg-primary text-primary-foreground",
                     isCurrent && "border-primary bg-surface",
                     !isDone && !isCurrent && "border-border bg-muted",
                   )}
                 >
                   {isDone ? (
-                    <Check className="size-3" strokeWidth={3} />
+                    <Check className="size-2.5" strokeWidth={3} />
                   ) : (
-                    <span className={cn("size-1.5 rounded-full", isCurrent ? "bg-primary" : "bg-border-strong")} />
+                    <span className={cn("size-1 rounded-full", isCurrent ? "bg-primary" : "bg-border-strong")} />
                   )}
                 </span>
                 <span
                   className={cn(
-                    "text-center text-[10px] font-extrabold leading-tight",
+                    "text-center text-[9px] font-extrabold leading-tight",
                     isDone || isCurrent ? "text-text-strong" : "text-text-muted",
                   )}
                 >
@@ -324,74 +381,79 @@ export function ActiveJobs() {
         return (
           <article
             key={j.id}
-            className="rounded-card border border-border bg-surface p-3 shadow-card-strong"
+            className="rounded-card border border-border bg-surface p-2.5 shadow-card-strong"
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2">
               <BusinessLogo
                 path={(j as any).customer_logo_path}
                 name={j.customer_name}
-                size={44}
+                size={36}
                 className="ring-2 ring-primary/20"
               />
               <div className="min-w-0 flex-1 text-right">
-                <h3 className="truncate text-sm font-extrabold text-text-strong">{j.customer_name ?? "משלוח"}</h3>
-                <p className="mt-0.5 truncate text-xs text-text-subtle">
-                  לקוח: {j.recipient_name || "—"}
+                <h3 className="truncate text-[13px] font-extrabold text-text-strong">{j.customer_name ?? "משלוח"}</h3>
+                <p className="mt-0.5 flex min-w-0 items-center justify-end gap-1.5 text-[11px] text-text-subtle">
+                  <span className="truncate">לקוח: {j.recipient_name || "—"}</span>
+                  {jobNo && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(String(j.job_number)).then(
+                          () => toast.success("מספר המשלוח הועתק"),
+                          () => toast.error("לא הצלחנו להעתיק"),
+                        );
+                      }}
+                      className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-text-muted"
+                    >
+                      {jobNo}
+                      <Copy className="size-2.5" aria-hidden />
+                    </button>
+                  )}
                 </p>
-                {jobNo && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(String(j.job_number)).then(
-                        () => toast.success("מספר המשלוח הועתק"),
-                        () => toast.error("לא הצלחנו להעתיק"),
-                      );
-                    }}
-                    className="mt-1 inline-flex min-h-8 items-center gap-1 font-mono text-[11px] text-text-muted"
-                  >
-                    {jobNo}
-                    <Copy className="size-3" aria-hidden />
-                  </button>
-                )}
               </div>
-              <div className="shrink-0 rounded-card bg-primary-soft px-3 py-2 text-center">
-                <p className="text-lg font-black tabular-nums leading-none text-primary">₪{Number(j.payment ?? 0).toFixed(0)}</p>
-                <p className="mt-1 max-w-[4.5rem] text-[10px] font-semibold leading-tight text-success-text">תגמול עבור המשלוח</p>
+              <div className="shrink-0 rounded-card bg-primary-soft px-2 py-1.5 text-center">
+                <p className="text-base font-black tabular-nums leading-none text-primary">₪{Number(j.payment ?? 0).toFixed(0)}</p>
+                <p className="mt-0.5 max-w-[4.2rem] text-[9px] font-semibold leading-tight text-success-text">תגמול למשלוח</p>
               </div>
             </div>
 
             <CourierActiveTimeline stage={stage} />
+            <DeliverySlaTimer
+              acceptedAt={(j as { accepted_at?: string | null }).accepted_at}
+              createdAt={(j as { created_at?: string | null }).created_at}
+              minutes={deliveryMinutesOf(j as { delivery_minutes?: number | null })}
+            />
 
-            <div className="mt-3 rounded-card border border-border px-3 py-3">
+            <div className="mt-2 rounded-card border border-border px-2.5 py-2">
               <div className="relative pr-1">
-                <div className="absolute right-[7px] top-3 bottom-3 border-r border-dashed border-border-strong" aria-hidden />
-                <div className="relative flex items-start gap-3">
-                  <span className="z-10 mt-1 size-3.5 shrink-0 rounded-full bg-primary ring-4 ring-primary-soft" />
+                <div className="absolute right-[6px] top-2 bottom-2 border-r border-dashed border-border-strong" aria-hidden />
+                <div className="relative flex items-start gap-2.5">
+                  <span className="z-10 mt-0.5 size-3 shrink-0 rounded-full bg-primary ring-2 ring-primary-soft" />
                   <div className="min-w-0 flex-1 text-right">
-                    <p className="text-[10px] font-bold text-text-muted">איסוף</p>
-                    <p className="truncate text-sm font-semibold text-text-strong">{j.pickup_address ?? j.pickup_area ?? "—"}</p>
+                    <p className="text-[9px] font-bold text-text-muted">איסוף</p>
+                    <p className="truncate text-[13px] font-semibold text-text-strong">{j.pickup_address ?? j.pickup_area ?? "—"}</p>
                     <span className={cn(
-                      "mt-1.5 inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[10px] font-bold",
+                      "mt-1 inline-flex items-center gap-1 rounded-pill px-1.5 py-px text-[9px] font-bold",
                       cash ? "bg-warning-bg text-warning-text" : "bg-danger-bg text-danger-text",
                     )}>
-                      {cash ? <Banknote className="size-3" /> : <CreditCard className="size-3" />}
+                      {cash ? <Banknote className="size-2.5" /> : <CreditCard className="size-2.5" />}
                       {cash ? "מזומן באיסוף" : "שולם באשראי"}
                     </span>
                   </div>
                 </div>
-                <div className="relative mt-3 flex items-start gap-3">
-                  <span className="z-10 mt-0.5 grid size-3.5 shrink-0 place-items-center text-text-muted">
-                    <MapPin className="size-3.5" />
+                <div className="relative mt-2 flex items-start gap-2.5">
+                  <span className="z-10 mt-0.5 grid size-3 shrink-0 place-items-center text-text-muted">
+                    <MapPin className="size-3" />
                   </span>
                   <div className="min-w-0 flex-1 text-right">
-                    <p className="text-[10px] font-bold text-text-muted">מסירה</p>
-                    <p className="truncate text-sm font-semibold text-text-strong">{j.dropoff_address ?? j.dropoff_area ?? "—"}</p>
+                    <p className="text-[9px] font-bold text-text-muted">מסירה</p>
+                    <p className="truncate text-[13px] font-semibold text-text-strong">{j.dropoff_address ?? j.dropoff_area ?? "—"}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button
                 type="button"
                 onClick={() => {
@@ -401,9 +463,9 @@ export function ActiveJobs() {
                   }
                   openWaze(pickupNav);
                 }}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-card border border-border bg-surface text-[12px] font-bold text-text-strong"
+                className="flex min-h-10 items-center justify-center gap-1.5 rounded-card border border-border bg-surface text-[11px] font-bold text-text-strong"
               >
-                <Navigation className="size-4 text-primary" />
+                <Navigation className="size-3.5 text-primary" />
                 נווט לעסק
               </button>
               <button
@@ -415,37 +477,37 @@ export function ActiveJobs() {
                   }
                   openWaze(dropoffNav);
                 }}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-card border border-border bg-surface text-[12px] font-bold text-text-strong"
+                className="flex min-h-10 items-center justify-center gap-1.5 rounded-card border border-border bg-surface text-[11px] font-bold text-text-strong"
               >
-                <Navigation className="size-4 text-primary" />
+                <Navigation className="size-3.5 text-primary" />
                 נווט ללקוח
               </button>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-2">
-              <div className="flex items-center justify-center gap-2 px-2">
-                <Banknote className="size-4 text-primary" aria-hidden />
+            <div className="mt-2 grid grid-cols-2 divide-x divide-x-reverse divide-border border-y border-border py-1.5">
+              <div className="flex items-center justify-center gap-1.5 px-2">
+                <Banknote className="size-3.5 text-primary" aria-hidden />
                 <div className="text-right">
-                  <p className="text-xs font-extrabold text-text-strong">{cash ? "מזומן ללקוח" : "שולם באשראי"}</p>
-                  <p className="text-[10px] text-text-muted">אופן תשלום</p>
+                  <p className="text-[11px] font-extrabold text-text-strong">{cash ? "מזומן ללקוח" : "שולם באשראי"}</p>
+                  <p className="text-[9px] text-text-muted">אופן תשלום</p>
                 </div>
               </div>
-              <div className="flex items-center justify-center gap-2 px-2">
-                <MapPin className="size-4 text-primary" aria-hidden />
+              <div className="flex items-center justify-center gap-1.5 px-2">
+                <MapPin className="size-3.5 text-primary" aria-hidden />
                 <div className="text-right">
-                  <p className="text-xs font-extrabold tabular-nums text-text-strong">{km != null ? `${km.toFixed(1)} ק״מ` : "—"}</p>
-                  <p className="text-[10px] text-text-muted">מרחק כולל</p>
+                  <p className="text-[11px] font-extrabold tabular-nums text-text-strong">{km != null ? `${km.toFixed(1)} ק״מ` : "—"}</p>
+                  <p className="text-[9px] text-text-muted">מרחק כולל</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => { void openBusinessChat(j); }}
-                className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-card border border-border bg-surface text-[11px] font-bold text-primary"
+                className="flex min-h-10 flex-col items-center justify-center gap-px rounded-card border border-border bg-surface text-[10px] font-bold text-primary"
               >
-                <MessageCircle className="size-4" />
+                <MessageCircle className="size-3.5" />
                 צ׳אט עסק
               </button>
               <button
@@ -455,17 +517,17 @@ export function ActiveJobs() {
                   if (p) window.location.href = `tel:${p}`;
                   else toast.error("אין מספר לקוח");
                 }}
-                className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-card border border-border bg-surface text-[11px] font-bold text-text-strong"
+                className="flex min-h-10 flex-col items-center justify-center gap-px rounded-card border border-border bg-surface text-[10px] font-bold text-text-strong"
               >
-                <Phone className="size-4" />
+                <Phone className="size-3.5" />
                 חייג ללקוח
               </button>
               <button
                 type="button"
                 onClick={() => setContactJob(j)}
-                className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-card border border-border bg-surface text-[11px] font-bold text-text-strong"
+                className="flex min-h-10 flex-col items-center justify-center gap-px rounded-card border border-border bg-surface text-[10px] font-bold text-text-strong"
               >
-                <Info className="size-4" />
+                <Info className="size-3.5" />
                 פרטים
               </button>
             </div>
@@ -475,7 +537,7 @@ export function ActiveJobs() {
                 type="button"
                 onClick={() => setStep.mutate({ job_id: j.id, step: primary.step })}
                 disabled={setStep.isPending}
-                className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-card bg-primary-deep text-[15px] font-extrabold text-primary-foreground shadow-card-strong active:opacity-90 disabled:opacity-60"
+                className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-card bg-primary-deep text-[14px] font-extrabold text-primary-foreground shadow-card-strong active:opacity-90 disabled:opacity-60"
               >
                 <primary.icon className="size-5" strokeWidth={2.5} />
                 {primary.label}

@@ -235,6 +235,10 @@ export class Job {
   @Column({ type: "jsonb", nullable: true })
   pricing_snapshot!: Record<string, unknown> | null;
 
+  /** SLA minutes stamped from the business setting when the job was created. */
+  @Column({ type: "int", nullable: true })
+  delivery_minutes!: number | null;
+
   @Column({ type: "timestamptz", nullable: true })
   accepted_at!: Date | null;
 

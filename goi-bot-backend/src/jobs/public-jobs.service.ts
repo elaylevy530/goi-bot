@@ -284,6 +284,7 @@ export class PublicJobsService {
         distance_km: distanceKm != null ? distanceKm.toFixed(2) : null,
         job_date: jobDate,
         job_time: jobTime,
+        delivery_minutes: 35,
         pricing_snapshot: snapshot,
         partner_id: partnerId,
         quote_deadline_at:
