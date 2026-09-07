@@ -50,6 +50,21 @@ export type CourierJobSkip = {
   declined_price?: string | number | null;
 };
 
+export function mergeCourierSkipRows(
+  server: CourierJobSkip[] | null | undefined,
+  session: Iterable<readonly [string, number]>,
+): CourierJobSkip[] {
+  const merged = new Map<string, CourierJobSkip>();
+  for (const row of server ?? []) {
+    const id = String(row.job_id ?? "");
+    if (id) merged.set(id, row);
+  }
+  for (const [id, price] of session) {
+    if (id) merged.set(id, { job_id: id, declined_price: price });
+  }
+  return [...merged.values()];
+}
+
 export function jobOfferPay(job: any): number {
   const n = Number(job?.suggested_courier_payment ?? job?.payment ?? job?.customer_price ?? 0);
   return Number.isFinite(n) ? n : 0;

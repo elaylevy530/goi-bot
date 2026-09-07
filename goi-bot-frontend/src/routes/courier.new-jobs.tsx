@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { termsFor } from "@/lib/courier-kind";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { ApiClientError } from "@/lib/api-client";
 import { isNestPreviewReadOnly } from "@/lib/nest-preview-cache";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
-import { COURIER_JOBS_RESTRICTED_MESSAGE, isCourierApproved, isCourierJobsRestricted, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay } from "@/lib/courier-live-jobs";
+import { COURIER_JOBS_RESTRICTED_MESSAGE, isCourierApproved, isCourierJobsRestricted, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay, mergeCourierSkipRows } from "@/lib/courier-live-jobs";
 import { ContactBlock } from "@/routes/courier.history";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
@@ -71,6 +71,8 @@ function NewJobsPage() {
   const [quoteFor, setQuoteFor] = useState<any>(null);
   const [activeOffer, setActiveOffer] = useState<MapJob | null>(null);
   const [stickyFocusId, setStickyFocusId] = useState<string | undefined>();
+  const sessionSkippedRef = useRef(new Map<string, number>());
+  const [sessionSkipGen, setSessionSkipGen] = useState(0);
 
   const { data: declinedRows = [] } = useQuery({
     queryKey: ["courier-job-declines", me?.id],
@@ -80,7 +82,15 @@ function NewJobsPage() {
       return rows.map((r) => ({ job_id: r.job_id, declined_price: r.declined_price }));
     },
   });
-  const declinedRowsSafe = declinedRows as { job_id: string; declined_price?: string | number | null }[];
+  const declinedRowsSafe = useMemo(
+    () => mergeCourierSkipRows(declinedRows as { job_id: string; declined_price?: string | number | null }[], sessionSkippedRef.current),
+    [declinedRows, sessionSkipGen],
+  );
+  const currentSkipRows = () =>
+    mergeCourierSkipRows(
+      qc.getQueryData<{ job_id: string; declined_price?: string | number | null }[]>(["courier-job-declines", me?.id]),
+      sessionSkippedRef.current,
+    );
 
   const { data: offers = [], isFetched: offersFetched, isError: offersError, isFetching: offersFetching } = useQuery({
     queryKey: ["new-jobs", me?.id, "pending"],
@@ -89,7 +99,7 @@ function NewJobsPage() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListCourierOffers("pending");
-      const skips = qc.getQueryData<typeof declinedRowsSafe>(["courier-job-declines", me?.id]) ?? [];
+      const skips = currentSkipRows();
       return data
         .filter((offer: any) => {
           const job = offer?.jobs;
@@ -110,7 +120,7 @@ function NewJobsPage() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenQuoteJobs();
-      const skips = qc.getQueryData<typeof declinedRowsSafe>(["courier-job-declines", me?.id]) ?? [];
+      const skips = currentSkipRows();
       return data.filter((j: any) => isOpenQuoteJobForCourier(j, me) && !isJobSkippedAtCurrentPrice(j, skips));
     },
   });
@@ -130,7 +140,7 @@ function NewJobsPage() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const data = await nestListOpenBroadcastJobs();
-      const skips = qc.getQueryData<typeof declinedRowsSafe>(["courier-job-declines", me?.id]) ?? [];
+      const skips = currentSkipRows();
       return data.filter((j: any) => isOpenBroadcastJobForCourier(j, me) && !isJobSkippedAtCurrentPrice(j, skips));
     },
   });
@@ -236,6 +246,9 @@ function NewJobsPage() {
   const hideJobLocally = (job: { id: string; suggested_courier_payment?: unknown; payment?: unknown; customer_price?: unknown }) => {
     if (!me?.id || !job.id) return;
     const price = jobOfferPay(job);
+    sessionSkippedRef.current.set(job.id, price);
+    setSessionSkipGen((n) => n + 1);
+    void qc.cancelQueries({ queryKey: ["courier-job-declines", me.id] });
     qc.setQueryData(
       ["courier-job-declines", me.id],
       (old: { job_id: string; declined_price?: string | number | null }[] | undefined) => {
@@ -264,20 +277,15 @@ function NewJobsPage() {
     setDetail(null);
   };
 
-  const persistSkip = (job: { id: string; offerId?: string }, price: number) => {
+  const persistSkip = (job: { id: string; offerId?: string }) => {
     if (!me?.id) return;
     if (isNestPreviewReadOnly()) return;
     void (async () => {
       try {
-        await nestAddCourierDecline(job.id, Number.isFinite(price) ? price : 0);
+        await nestAddCourierDecline(job.id);
       } catch (e) {
         if (e instanceof ApiClientError && e.code === "preview_read_only") return;
-        toast.error(e instanceof Error ? e.message : "שגיאה");
-        qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
-        qc.invalidateQueries({ queryKey: ["new-jobs"] });
-        qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
-        qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
-        return;
+        /* keep the local skip even if the live API DTO rejects extra fields */
       }
       if (!job.offerId) return;
       try {
@@ -296,12 +304,14 @@ function NewJobsPage() {
     customer_price?: unknown;
   }) => {
     hideJobLocally(job);
-    persistSkip({ id: job.id, offerId: job.offerId }, jobOfferPay(job));
+    persistSkip({ id: job.id, offerId: job.offerId });
     toast(t.jobRemoved, {
       action: {
         label: "בטל דילוג",
         onClick: () => {
           if (!me?.id) return;
+          sessionSkippedRef.current.delete(job.id);
+          setSessionSkipGen((n) => n + 1);
           qc.setQueryData(
             ["courier-job-declines", me.id],
             (old: { job_id: string }[] | undefined) => (old ?? []).filter((r) => r.job_id !== job.id),

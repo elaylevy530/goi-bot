@@ -5,6 +5,7 @@ import {
   isCourierReceivingJobs,
   isJobSkippedAtCurrentPrice,
   jobOfferPay,
+  mergeCourierSkipRows,
 } from "./courier-live-jobs";
 
 describe("job skip is per delivery, not per business", () => {
@@ -32,6 +33,12 @@ describe("job skip is per delivery, not per business", () => {
   it("keeps a legacy skip hidden until a priced re-offer", () => {
     const skips = [{ job_id: "job-a", declined_price: null }];
     expect(isJobSkippedAtCurrentPrice({ id: "job-a", payment: 50 }, skips)).toBe(true);
+  });
+
+  it("keeps a session skip even if the server list does not have it yet", () => {
+    const merged = mergeCourierSkipRows([], [["job-a", 30]]);
+    expect(isJobSkippedAtCurrentPrice({ id: "job-a", payment: 30 }, merged)).toBe(true);
+    expect(isJobSkippedAtCurrentPrice({ id: "job-b", payment: 30 }, merged)).toBe(false);
   });
 });
 
