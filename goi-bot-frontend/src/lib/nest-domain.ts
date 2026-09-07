@@ -144,10 +144,13 @@ export function nestListMyCourierReferrals() {
     commissions?: {
       id?: string;
       job_id?: string;
+      job_number?: string | null;
       kind?: "courier" | "business";
       amount?: number;
       created_at?: string;
       walleted_at?: string | null;
+      source_name?: string | null;
+      source_avatar_url?: string | null;
     }[];
     commission_ils?: number;
     totals?: Record<string, number>;

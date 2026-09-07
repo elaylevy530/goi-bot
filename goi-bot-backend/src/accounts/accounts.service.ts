@@ -61,10 +61,13 @@ export type CourierReferralsPayload = {
   commissions: {
     id: string;
     job_id: string;
+    job_number: string | null;
     kind: "courier" | "business";
     amount: number;
     created_at: Date;
     walleted_at: Date | null;
+    source_name: string;
+    source_avatar_url: string | null;
   }[];
   commission_ils: number;
   totals: {
@@ -294,7 +297,32 @@ export class AccountsService implements OnModuleInit {
     const jobsByCourier = await this.completedJobsByCourier(unique.map((c) => c.id));
     const mine = await this.commissions.find({
       where: { beneficiary_courier_id: me.id },
+      order: { created_at: "DESC" },
     });
+    const sourceCourierIds = [...new Set(mine.map((row) => row.source_courier_id).filter(Boolean))] as string[];
+    const sourceBusinessIds = [...new Set(mine.map((row) => row.source_customer_id).filter(Boolean))] as string[];
+    const jobIds = [...new Set(mine.map((row) => row.job_id).filter(Boolean))];
+    const sourceCouriers = sourceCourierIds.length
+      ? await this.couriers.find({
+          where: { id: In(sourceCourierIds) },
+          select: ["id", "full_name", "avatar_url"],
+        })
+      : [];
+    const sourceBusinesses = sourceBusinessIds.length
+      ? await this.customers.find({
+          where: { id: In(sourceBusinessIds) },
+          select: ["id", "name", "business_name", "logo_url"],
+        })
+      : [];
+    const sourceJobs = jobIds.length
+      ? await this.jobs.find({
+          where: { id: In(jobIds) },
+          select: ["id", "job_number"],
+        })
+      : [];
+    const courierById = new Map(sourceCouriers.map((c) => [c.id, c]));
+    const businessById = new Map(sourceBusinesses.map((b) => [b.id, b]));
+    const jobById = new Map(sourceJobs.map((j) => [j.id, j]));
     const profitByCourier = new Map<string, number>();
     const profitByBusiness = new Map<string, number>();
     let profit = 0;
@@ -357,14 +385,27 @@ export class AccountsService implements OnModuleInit {
     return {
       couriers,
       businesses,
-      commissions: mine.map((row) => ({
-        id: row.id,
-        job_id: row.job_id,
-        kind: row.kind,
-        amount: Number(row.amount) || 0,
-        created_at: row.created_at,
-        walleted_at: row.walleted_at ?? null,
-      })),
+      commissions: mine.map((row) => {
+        const sourceCourier = row.source_courier_id ? courierById.get(row.source_courier_id) : null;
+        const sourceBusiness = row.source_customer_id ? businessById.get(row.source_customer_id) : null;
+        const sourceName = row.kind === "business"
+          ? (sourceBusiness?.business_name || sourceBusiness?.name || "עסק")
+          : (sourceCourier?.full_name || "שליח");
+        const sourceAvatar = row.kind === "business"
+          ? (sourceBusiness?.logo_url ?? null)
+          : (sourceCourier?.avatar_url ?? null);
+        return {
+          id: row.id,
+          job_id: row.job_id,
+          job_number: jobById.get(row.job_id)?.job_number ?? null,
+          kind: row.kind,
+          amount: Number(row.amount) || 0,
+          created_at: row.created_at,
+          walleted_at: row.walleted_at ?? null,
+          source_name: sourceName,
+          source_avatar_url: sourceAvatar,
+        };
+      }),
       commission_ils: REFERRAL_COMMISSION_ILS,
       totals: {
         couriers_registered: couriers.length,

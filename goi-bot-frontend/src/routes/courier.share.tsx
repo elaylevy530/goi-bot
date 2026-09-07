@@ -44,10 +44,13 @@ type ReferralPayload = {
   commissions?: {
     id?: string;
     job_id?: string;
+    job_number?: string | null;
     kind?: "courier" | "business";
     amount?: number;
     created_at?: string;
     walleted_at?: string | null;
+    source_name?: string | null;
+    source_avatar_url?: string | null;
   }[];
   commission_ils?: number;
   totals?: {
@@ -76,6 +79,47 @@ function joinDate(iso?: string | null) {
   return new Date(iso).toLocaleDateString("he-IL");
 }
 
+type CommissionRow = NonNullable<ReferralPayload["commissions"]>[number];
+
+function groupDeliveryEarnings(rows: CommissionRow[]) {
+  const groups: {
+    key: string;
+    created_at?: string;
+    walleted: boolean;
+    amount: number;
+    job_number?: string | null;
+    couriers: { name: string; avatar?: string | null }[];
+    businesses: { name: string; avatar?: string | null }[];
+  }[] = [];
+  const index = new Map<string, (typeof groups)[number]>();
+  for (const row of rows) {
+    const key = row.job_id || row.id || `${row.created_at}-${row.kind}`;
+    let group = index.get(key);
+    if (!group) {
+      group = {
+        key,
+        created_at: row.created_at,
+        walleted: false,
+        amount: 0,
+        job_number: row.job_number,
+        couriers: [],
+        businesses: [],
+      };
+      index.set(key, group);
+      groups.push(group);
+    }
+    group.amount += Number(row.amount ?? 0);
+    if (row.walleted_at) group.walleted = true;
+    const person = {
+      name: row.source_name?.trim() || (row.kind === "business" ? "עסק" : "שליח"),
+      avatar: row.source_avatar_url,
+    };
+    if (row.kind === "business") group.businesses.push(person);
+    else group.couriers.push(person);
+  }
+  return groups;
+}
+
 async function fetchReferrals(): Promise<ReferralPayload> {
   const token = getNestAccessToken();
   if (!token) return {};
@@ -92,6 +136,7 @@ function SharePage() {
   const { data: me, isPending: mePending } = useMyCourier();
   const [tab, setTab] = useState<"courier" | "business">("courier");
   const [showAll, setShowAll] = useState(false);
+  const [showAllJobs, setShowAllJobs] = useState(false);
   const code = referralCode(me);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://goi.co.il";
   const courierLink = code ? `${origin}/join?ref=${encodeURIComponent(code)}` : "";
@@ -109,6 +154,8 @@ function SharePage() {
   const couriers = data?.couriers ?? [];
   const businesses = data?.businesses ?? [];
   const commissions = data?.commissions ?? [];
+  const deliveries = useMemo(() => groupDeliveryEarnings(commissions), [commissions]);
+  const visibleDeliveries = showAllJobs ? deliveries : deliveries.slice(0, 8);
   const list = tab === "courier" ? couriers : businesses;
   const visible = showAll ? list : list.slice(0, 4);
   const totals = data?.totals ?? {};
@@ -184,9 +231,9 @@ function SharePage() {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
           <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
             <section className="overflow-hidden rounded-[1.5rem] bg-[#104421] text-white shadow-[0_12px_28px_rgba(12,40,18,0.22)]">
-              <div className="relative h-48 w-full overflow-hidden sm:h-56">
+              <div className="relative h-56 w-full overflow-hidden sm:h-64">
                 <img
-                  src="/courier/share-hero.png?v=4"
+                  src="/courier/share-hero.png?v=5"
                   alt=""
                   className="absolute inset-0 h-full w-full object-contain object-bottom"
                 />
@@ -252,6 +299,61 @@ function SharePage() {
                 >
                   מעבר לארנק
                 </Link>
+              )}
+            </section>
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-extrabold text-text-strong">רווח מכל משלוח</h2>
+                {deliveries.length > 8 && (
+                  <button type="button" onClick={() => setShowAllJobs((v) => !v)} className="min-h-11 text-sm font-bold text-primary">
+                    {showAllJobs ? "הצג פחות" : "הצג את כולם"}
+                  </button>
+                )}
+              </div>
+              {deliveries.length === 0 ? (
+                <p className="rounded-[1.15rem] border border-black/5 bg-white px-4 py-6 text-center text-sm leading-relaxed text-text-muted">
+                  כל משלוח של שליח או עסק שגייסתם יופיע כאן עם השם והרווח — ₪1.50 למשלוח, ₪3 אם שניהם שלכם.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {visibleDeliveries.map((row) => {
+                    const names = [...row.couriers, ...row.businesses].map((p) => p.name);
+                    const title = names.join(" + ");
+                    const kindLabel = row.couriers.length && row.businesses.length
+                      ? "שליח ועסק באותו משלוח"
+                      : row.businesses.length
+                        ? "עסק שהצטרף דרכך"
+                        : "שליח שהצטרף דרכך";
+                    const person = row.couriers[0] || row.businesses[0];
+                    return (
+                      <li
+                        key={row.key}
+                        className="flex items-center gap-3 rounded-[1.15rem] border border-black/5 bg-white px-3 py-3 shadow-[0_8px_20px_rgba(16,24,40,0.05)]"
+                      >
+                        {row.couriers.length ? (
+                          <CourierAvatar path={person?.avatar} name={person?.name} size={44} />
+                        ) : (
+                          <div className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary">
+                            <Store className="size-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 text-right">
+                          <p className="truncate text-sm font-bold text-text-strong">{title}</p>
+                          <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                            {kindLabel}
+                            {row.job_number ? ` · #${row.job_number}` : ""}
+                            {row.created_at ? ` · ${joinDate(row.created_at)}` : ""}
+                            {` · ${row.walleted ? "בארנק" : "ממתין למשיכה"}`}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-extrabold tabular-nums text-primary">
+                          +₪ {money(row.amount)}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </section>
 
@@ -350,33 +452,6 @@ function SharePage() {
                 </ul>
               )}
             </section>
-
-            {commissions.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-sm font-extrabold text-text-strong">עמלות אחרונות</h2>
-                <ul className="flex flex-col gap-2">
-                  {commissions.slice(0, 8).map((row) => (
-                    <li
-                      key={row.id ?? `${row.job_id}-${row.created_at}`}
-                      className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-black/5 bg-white px-3 py-3"
-                    >
-                      <div className="min-w-0 text-right">
-                        <p className="text-sm font-bold text-text-strong">
-                          {row.kind === "business" ? "הפניית עסק" : "הפניית שליח"}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-text-muted">
-                          {row.walleted_at ? "בארנק" : "ממתין למשיכה לארנק"}
-                          {row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString("he-IL")}` : ""}
-                        </p>
-                      </div>
-                      <p className="text-sm font-extrabold tabular-nums text-primary">
-                        ₪ {money(Number(row.amount ?? 0))}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
 
             <section className="space-y-3">
               <h2 className="text-sm font-extrabold text-text-strong">שיתוף מהיר</h2>
