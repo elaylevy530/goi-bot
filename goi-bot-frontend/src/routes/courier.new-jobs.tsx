@@ -32,6 +32,8 @@ import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
 import { PullToRefresh } from "@/components/courier/PullToRefresh";
 import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
+import { EnableLocationSheet } from "@/components/courier/EnableLocationSheet";
+import { enableCourierLocationSharing, isDeviceLocationActive, isLiveGpsFix } from "@/lib/courier-location";
 
 export const Route = createFileRoute("/courier/new-jobs")({
   head: () => ({ meta: [{ title: "עבודות חדשות — Goi" }] }),
@@ -72,6 +74,13 @@ function NewJobsPage() {
   const [stickyFocusId, setStickyFocusId] = useState<string | undefined>();
   const sessionSkippedRef = useRef(new Map<string, number>());
   const [sessionSkipGen, setSessionSkipGen] = useState(0);
+  const [locationOfferOpen, setLocationOfferOpen] = useState(false);
+  const availabilityReadyRef = useRef(false);
+  const wasAvailableRef = useRef(false);
+  const locationOfferCheckedRef = useRef(false);
+  const gps = useGpsLiveStatus();
+  const gpsRef = useRef(gps);
+  gpsRef.current = gps;
 
   const { data: declinedRows = [] } = useQuery({
     queryKey: ["courier-job-declines", me?.id],
@@ -143,6 +152,49 @@ function NewJobsPage() {
       return data.filter((j: any) => isOpenBroadcastJobForCourier(j, me) && !isJobSkippedAtCurrentPrice(j, skips));
     },
   });
+
+  useEffect(() => {
+    if (!me) {
+      availabilityReadyRef.current = false;
+      wasAvailableRef.current = false;
+      locationOfferCheckedRef.current = false;
+      return;
+    }
+    if (!availabilityReadyRef.current) {
+      availabilityReadyRef.current = true;
+      wasAvailableRef.current = isAvailable;
+      locationOfferCheckedRef.current = isAvailable;
+      return;
+    }
+    if (!isAvailable) {
+      wasAvailableRef.current = false;
+      locationOfferCheckedRef.current = false;
+      return;
+    }
+    const justWentOnline = !wasAvailableRef.current;
+    wasAvailableRef.current = true;
+    if (!justWentOnline || locationOfferCheckedRef.current) return;
+    locationOfferCheckedRef.current = true;
+
+    const sharingEnabled = me.location_sharing_enabled === true;
+    void (async () => {
+      const active = await isDeviceLocationActive({
+        gps: gpsRef.current,
+        sharingEnabled,
+      });
+      if (!wasAvailableRef.current) return;
+      if (active) {
+        if (!sharingEnabled) {
+          try {
+            await enableCourierLocationSharing();
+            qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+          } catch {}
+        }
+        return;
+      }
+      setLocationOfferOpen(true);
+    })();
+  }, [me, isAvailable, qc]);
 
   useEffect(() => {
     if (!me?.id || !isAvailable) return;
@@ -536,6 +588,8 @@ function NewJobsPage() {
       </div>
       </PullToRefresh>
 
+      <EnableLocationSheet open={locationOfferOpen} onOpenChange={setLocationOfferOpen} />
+
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent dir="rtl" className="text-start [&>button]:right-auto [&>button]:left-4 p-0 gap-0 max-w-[min(95vw,400px)]">
           {detail && (
@@ -742,18 +796,11 @@ function MapFab({
 
 function GpsStatusChip() {
   const gps = useGpsLiveStatus();
-  if (!gps.enabled && gps.permission !== "denied") return null;
-  const denied = gps.permission === "denied";
-  const live = gps.permission === "granted" && !gps.error && gps.lastFixAt != null;
-  const label = denied ? "מיקום חסום" : live ? "מיקום פעיל" : "מחפש מיקום";
+  if (!gps.enabled || !isLiveGpsFix(gps)) return null;
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-pill bg-surface/95 px-2.5 py-1 text-[10px] font-extrabold shadow-card ${
-        denied ? "text-destructive" : live ? "text-primary" : "text-text-muted"
-      }`}
-    >
+    <span className="inline-flex items-center gap-1 rounded-pill bg-surface/95 px-2.5 py-1 text-[10px] font-extrabold text-primary shadow-card">
       <MapPin className="size-3" aria-hidden />
-      {label}
+      מיקום פעיל
     </span>
   );
 }

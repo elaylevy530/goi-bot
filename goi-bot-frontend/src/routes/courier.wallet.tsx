@@ -33,6 +33,9 @@ import {
   isPaidWithdrawal,
   isPreviousIsraelMonth,
   isRejectedWithdrawal,
+  isWalletCompletedOutcome,
+  outcomeEarnedAt,
+  outcomeJob,
   summarizeCourierWallet,
 } from "@/lib/courier-wallet";
 import { cn } from "@/lib/utils";
@@ -188,8 +191,8 @@ function WalletPage() {
       ? "יש למלא פרטי בנק"
       : available <= 0
         ? currentMonthEarned > 0
-          ? `אין יתרה מחודשים סגורים. ₪ ${money(unlockingAmount)} ייפתחו למשיכה ב-${unlockDateLabel}`
-          : "אין יתרה למשיכה מחודשים קודמים"
+          ? `רווחי ${currentMonthLabel} עדיין נעולים. ₪ ${money(unlockingAmount)} ייפתחו ב-${unlockDateLabel}`
+          : "אין יתרה למשיכה מחודשים שנסגרו"
         : null;
   const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
   const invoiceWithdrawalId = invoiceTargetId || latestPending?.id || null;
@@ -204,15 +207,17 @@ function WalletPage() {
       amount: number;
       status?: string | null;
     }[] = [];
-    for (const o of rows.filter((r) => r.delivered_at && !r.was_cancelled)) {
-      const pay = jobOfferPay(o.jobs);
+    for (const o of rows.filter(isWalletCompletedOutcome)) {
+      const job = outcomeJob(o);
+      const pay = jobOfferPay(job);
       const tip = Number(o.tip_amount ?? 0);
-      const no = o.jobs?.job_number ? `#${o.jobs.job_number}` : "";
+      const no = job?.job_number ? `#${job.job_number}` : "";
+      const at = outcomeEarnedAt(o) || "";
       if (pay) {
-        items.push({ id: `job-${o.id}`, kind: "job", title: `רווח ממשלוח ${no}`.trim(), at: o.delivered_at!, amount: pay, status: "שולמה" });
+        items.push({ id: `job-${o.id}`, kind: "job", title: `רווח ממשלוח ${no}`.trim(), at, amount: pay, status: "שולמה" });
       }
       if (tip) {
-        items.push({ id: `tip-${o.id}`, kind: "tip", title: `טיפ ${no}`.trim(), at: o.delivered_at!, amount: tip, status: "אושרה" });
+        items.push({ id: `tip-${o.id}`, kind: "tip", title: `טיפ ${no}`.trim(), at, amount: tip, status: "אושרה" });
       }
     }
     for (const c of commissions) {
@@ -379,7 +384,7 @@ function WalletPage() {
                   <p className="text-sm font-black tabular-nums text-text-strong">{unlockDateLabel}</p>
                 </div>
                 <p className="mt-2 text-xl font-black tabular-nums text-primary">₪ {money(unlockingAmount)}</p>
-                <p className="mt-1 text-[11px] text-text-muted">רווחי {currentMonthLabel} נפתחים ב-1 לחודש הבא</p>
+                <p className="mt-1 text-[11px] text-text-muted">רק רווחי {currentMonthLabel}. חודשים קודמים זמינים עכשיו</p>
               </div>
             </div>
 
@@ -479,7 +484,7 @@ function WalletPage() {
               <h2 className="text-sm font-extrabold text-text-strong">חודשים קודמים</h2>
               {closedMonths.length === 0 ? (
                 <p className="rounded-card border border-border bg-surface px-3 py-4 text-sm text-text-muted">
-                  אין עדיין חודש סגור. רווחי {currentMonthLabel} ייפתחו ב-{unlockDateLabel}.
+                  אין עדיין חודש שנסגר. רווחי {currentMonthLabel} ייפתחו ב-{unlockDateLabel}.
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
@@ -513,7 +518,11 @@ function WalletPage() {
 
             <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-sm text-text">
               <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <p>משיכה רק על חודש שנסגר: מה-1 לחודש אפשר למשוך את החודש הקודם. רווחי {currentMonthLabel} ייפתחו ב-{unlockDateLabel}.</p>
+              <p>
+                {closedMonths.length > 0
+                  ? `רווחי חודשים שנסגרו זמינים למשיכה עכשיו. רווחי ${currentMonthLabel} ייפתחו ב-${unlockDateLabel}.`
+                  : `משיכה נפתחת אחרי שהחודש נסגר. רווחי ${currentMonthLabel} ייפתחו ב-${unlockDateLabel}.`}
+              </p>
             </div>
 
             <section className="space-y-2">

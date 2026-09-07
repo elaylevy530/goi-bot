@@ -36,6 +36,23 @@ describe("courier wallet month split", () => {
     expect(summary.closedMonths.find((m) => m.key === "2026-07")?.earned).toBe(20);
   });
 
+  it("counts August jobs as withdrawable in September even without outcome.delivered_at", () => {
+    const summary = summarizeCourierWallet({
+      now,
+      outcomes: [
+        {
+          jobs: { status: "הושלמה", job_date: "2026-08-12", suggested_courier_payment: 55, payment: 0 },
+        },
+        {
+          jobs: [{ status: "הושלמה", delivered_at: "2026-08-18T18:00:00.000Z", payment: 40 }],
+        },
+      ],
+    });
+    expect(summary.available).toBe(95);
+    expect(summary.closedMonths.find((m) => m.key === "2026-08")?.earned).toBe(95);
+    expect(summary.currentMonthEarned).toBe(0);
+  });
+
   it("subtracts paid and pending withdrawals from available closed-month pay", () => {
     const summary = summarizeCourierWallet({
       now,

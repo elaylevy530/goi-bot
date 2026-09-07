@@ -66,8 +66,13 @@ export function mergeCourierSkipRows(
 }
 
 export function jobOfferPay(job: any): number {
-  const n = Number(job?.suggested_courier_payment ?? job?.payment ?? job?.customer_price ?? 0);
-  return Number.isFinite(n) ? n : 0;
+  const row = Array.isArray(job) ? job[0] : job;
+  for (const value of [row?.suggested_courier_payment, row?.payment, row?.customer_price]) {
+    if (value == null || value === "") continue;
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
 }
 
 /** Skip is per job only. Same job can return if its pay is strictly higher than the skipped price. */

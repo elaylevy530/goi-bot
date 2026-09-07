@@ -129,10 +129,6 @@ export function useCourierGpsTracker({
       setState({ error: err.message });
       if (err.code === err.PERMISSION_DENIED) {
         setState({ permission: "denied" });
-        if (!warnedRef.current) {
-          warnedRef.current = true;
-          toast.error("הרשאת מיקום נדחתה — עדיין תקבל משלוחים לפי האזורים והערים שבחרת", { duration: 6000 });
-        }
       }
     };
 

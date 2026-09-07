@@ -13,6 +13,8 @@ describe("job skip is per delivery, not per business", () => {
   it("reads courier pay from the job", () => {
     expect(jobOfferPay({ suggested_courier_payment: "32.5" })).toBe(32.5);
     expect(jobOfferPay({ payment: 20 })).toBe(20);
+    expect(jobOfferPay({ payment: 0, customer_price: 80 })).toBe(80);
+    expect(jobOfferPay([{ suggested_courier_payment: 45 }])).toBe(45);
     expect(jobOfferPay({})).toBe(0);
   });
 

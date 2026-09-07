@@ -7,13 +7,18 @@ export type WalletJobRef = {
   suggested_courier_payment?: unknown;
   customer_price?: unknown;
   job_number?: string | number | null;
+  delivered_at?: string | null;
+  job_date?: string | null;
+  status?: string | null;
+  delivery_status?: string | null;
 };
 
 export type WalletOutcome = {
   delivered_at?: string | null;
+  created_at?: string | null;
   was_cancelled?: boolean | null;
   tip_amount?: unknown;
-  jobs?: WalletJobRef | null;
+  jobs?: WalletJobRef | WalletJobRef[] | null;
 };
 
 export type WalletCommission = {
@@ -63,8 +68,31 @@ export function isOpenWithdrawal(status?: string | null) {
   return !isPaidWithdrawal(status) && !isRejectedWithdrawal(status);
 }
 
+export function outcomeJob(outcome: WalletOutcome): WalletJobRef | null {
+  const jobs = outcome.jobs;
+  if (Array.isArray(jobs)) return jobs[0] ?? null;
+  return jobs ?? null;
+}
+
+export function isWalletCompletedOutcome(outcome: WalletOutcome) {
+  if (outcome.was_cancelled) return false;
+  const job = outcomeJob(outcome);
+  return !!(
+    outcome.delivered_at ||
+    job?.delivered_at ||
+    job?.status === "הושלמה" ||
+    job?.delivery_status === "delivered" ||
+    job?.delivery_status === "נמסר"
+  );
+}
+
+export function outcomeEarnedAt(outcome: WalletOutcome) {
+  const job = outcomeJob(outcome);
+  return outcome.delivered_at || job?.delivered_at || job?.job_date || outcome.created_at || null;
+}
+
 export function outcomeCourierPay(outcome: WalletOutcome) {
-  return jobOfferPay(outcome.jobs) + (Number(outcome.tip_amount ?? 0) || 0);
+  return jobOfferPay(outcomeJob(outcome)) + (Number(outcome.tip_amount ?? 0) || 0);
 }
 
 export function isPreviousIsraelMonth(iso?: string | null, now = new Date()) {
@@ -72,6 +100,11 @@ export function isPreviousIsraelMonth(iso?: string | null, now = new Date()) {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return false;
   return israelYearMonthValue(at) < israelYearMonthValue(now);
+}
+
+export function currentIsraelYearMonthKey(now = new Date()) {
+  const { year, month } = israelCalendarParts(now);
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 export function israelYearMonthKey(iso?: string | null) {
@@ -120,7 +153,7 @@ export function summarizeCourierWallet({
   withdrawals?: WalletWithdrawal[];
   now?: Date;
 }) {
-  const completed = outcomes.filter((o) => o.delivered_at && !o.was_cancelled);
+  const completed = outcomes.filter(isWalletCompletedOutcome);
   const monthMap = new Map<string, number>();
   const add = (iso: string | null | undefined, amount: number) => {
     const key = israelYearMonthKey(iso);
@@ -128,10 +161,10 @@ export function summarizeCourierWallet({
     monthMap.set(key, (monthMap.get(key) ?? 0) + amount);
   };
 
-  for (const o of completed) add(o.delivered_at, outcomeCourierPay(o));
+  for (const o of completed) add(outcomeEarnedAt(o), outcomeCourierPay(o));
   for (const c of commissions) add(c.created_at, Number(c.amount ?? 0) || 0);
 
-  const currentKey = israelYearMonthKey(now.toISOString()) ?? "";
+  const currentKey = currentIsraelYearMonthKey(now);
   const months: WalletMonthRow[] = [...monthMap.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([key, earned]) => ({

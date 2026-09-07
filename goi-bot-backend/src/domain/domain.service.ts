@@ -321,21 +321,37 @@ export class DomainService {
     return this.attachCouriersToWithdrawals(rows);
   }
   async withdrawableBalanceForCourier(courierId: string) {
+    const monthStart = `date_trunc('month', NOW() AT TIME ZONE '${ISRAEL_TZ}')`;
+    const earnedAt = `COALESCE(
+      o.delivered_at AT TIME ZONE '${ISRAEL_TZ}',
+      j.delivered_at AT TIME ZONE '${ISRAEL_TZ}',
+      CASE WHEN j.job_date IS NOT NULL THEN j.job_date::timestamp ELSE NULL END
+    )`;
+    const payExpr =
+      "COALESCE(NULLIF(j.suggested_courier_payment, 0), NULLIF(j.payment, 0), NULLIF(j.customer_price, 0), 0) + COALESCE(o.tip_amount, 0)";
     const earnedRow = await this.outcomes
       .createQueryBuilder("o")
-      .innerJoin(Job, "j", "j.id = o.job_id")
-      .select("COALESCE(SUM(COALESCE(j.suggested_courier_payment, j.payment, 0) + COALESCE(o.tip_amount, 0)), 0)", "earned")
+      .leftJoin(Job, "j", "j.id = o.job_id")
+      .select(`COALESCE(SUM(${payExpr}), 0)`, "earned")
       .where("o.courier_id = :courierId", { courierId })
-      .andWhere("o.delivered_at IS NOT NULL")
       .andWhere("COALESCE(o.was_cancelled, false) = false")
-      .andWhere(
-        `(EXTRACT(YEAR FROM (o.delivered_at AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
-          + EXTRACT(MONTH FROM (o.delivered_at AT TIME ZONE '${ISRAEL_TZ}'))::int)
-         < (EXTRACT(YEAR FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
-          + EXTRACT(MONTH FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int)`,
-      )
+      .andWhere(`${earnedAt} IS NOT NULL`)
+      .andWhere(`${earnedAt} < ${monthStart}`)
       .getRawOne<{ earned: string | number }>();
-    const earned = Number(earnedRow?.earned ?? 0);
+    const extraRow = await this.jobs
+      .createQueryBuilder("j")
+      .leftJoin(JobOutcome, "o", "o.job_id = j.id")
+      .select(
+        "COALESCE(SUM(COALESCE(NULLIF(j.suggested_courier_payment, 0), NULLIF(j.payment, 0), NULLIF(j.customer_price, 0), 0)), 0)",
+        "earned",
+      )
+      .where("j.selected_courier_id = :courierId", { courierId })
+      .andWhere("j.status = :done", { done: "הושלמה" })
+      .andWhere("o.id IS NULL")
+      .andWhere(`${earnedAt} IS NOT NULL`)
+      .andWhere(`${earnedAt} < ${monthStart}`)
+      .getRawOne<{ earned: string | number }>();
+    const earned = Number(earnedRow?.earned ?? 0) + Number(extraRow?.earned ?? 0);
     const commissionRow = await this.referralCommissions
       .createQueryBuilder("c")
       .select("COALESCE(SUM(c.amount), 0)", "earned")
@@ -383,7 +399,7 @@ export class DomainService {
       if (Math.round(amount * 100) > Math.round(available * 100)) {
         throw new BadRequestException(
           available <= 0
-            ? "ניתן למשוך רק משלוחים מחודשים קודמים, החל מה-1 לחודש"
+            ? "אין יתרה למשיכה מחודשים שנסגרו. רווחי החודש הנוכחי ייפתחו ב-1 לחודש הבא"
             : "הסכום גבוה מהיתרה הזמינה",
         );
       }
@@ -820,15 +836,36 @@ export class DomainService {
       order: { delivered_at: "DESC" },
       take: limit,
     });
-    const jobIds = [...new Set(rows.map((r) => r.job_id).filter(Boolean))];
+    const seenJobIds = new Set(rows.map((r) => r.job_id).filter(Boolean));
+    const completedJobs = await this.jobs.find({
+      where: { selected_courier_id: courierId, status: "הושלמה" },
+      take: limit,
+    });
+    const extra = completedJobs
+      .filter((job) => !seenJobIds.has(job.id))
+      .map((job) => ({
+        id: `job-${job.id}`,
+        job_id: job.id,
+        courier_id: courierId,
+        delivered_at: job.delivered_at,
+        was_cancelled: false,
+        tip_amount: null as string | null,
+        created_at: job.created_at,
+      }));
+    const combined = [...rows, ...extra] as Array<(typeof rows)[number] | (typeof extra)[number]>;
+    const jobIds = [...new Set(combined.map((r) => r.job_id).filter(Boolean))];
     const jobs = jobIds.length
       ? await this.jobs.find({ where: { id: In(jobIds) } })
       : [];
     const jobById = new Map(jobs.map((j) => [j.id, j]));
-    return rows.map((o) => ({
-      ...o,
-      jobs: jobById.get(o.job_id) ?? null,
-    }));
+    return combined.slice(0, limit).map((o) => {
+      const job = jobById.get(o.job_id) ?? null;
+      return {
+        ...o,
+        delivered_at: o.delivered_at ?? job?.delivered_at ?? null,
+        jobs: job,
+      };
+    });
   }
 
   async listCourierDeclinedOffers(courierId: string, limit = 100) {
