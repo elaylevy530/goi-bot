@@ -233,7 +233,7 @@ function SharePage() {
             <section className="overflow-hidden rounded-[1.5rem] bg-[#114421] text-white shadow-[0_12px_28px_rgba(12,40,18,0.22)]">
               <div className="relative h-56 w-full overflow-hidden sm:h-64">
                 <img
-                  src="/courier/share-hero.png?v=8"
+                  src="/courier/share-hero.png?v=10"
                   alt=""
                   className="absolute inset-0 h-full w-full object-contain object-bottom"
                 />
