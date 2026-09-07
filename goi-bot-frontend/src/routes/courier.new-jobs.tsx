@@ -19,7 +19,7 @@ import {
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob } from "@/lib/courier-session";
 import { nestListConversations } from "@/lib/nest-chat";
-import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag, MapPin } from "lucide-react";
+import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
 import { useGpsLiveStatus } from "@/hooks/useCourierGpsTracker";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -33,7 +33,7 @@ import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
 import { PullToRefresh } from "@/components/courier/PullToRefresh";
 import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
 import { EnableLocationSheet } from "@/components/courier/EnableLocationSheet";
-import { enableCourierLocationSharing, isDeviceLocationActive, isLiveGpsFix } from "@/lib/courier-location";
+import { enableCourierLocationSharing, isDeviceLocationActive } from "@/lib/courier-location";
 
 export const Route = createFileRoute("/courier/new-jobs")({
   head: () => ({ meta: [{ title: "עבודות חדשות — Goi" }] }),
@@ -518,9 +518,6 @@ function NewJobsPage() {
                   <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
                 </div>
               )}
-              <div className="absolute inset-y-0 left-0 z-10 flex items-center">
-                <GpsStatusChip />
-              </div>
             </div>
           </div>
         </div>
@@ -791,17 +788,6 @@ function MapFab({
         </span>
       )}
     </Link>
-  );
-}
-
-function GpsStatusChip() {
-  const gps = useGpsLiveStatus();
-  if (!gps.enabled || !isLiveGpsFix(gps)) return null;
-  return (
-    <span className="inline-flex items-center gap-1 rounded-pill bg-surface/95 px-2.5 py-1 text-[10px] font-extrabold text-primary shadow-card">
-      <MapPin className="size-3" aria-hidden />
-      מיקום פעיל
-    </span>
   );
 }
 
