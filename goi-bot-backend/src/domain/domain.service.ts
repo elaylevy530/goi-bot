@@ -9,6 +9,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import { Courier } from "../accounts/entities/courier.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { resolveCourierNotificationCategory } from "../accounts/courier-notification-category";
 import { CourierAdminNotification } from "../accounts/entities/courier-admin-notification.entity";
 import { WithdrawalRequest } from "../accounts/entities/withdrawal-request.entity";
 import { CourierBonus } from "../accounts/entities/courier-bonus.entity";
@@ -35,12 +36,12 @@ import { BusinessFavoriteCourier } from "../accounts/entities/business-favorite-
 import { IntegrationRequestLog } from "../accounts/entities/integration-request-log.entity";
 import { BillingRecord } from "../payments/entities/billing-record.entity";
 import { Job } from "../jobs/entities/job.entity";
+import { resolveJobTiming } from "../jobs/job-timing";
+import { withdrawableBalance } from "../accounts/courier-wallet-balance";
 import { OfferEvent } from "../jobs/entities/offer-event.entity";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 
 type Mutable = Record<string, unknown>;
-
-const ISRAEL_TZ = "Asia/Jerusalem";
 
 @Injectable()
 export class DomainService {
@@ -270,7 +271,17 @@ export class DomainService {
   }
   createNotification(userId: string, body: Mutable) {
     const notification = this.notifications.create({ sent_by: userId });
-    Object.assign(notification, body, { sent_by: userId });
+    Object.assign(notification, body, {
+      sent_by: userId,
+      category: resolveCourierNotificationCategory({
+        category: typeof body.category === "string" ? body.category : null,
+        title: typeof body.title === "string" ? body.title : null,
+        body: typeof body.body === "string" ? body.body : null,
+        link_url: typeof body.link_url === "string" ? body.link_url : null,
+        audience: typeof body.audience === "string" ? body.audience : null,
+        courier_id: typeof body.courier_id === "string" ? body.courier_id : null,
+      }),
+    });
     return this.notifications.save(notification);
   }
   async updateNotification(id: string, body: Mutable) {
@@ -321,63 +332,12 @@ export class DomainService {
     return this.attachCouriersToWithdrawals(rows);
   }
   async withdrawableBalanceForCourier(courierId: string) {
-    const monthStart = `date_trunc('month', NOW() AT TIME ZONE '${ISRAEL_TZ}')`;
-    const earnedAt = `COALESCE(
-      CASE WHEN j.job_date IS NOT NULL THEN j.job_date::timestamp ELSE NULL END,
-      o.delivered_at AT TIME ZONE '${ISRAEL_TZ}',
-      j.delivered_at AT TIME ZONE '${ISRAEL_TZ}',
-      o.created_at AT TIME ZONE '${ISRAEL_TZ}',
-      j.created_at AT TIME ZONE '${ISRAEL_TZ}'
-    )`;
-    const payExpr =
-      "COALESCE(NULLIF(j.suggested_courier_payment, 0), NULLIF(j.payment, 0), NULLIF(j.customer_price, 0), 0) + COALESCE(o.tip_amount, 0)";
-    const earnedRow = await this.outcomes
-      .createQueryBuilder("o")
-      .leftJoin(Job, "j", "j.id = o.job_id")
-      .select(`COALESCE(SUM(${payExpr}), 0)`, "earned")
-      .where("o.courier_id = :courierId", { courierId })
-      .andWhere("COALESCE(o.was_cancelled, false) = false")
-      .andWhere(`${earnedAt} IS NOT NULL`)
-      .andWhere(`${earnedAt} < ${monthStart}`)
-      .getRawOne<{ earned: string | number }>();
-    const extraRow = await this.jobs
-      .createQueryBuilder("j")
-      .leftJoin(JobOutcome, "o", "o.job_id = j.id")
-      .select(
-        "COALESCE(SUM(COALESCE(NULLIF(j.suggested_courier_payment, 0), NULLIF(j.payment, 0), NULLIF(j.customer_price, 0), 0)), 0)",
-        "earned",
-      )
-      .where("j.selected_courier_id = :courierId", { courierId })
-      .andWhere("(j.status = :done OR j.delivery_status IN (:...delivered))", {
-        done: "הושלמה",
-        delivered: ["delivered", "נמסר"],
-      })
-      .andWhere("o.id IS NULL")
-      .andWhere(`${earnedAt} IS NOT NULL`)
-      .andWhere(`${earnedAt} < ${monthStart}`)
-      .getRawOne<{ earned: string | number }>();
-    const earned = Number(earnedRow?.earned ?? 0) + Number(extraRow?.earned ?? 0);
-    const commissionRow = await this.referralCommissions
-      .createQueryBuilder("c")
-      .select("COALESCE(SUM(c.amount), 0)", "earned")
-      .where("c.beneficiary_courier_id = :courierId", { courierId })
-      .andWhere("c.walleted_at IS NOT NULL")
-      .andWhere(
-        `(EXTRACT(YEAR FROM (c.created_at AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
-          + EXTRACT(MONTH FROM (c.created_at AT TIME ZONE '${ISRAEL_TZ}'))::int)
-         < (EXTRACT(YEAR FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
-          + EXTRACT(MONTH FROM (NOW() AT TIME ZONE '${ISRAEL_TZ}'))::int)`,
-      )
-      .getRawOne<{ earned: string | number }>();
-    const commissions = Number(commissionRow?.earned ?? 0);
-    const rows = await this.withdrawals.find({ where: { courier_id: courierId } });
-    const paidOut = rows
-      .filter((w) => w.status === "שולמה" || w.status === "paid")
-      .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
-    const reserved = rows
-      .filter((w) => w.status !== "נדחתה" && w.status !== "rejected" && w.status !== "שולמה" && w.status !== "paid")
-      .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
-    return Math.max(0, earned + commissions - paidOut - reserved);
+    const [outcomes, commissions, rows] = await Promise.all([
+      this.listCourierOutcomes(courierId),
+      this.referralCommissions.find({ where: { beneficiary_courier_id: courierId } }),
+      this.withdrawals.find({ where: { courier_id: courierId } }),
+    ]);
+    return withdrawableBalance({ outcomes, commissions, withdrawals: rows });
   }
 
   async createWithdrawal(userId: string, body: Mutable, roles: AppRole[] = []) {
@@ -853,6 +813,7 @@ export class DomainService {
         id: `job-${job.id}`,
         job_id: job.id,
         courier_id: courierId,
+        picked_up_at: job.picked_up_at,
         delivered_at: job.delivered_at,
         was_cancelled: false,
         tip_amount: null as string | null,
@@ -864,12 +825,50 @@ export class DomainService {
       ? await this.jobs.find({ where: { id: In(jobIds) } })
       : [];
     const jobById = new Map(jobs.map((j) => [j.id, j]));
+    const logs = jobIds.length
+      ? await this.logs.find({
+          where: {
+            entity_type: "job",
+            entity_id: In(jobIds),
+            new_status: In([
+              "בדרך לאיסוף",
+              "יצאתי לאיסוף",
+              "הגעתי לאיסוף",
+              "אספתי",
+              "נמסר",
+            ]),
+          },
+          order: { created_at: "ASC" },
+        })
+      : [];
+    const logsByJob = new Map<string, typeof logs>();
+    for (const log of logs) {
+      const list = logsByJob.get(log.entity_id) ?? [];
+      list.push(log);
+      logsByJob.set(log.entity_id, list);
+    }
     return combined.slice(0, limit).map((o) => {
       const job = jobById.get(o.job_id) ?? null;
+      const timing = resolveJobTiming(job, o, logsByJob.get(o.job_id) ?? []);
       return {
         ...o,
-        delivered_at: o.delivered_at ?? job?.delivered_at ?? null,
-        jobs: job,
+        picked_up_at: o.picked_up_at ?? timing.picked_up_at ?? null,
+        delivered_at: o.delivered_at ?? timing.delivered_at ?? null,
+        jobs: job
+          ? {
+              ...job,
+              accepted_at: timing.accepted_at,
+              heading_to_pickup_at: timing.heading_to_pickup_at,
+              arrived_at_pickup_at: timing.arrived_at_pickup_at,
+              picked_up_at: timing.picked_up_at,
+              delivered_at: timing.delivered_at,
+            }
+          : {
+              heading_to_pickup_at: timing.heading_to_pickup_at,
+              arrived_at_pickup_at: timing.arrived_at_pickup_at,
+              picked_up_at: timing.picked_up_at,
+              delivered_at: timing.delivered_at,
+            },
       };
     });
   }

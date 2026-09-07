@@ -101,7 +101,7 @@ function MyProfilePage() {
             {COURIER_JOBS_RESTRICTED_MESSAGE}
           </div>
         )}
-        <div className="relative overflow-hidden rounded-2xl bg-primary-deep p-6 text-primary-foreground shadow-card-strong">
+        <div className="relative overflow-hidden rounded-2xl bg-courier-hero p-6 text-primary-foreground shadow-card-strong">
           <div className="relative z-10">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">

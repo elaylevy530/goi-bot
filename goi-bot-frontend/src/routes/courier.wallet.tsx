@@ -344,7 +344,7 @@ function WalletPage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
           <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
-            <section className="overflow-hidden rounded-card bg-primary-deep p-4 text-primary-foreground shadow-card-strong">
+            <section className="overflow-hidden rounded-card bg-courier-hero p-4 text-primary-foreground shadow-card-strong">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 text-right">
                   <p className="text-sm text-primary-foreground/80">יתרה זמינה למשיכה</p>
@@ -370,7 +370,7 @@ function WalletPage() {
                   setAmount(available > 0 ? String(Number(available.toFixed(2))) : "");
                   setWithdrawOpen(true);
                 }}
-                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-primary active:bg-primary-soft"
+                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-courier-hero active:bg-primary-soft"
               >
                 <Building2 className="size-4" aria-hidden />
                 בקשת משיכה

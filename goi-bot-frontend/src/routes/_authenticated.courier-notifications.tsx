@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { nestCreateAdminNotification, nestDeleteAdminNotification, nestListAdminNotifications } from "@/lib/nest-domain";
 import { nestListCouriers } from "@/lib/nest-accounts";
+import { COURIER_NOTIFICATION_CATEGORY_LABEL, type CourierNotificationCategory } from "@/lib/courier-notifications";
 import { toast } from "sonner";
 import { Bell, Send, Trash2, Loader2, Users } from "lucide-react";
 
@@ -26,6 +27,7 @@ function Page() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
+  const [category, setCategory] = useState<CourierNotificationCategory>("system");
 
   const { data: couriers = [] } = useQuery({
     queryKey: ["all-couriers-min"],
@@ -47,13 +49,14 @@ function Page() {
         title: title.trim(),
         body: body.trim() || null,
         link_url: linkUrl.trim() || null,
+        category,
         courier_id: audience === "single" ? courierId : null,
       };
       await nestCreateAdminNotification(row);
     },
     onSuccess: () => {
       toast.success("ההודעה נשלחה");
-      setTitle(""); setBody(""); setLinkUrl("");
+      setTitle(""); setBody(""); setLinkUrl(""); setCategory("system");
       qc.invalidateQueries({ queryKey: ["admin-sent-notifs"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "שגיאה בשליחה"),
@@ -106,6 +109,19 @@ function Page() {
                   </Select>
                 </div>
               )}
+              <div>
+                <Label>סוג הודעה</Label>
+                <Select value={category} onValueChange={(v) => setCategory(v as CourierNotificationCategory)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">מערכת</SelectItem>
+                    <SelectItem value="bonus">בונוסים והטבות</SelectItem>
+                    <SelectItem value="wallet">ארנק ותשלומים</SelectItem>
+                    <SelectItem value="jobs">משלוחים ועבודות</SelectItem>
+                    <SelectItem value="personal">הודעה אישית</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label>כותרת</Label>
@@ -140,6 +156,9 @@ function Page() {
                         <div className="font-semibold">{n.title}</div>
                         <Badge variant={n.audience === "all" ? "default" : "secondary"} className={n.audience === "all" ? "bg-emerald-600" : ""}>
                           {n.audience === "all" ? "כל השליחים" : nameOf(n.courier_id)}
+                        </Badge>
+                        <Badge variant="outline">
+                          {COURIER_NOTIFICATION_CATEGORY_LABEL[(n.category as CourierNotificationCategory)] ?? "מערכת"}
                         </Badge>
                         {n.read_at && <Badge variant="outline">נקרא</Badge>}
                       </div>

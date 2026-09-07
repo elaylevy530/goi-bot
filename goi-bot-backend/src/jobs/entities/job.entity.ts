@@ -243,6 +243,9 @@ export class Job {
   accepted_at!: Date | null;
 
   @Column({ type: "timestamptz", nullable: true })
+  heading_to_pickup_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
   picked_up_at!: Date | null;
 
   @Column({ type: "timestamptz", nullable: true })

@@ -1381,6 +1381,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       "נמסר": "delivered",
     };
     if (statusMap[step]) job.delivery_status = statusMap[step];
+    if (step === "בדרך לאיסוף" && !job.heading_to_pickup_at) {
+      job.heading_to_pickup_at = now;
+    }
     if (step === "אספתי") {
       job.picked_up_at = now;
       let outcome = await this.outcomes.findOne({ where: { job_id: jobId } });

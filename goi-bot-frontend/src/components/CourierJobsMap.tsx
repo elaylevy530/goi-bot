@@ -168,12 +168,14 @@ type Props = {
   /** Rendered under the zoom +/− cluster (same left column). */
   belowControls?: ReactNode;
   rightExtra?: ReactNode;
+  /** Extra classes for the right shortcut cluster (active/chat). Defaults to controlsClassName. */
+  rightControlsClassName?: string;
   emptyState?: ReactNode;
   onActiveChange?: (job: MapJob | null) => void;
   focusJobId?: string | null;
 };
 
-export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, belowControls, rightExtra, emptyState, onActiveChange, focusJobId }: Props) {
+export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, claiming, controlsClassName, leftExtra, belowControls, rightExtra, rightControlsClassName, emptyState, onActiveChange, focusJobId }: Props) {
 
   const { data: me } = useMyCourier();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
@@ -727,7 +729,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
         </div>
 
         {rightExtra && (
-          <div className={`absolute right-3 z-10 flex flex-col gap-3 ${controlsClassName ?? "top-3"}`}>
+          <div className={`absolute right-3 z-10 flex flex-col gap-3 ${rightControlsClassName ?? controlsClassName ?? "top-3"}`}>
             {rightExtra}
           </div>
         )}

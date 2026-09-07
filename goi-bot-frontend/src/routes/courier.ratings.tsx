@@ -19,6 +19,7 @@ import { CourierAvatar } from "@/components/CourierAvatar";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { nestGetMyCourierStats, nestListMyCourierOutcomes } from "@/lib/nest-domain";
+import { deliveryMins, pickupMins, type RatingOutcome } from "@/lib/courier-ratings";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { cn } from "@/lib/utils";
 
@@ -29,40 +30,12 @@ export const Route = createFileRoute("/courier/ratings")({
 
 type RangeKey = "7" | "30" | "month";
 
-type JobRef = {
-  customer_name?: string | null;
-  pickup_area?: string | null;
-  dropoff_area?: string | null;
-  heading_to_pickup_at?: string | null;
-  arrived_at_pickup_at?: string | null;
-  picked_up_at?: string | null;
-  delivered_at?: string | null;
-};
-
-type OutcomeRow = {
-  id?: string;
-  delivered_at?: string | null;
-  cancelled_at?: string | null;
-  created_at?: string | null;
-  picked_up_at?: string | null;
-  was_cancelled?: boolean | null;
-  was_late?: boolean | null;
-  customer_rating?: number | null;
-  customer_comment?: string | null;
-  jobs?: JobRef | null;
-};
+type OutcomeRow = RatingOutcome & { id?: string };
 
 function startOfDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
-}
-
-function minutesBetween(a?: string | null, b?: string | null) {
-  if (!a || !b) return null;
-  const ms = new Date(b).getTime() - new Date(a).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return ms / 60_000;
 }
 
 function avg(values: number[]) {
@@ -72,6 +45,11 @@ function avg(values: number[]) {
 
 function fmt(n: number, digits = 0) {
   return new Intl.NumberFormat("he-IL", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(n);
+}
+
+function fmtMins(n: number) {
+  if (n < 1) return "<1 דק'";
+  return `${fmt(n)} דק'`;
 }
 
 function ratingLabel(score: number | null) {
@@ -106,18 +84,6 @@ function inRange(o: OutcomeRow, start: Date, end: Date) {
   if (!raw) return false;
   const at = new Date(raw);
   return at >= start && at <= end;
-}
-
-function pickupMins(o: OutcomeRow) {
-  const start = o.jobs?.heading_to_pickup_at;
-  const end = o.jobs?.arrived_at_pickup_at || o.jobs?.picked_up_at || o.picked_up_at;
-  return minutesBetween(start, end);
-}
-
-function deliveryMins(o: OutcomeRow) {
-  const start = o.jobs?.picked_up_at || o.picked_up_at;
-  const end = o.jobs?.delivered_at || o.delivered_at;
-  return minutesBetween(start, end);
 }
 
 function RatingsPage() {
@@ -206,7 +172,7 @@ function RatingsPage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
           <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
-            <section className="overflow-hidden rounded-card bg-primary-deep p-4 text-primary-foreground shadow-card-strong">
+            <section className="overflow-hidden rounded-card bg-courier-hero p-4 text-primary-foreground shadow-card-strong">
               <div className="flex items-center gap-3">
                 <CourierAvatar
                   path={(me as { avatar_url?: string | null } | null)?.avatar_url}
@@ -242,7 +208,7 @@ function RatingsPage() {
 
               <div className="mt-4 grid grid-cols-4 gap-2 border-t border-primary-foreground/15 pt-3">
                 <HeroStat icon={<Shield className="size-3.5" />} value={completionPct != null ? `${completionPct}%` : "—"} label={`אחוז השלמת ${t.jobPlural}`} />
-                <HeroStat icon={<Clock className="size-3.5" />} value={pickupAvgAll != null ? `${fmt(pickupAvgAll)} דק'`: "—"} label="זמן הגעה ממוצע לאיסוף" />
+                <HeroStat icon={<Clock className="size-3.5" />} value={pickupAvgAll != null ? fmtMins(pickupAvgAll) : "—"} label="זמן הגעה ממוצע לאיסוף" />
                 <HeroStat icon={<Target className="size-3.5" />} value={onTimePct != null ? `${onTimePct}%` : "—"} label="אחוז מסירה בזמן" />
                 <HeroStat icon={<ThumbsUp className="size-3.5" />} value={String(ratingsLastMonth)} label="דירוגים בחודש האחרון" />
               </div>
@@ -276,8 +242,8 @@ function RatingsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <KpiCard icon={<CheckCircle2 className="size-4" />} value={String(nowKpi.jobs)} label={`${t.jobPlural} שביצעתי`} trend={deltaText(nowKpi.jobs, prevKpi.jobs, "count")} upIsGood />
                   <KpiCard icon={<Timer className="size-4" />} value={nowKpi.rating != null ? fmt(nowKpi.rating, 1) : "—"} label="דירוג לקוחות ממוצע" trend={deltaText(nowKpi.rating, prevKpi.rating, "score")} upIsGood />
-                  <KpiCard icon={<Target className="size-4" />} value={nowKpi.pickup != null ? `${fmt(nowKpi.pickup)} דק'` : "—"} label="זמן הגעה ממוצע לאיסוף" trend={deltaText(nowKpi.pickup, prevKpi.pickup, "mins")} upIsGood={false} />
-                  <KpiCard icon={<MapPin className="size-4" />} value={nowKpi.delivery != null ? `${fmt(nowKpi.delivery)} דק'` : "—"} label="זמן מסירה ממוצע" trend={deltaText(nowKpi.delivery, prevKpi.delivery, "mins")} upIsGood={false} />
+                  <KpiCard icon={<Target className="size-4" />} value={nowKpi.pickup != null ? fmtMins(nowKpi.pickup) : "—"} label="זמן הגעה ממוצע לאיסוף" trend={deltaText(nowKpi.pickup, prevKpi.pickup, "mins")} upIsGood={false} />
+                  <KpiCard icon={<MapPin className="size-4" />} value={nowKpi.delivery != null ? fmtMins(nowKpi.delivery) : "—"} label="זמן מסירה ממוצע" trend={deltaText(nowKpi.delivery, prevKpi.delivery, "mins")} upIsGood={false} />
                   <KpiCard icon={<Clock className="size-4" />} value={nowKpi.onTime != null ? `${fmt(nowKpi.onTime)}%` : "—"} label="אחוז מסירה בזמן" trend={deltaText(nowKpi.onTime, prevKpi.onTime, "pct")} upIsGood />
                   <KpiCard icon={<XCircle className="size-4" />} value={String(nowKpi.cancelled)} label="ביטולים" trend={deltaText(nowKpi.cancelled, prevKpi.cancelled, "count")} upIsGood={false} danger />
                 </div>

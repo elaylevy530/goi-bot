@@ -67,7 +67,7 @@ export function mergeCourierSkipRows(
 
 export function jobOfferPay(job: any): number {
   const row = Array.isArray(job) ? job[0] : job;
-  for (const value of [row?.suggested_courier_payment, row?.payment, row?.customer_price]) {
+  for (const value of [row?.suggested_courier_payment, row?.payment, row?.per_job_amount, row?.customer_price]) {
     if (value == null || value === "") continue;
     const n = Number(value);
     if (Number.isFinite(n) && n > 0) return n;

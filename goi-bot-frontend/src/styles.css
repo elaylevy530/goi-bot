@@ -23,6 +23,7 @@
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-strong: var(--primary-soft-strong);
   --color-primary-deep: var(--primary-deep);
+  --color-courier-hero: var(--courier-hero);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -109,6 +110,7 @@
   --primary-soft-strong: #d8f0d4;
   /* Dark forest green for CTAs, switches, and courier hero cards. */
   --primary-deep: color-mix(in oklab, #0c1a10 58%, var(--brand-green));
+  --courier-hero: #114421;
 
   /* Semantic surfaces & type (Valentin-quality scale, Goi values) */
   --bg: #f5f6f7;
@@ -271,6 +273,7 @@
   --map-puck: #35ad29;
   --map-nav-banner: #0b0b0b;
   --primary-deep: color-mix(in oklab, #07140a 48%, var(--brand-green));
+  --courier-hero: #114421;
 }
 
 @layer base {

@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -47,6 +48,7 @@ export class CreateMessageDto {
 export class NotificationDto {
   @IsOptional() @IsUUID() courier_id?: string;
   @IsOptional() @IsString() audience?: string;
+  @IsOptional() @IsIn(["system", "bonus", "wallet", "jobs", "personal"]) category?: string;
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() body?: string;
   @IsOptional() @IsString() link_url?: string;

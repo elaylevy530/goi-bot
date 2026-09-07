@@ -57,11 +57,6 @@ function israelCalendarParts(now = new Date()) {
   return { year: num("year"), month: num("month"), day: num("day") };
 }
 
-function israelYearMonthValue(d: Date) {
-  const { year, month } = israelCalendarParts(d);
-  return year * 12 + month;
-}
-
 export function isPaidWithdrawal(status?: string | null) {
   const s = String(status ?? "").toLowerCase();
   return status === "שולמה" || s === "paid";
@@ -103,11 +98,10 @@ export function outcomeCourierPay(outcome: WalletOutcome) {
   return jobOfferPay(outcomeJob(outcome)) + (Number(outcome.tip_amount ?? 0) || 0);
 }
 
-export function isPreviousIsraelMonth(iso?: string | null, now = new Date()) {
-  if (!iso) return false;
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return false;
-  return israelYearMonthValue(at) < israelYearMonthValue(now);
+export function isPreviousIsraelMonth(iso?: string | Date | null, now = new Date()) {
+  const key = israelYearMonthKey(iso);
+  if (!key) return false;
+  return key < currentIsraelYearMonthKey(now);
 }
 
 export function currentIsraelYearMonthKey(now = new Date()) {
@@ -115,9 +109,14 @@ export function currentIsraelYearMonthKey(now = new Date()) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
-export function israelYearMonthKey(iso?: string | null) {
-  if (!iso) return null;
-  const at = new Date(iso);
+export function israelYearMonthKey(iso?: string | Date | null) {
+  if (iso == null || iso === "") return null;
+  if (typeof iso === "string") {
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+    // DATE columns arrive as YYYY-MM-DD. Don't let UTC parsing shift the calendar month.
+    if (ymd && !iso.includes("T")) return `${ymd[1]}-${ymd[2]}`;
+  }
+  const at = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(at.getTime())) return null;
   const { year, month } = israelCalendarParts(at);
   return `${year}-${String(month).padStart(2, "0")}`;

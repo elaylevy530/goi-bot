@@ -230,7 +230,7 @@ function SharePage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
           <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
-            <section className="overflow-hidden rounded-[1.5rem] bg-[#114421] text-white shadow-[0_12px_28px_rgba(12,40,18,0.22)]">
+            <section className="overflow-hidden rounded-[1.5rem] bg-courier-hero text-white shadow-[0_12px_28px_rgba(12,40,18,0.22)]">
               <div className="relative h-56 w-full overflow-hidden sm:h-64">
                 <img
                   src="/courier/share-hero.png?v=10"
@@ -247,7 +247,7 @@ function SharePage() {
                   type="button"
                   onClick={() => void copy(courierLink)}
                   disabled={!linkReady}
-                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-extrabold text-[#114421] disabled:opacity-60"
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-extrabold text-courier-hero disabled:opacity-60"
                 >
                   <Copy className="size-4" />
                   {linkReady ? "העתק קישור לשליחים" : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}

@@ -68,6 +68,15 @@ describe("courier wallet month split", () => {
     expect(summary.currentMonthEarned).toBe(0);
   });
 
+  it("treats YYYY-MM-DD job_date as that calendar month", () => {
+    const summary = summarizeCourierWallet({
+      now,
+      outcomes: [{ jobs: { status: "הושלמה", job_date: "2026-08-31", payment: 80 } }],
+    });
+    expect(summary.available).toBe(80);
+    expect(summary.closedMonths.find((m) => m.key === "2026-08")?.earned).toBe(80);
+  });
+
   it("subtracts paid and pending withdrawals from available closed-month pay", () => {
     const summary = summarizeCourierWallet({
       now,
