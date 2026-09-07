@@ -40,7 +40,7 @@ export function AuthShell({
     >
       {/* Green paints under the status bar; content sits below safe-area */}
       <div className="relative bg-primary shrink-0 pt-[env(safe-area-inset-top,0px)]">
-        <div className="relative h-64 flex flex-col items-center justify-center overflow-hidden">
+        <div className="relative flex h-44 min-[400px]:h-56 sm:h-64 flex-col items-center justify-center overflow-hidden">
           <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full" />
           <div className="absolute top-20 -left-20 w-64 h-64 bg-black/10 rounded-full" />
 
@@ -69,8 +69,8 @@ export function AuthShell({
         </div>
       </div>
 
-      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-6 pt-8 shadow-card-strong z-20 mx-auto w-full max-w-md relative pb-[max(2.5rem,env(safe-area-inset-bottom,0px))]">
-        <h2 className="text-2xl font-bold text-text-strong mb-6">{title}</h2>
+      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-5 pt-7 shadow-card-strong z-20 mx-auto w-full max-w-md relative pb-[max(2rem,env(safe-area-inset-bottom,0px))] sm:px-6 sm:pt-8">
+        <h2 className="text-xl min-[400px]:text-2xl font-bold text-text-strong mb-5 sm:mb-6">{title}</h2>
         {children}
         {footer && <div className="mt-8 pb-4 text-center">{footer}</div>}
       </div>

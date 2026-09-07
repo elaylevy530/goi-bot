@@ -194,8 +194,10 @@ export function CourierOfferCard({
           <span className="text-[10px] font-bold text-text-muted">החלק למעלה לפרטים נוספים</span>
         </button>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-between px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
-          <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} compact />
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
+          <div className="shrink-0">
+            <RewardBanner isQuote={isQuote} payment={Number(job.payment ?? 0)} compact />
+          </div>
 
           <div className="mt-1.5 shrink-0">
             <StopsTimeline
@@ -353,10 +355,10 @@ function RewardBanner({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl text-white",
+        "relative shrink-0 overflow-hidden rounded-2xl text-white",
         "bg-[linear-gradient(145deg,#4A5F54_0%,#3A4C43_42%,#2F3D36_100%)]",
         "shadow-[inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.22),0_6px_14px_rgba(0,0,0,0.18)]",
-        compact ? "px-3 py-2" : "px-4 py-3.5",
+        compact ? "min-h-[4.25rem] px-3 py-2" : "px-4 py-3.5",
       )}
     >
       <div

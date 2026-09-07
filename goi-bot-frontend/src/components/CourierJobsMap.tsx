@@ -761,7 +761,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 "absolute z-10 pointer-events-none",
                 offerExpanded
                   ? "inset-0"
-                  : "inset-x-0 bottom-0 flex h-[46%] flex-col justify-end",
+                  : "inset-x-0 bottom-0 h-[46%]",
               )}
             >
               {offerExpanded && (
@@ -773,7 +773,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                 />
               )}
               {hasMultiple && (
-                <div dir="rtl" className="pointer-events-auto mx-2 mb-1.5 flex shrink-0 items-center justify-between gap-2">
+                <div dir="rtl" className="pointer-events-auto absolute inset-x-2 bottom-full mb-1.5 flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => goToIdx(activeIdx - 1)}
@@ -826,10 +826,10 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
                   if (target && target !== activeId) setActiveId(target);
                 }}
                 className={cn(
-                  "pointer-events-auto",
+                  "pointer-events-auto h-full w-full",
                   offerExpanded
-                    ? "relative h-full w-full"
-                    : "flex min-h-0 max-h-full gap-0 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar",
+                    ? "relative"
+                    : "flex gap-0 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar",
                 )}
                 style={offerExpanded ? undefined : { scrollbarWidth: "none" }}
               >
