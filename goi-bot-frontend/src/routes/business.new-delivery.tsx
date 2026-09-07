@@ -15,6 +15,7 @@ import type { SelectedPlace } from "@/components/customer/AddressAutocomplete";
 import type { DrivingRoute } from "@/lib/google-driving-route";
 import { haversineKm } from "@/lib/google-driving-route";
 import { toast } from "sonner";
+import { canonicalizeVehicleValue } from "@/lib/courier-vehicles";
 
 type FieldKey =
   | "pickup"
@@ -134,10 +135,11 @@ function NewDeliveryPage() {
     return () => { cancelled = true; };
   }, [useBusinessAddress, businessPickupAddress, pickup, geocodeAddrs]);
 
-  const defaultVehicle = category.serviceType === "moving" ? "רכב" : "אופנוע";
+  const defaultVehicle = category.serviceType === "moving" ? "רכב" : "קטנוע";
   const [vehicle, setVehicle] = useState(defaultVehicle);
   useEffect(() => {
-    setVehicle(search.vehicle || (category.serviceType === "moving" ? "רכב" : "אופנוע"));
+    const fromSearch = canonicalizeVehicleValue(search.vehicle);
+    setVehicle(fromSearch || (category.serviceType === "moving" ? "רכב" : "קטנוע"));
   }, [category.serviceType, search.vehicle]);
 
   const [dropoffFloor, setDropoffFloor] = useState("");
@@ -361,7 +363,7 @@ function NewDeliveryPage() {
         package_type: deliveryType,
         fragile: attributes.has("fragile"),
         number_of_packages: 1 + validExtraStops.length,
-        vehicle_required: vehicle || null,
+        vehicle_required: canonicalizeVehicleValue(vehicle) || vehicle || null,
         job_date: jobDate,
         job_time: jobTime,
         delivery_deadline: deliveryDeadline,

@@ -98,7 +98,7 @@ function BusinessDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<OpsTab>("waiting");
   const [dropoffText, setDropoffText] = useState("");
-  const [quickVehicle, setQuickVehicle] = useState("אופנוע");
+  const [quickVehicle, setQuickVehicle] = useState("קטנוע");
   const prevStatusesRef = useRef<Map<string, string> | null>(null);
   const primedRef = useRef(false);
 
@@ -282,7 +282,7 @@ function BusinessDashboard() {
                   className="biz-input appearance-none pe-9"
                   aria-label="סוג רכב"
                 >
-                  <option value="אופנוע">קטנוע (משלוח מהיר)</option>
+                  <option value="קטנוע">אופנוע / קטנוע</option>
                   <option value="רכב">רכב</option>
                   <option value="טנדר">טנדר / משא</option>
                 </select>

@@ -31,6 +31,7 @@ import {
   COURIER_STATUSES, VEHICLE_TYPES, JOB_TYPES, AVAILABILITY, INVOICE_STATUS,
   type CourierStatus,
 } from "@/lib/constants";
+import { canonicalizeVehicleValue, vehicleLabel } from "@/lib/courier-vehicles";
 import { REGIONS, regionOf, regionsOfCourier, type Region } from "@/lib/regions";
 import {
   MoreHorizontal, Plus, Eye, CheckCircle2, AlertCircle, MessageCircle, Ban, Loader2, Pause,
@@ -214,7 +215,9 @@ function NewCourierDialog() {
             <Label>רכב</Label>
             <Select value={form.vehicle_type} onValueChange={(v) => setForm({ ...form, vehicle_type: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{vehicleLabel(v)}</SelectItem>)}
+              </SelectContent>
             </Select>
           </div>
           <div>
@@ -438,7 +441,14 @@ function CouriersPage() {
       const courierRegions = regionsOfCourier(c as any);
       if (!fRegions.some((r) => courierRegions.includes(r))) return false;
     }
-    if (fVehicle !== "all" && c.vehicle_type !== fVehicle) return false;
+    if (
+      fVehicle !== "all" &&
+      canonicalizeVehicleValue(c.vehicle_type) !== fVehicle &&
+      c.vehicle_type !== fVehicle &&
+      !((c.vehicle_types as string[] | undefined) ?? []).some(
+        (v) => canonicalizeVehicleValue(v) === fVehicle || v === fVehicle,
+      )
+    ) return false;
     if (fJobTypes.length > 0 && !fJobTypes.some((jt) => (c.job_types ?? []).includes(jt))) return false;
     if (fAvailability !== "all" && !(c.availability ?? []).includes(fAvailability)) return false;
     if (fInvoice !== "all" && c.invoice_status !== fInvoice) return false;
@@ -662,7 +672,7 @@ function CouriersPage() {
               <SelectTrigger><SelectValue placeholder="כלי" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">כל הכלים</SelectItem>
-                {VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                {VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{vehicleLabel(v)}</SelectItem>)}
               </SelectContent>
             </Select>
             <MultiSelectFilter

@@ -40,7 +40,7 @@ import {
   OPEN_STATUSES,
   isClaimableStatus as statusIsClaimable,
 } from "./job-statuses";
-import { pickDispatchCouriers } from "./courier-job-match";
+import { courierVehicleFitsJob, jobNeededVehicleClass, pickDispatchCouriers } from "./courier-job-match";
 
 function generateTrackingToken(): string {
   return randomBytes(16).toString("hex");
@@ -126,7 +126,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     });
     const statsById = new Map(statsRows.map((s) => [s.courier_id, s]));
 
-    const vehicleNeeded = (job.vehicle_required || "").trim();
     const pickup = (job.pickup_area || "").trim();
     const dropoff = (job.dropoff_area || "").trim();
     const jobType = (job.job_type || "").trim();
@@ -138,19 +137,13 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       let score = 40;
       reasons.push({ label: "שליח פעיל", points: 40 });
 
-      const vehicles = [
-        c.vehicle_type,
-        c.vehicle_label,
-        ...(c.vehicle_types || []),
-      ]
-        .filter(Boolean)
-        .map(String);
-      if (vehicleNeeded && vehicles.some((v) => v.includes(vehicleNeeded) || vehicleNeeded.includes(v))) {
-        score += 20;
-        reasons.push({ label: "התאמת רכב", points: 20 });
-      } else if (!vehicleNeeded) {
+      const neededClass = jobNeededVehicleClass(job);
+      if (!neededClass) {
         score += 5;
         reasons.push({ label: "ללא דרישת רכב", points: 5 });
+      } else if (courierVehicleFitsJob(job, c)) {
+        score += 20;
+        reasons.push({ label: "התאמת רכב", points: 20 });
       }
 
       const areas = [

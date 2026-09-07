@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeJob } from "@/lib/geocode-job.functions";
 import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
+import { COURIER_VEHICLE_OPTIONS } from "@/lib/courier-vehicles";
 
 export const Route = createFileRoute("/business/new-route")({
   head: () => ({ meta: [{ title: "קו חלוקה — Goi" }] }),
@@ -93,9 +94,9 @@ function NewRoutePage() {
                 <Select value={f.vehicle_required} onValueChange={(v) => setF({ ...f, vehicle_required: v })}>
                   <SelectTrigger><SelectValue placeholder="לא משנה" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="קטנוע">קטנוע</SelectItem>
-                    <SelectItem value="רכב">רכב</SelectItem>
-                    <SelectItem value="אופניים חשמליים">אופניים חשמליים</SelectItem>
+                    {COURIER_VEHICLE_OPTIONS.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

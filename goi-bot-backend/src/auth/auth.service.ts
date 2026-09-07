@@ -599,6 +599,7 @@ export class AuthService {
     const legacyVehicleEnum = [
       "קטנוע",
       "רכב",
+      "טנדר",
       "אופניים חשמליים",
       "הליכה",
       "קורקינט חשמלי",
@@ -606,7 +607,8 @@ export class AuthService {
     ];
     const vehicleTypes = dto.vehicle_types ?? [];
     const firstVehicle =
-      vehicleTypes.find((v) => legacyVehicleEnum.includes(v)) ?? null;
+      vehicleTypes.find((v) => legacyVehicleEnum.includes(v)) ??
+      (vehicleTypes.some((v) => /טנדר|משאית|van|truck|הובל/.test(v)) ? "טנדר" : null);
 
     const JOB_TYPE_ENUM = [
       "משלוח בודד",

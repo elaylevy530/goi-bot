@@ -10,32 +10,46 @@ import {
   Car, Zap, MoreHorizontal, Package,
   Boxes, ClipboardList, MessageCircle, Lock,
   Briefcase, Bell, ThumbsUp, Sparkles, Send,
-  Camera, Upload, X, KeyRound,
+  Camera, Upload, X, KeyRound, FileText,
 } from "lucide-react";
 import { BackNav } from "@/components/BackNav";
 import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
 import { composeWorkingAreas, workAreaSelectionError } from "@/lib/regions";
 import { toast } from "sonner";
 import { cacheCourierKind } from "@/lib/courier-kind";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  COURIER_AGREEMENT_SECTIONS,
+  COURIER_AGREEMENT_TITLE,
+  COURIER_AGREEMENT_VERSION,
+} from "@/lib/courier-agreement";
 
 type CourierKind = "courier" | "mover";
 
-const VEHICLES_BY_KIND: Record<CourierKind, { value: string; icon: typeof Bike }[]> = {
+const VEHICLES_BY_KIND: Record<CourierKind, { value: string; label: string; icon: typeof Bike }[]> = {
   courier: [
-    { value: "קטנוע", icon: Bike },
-    { value: "אופניים חשמליים", icon: Zap },
-    { value: "רכב", icon: Car },
-    { value: "קורקינט חשמלי", icon: Zap },
-    { value: "אופניים רגילים", icon: Bike },
-    { value: "אחר", icon: MoreHorizontal },
+    { value: "קטנוע", label: "אופנוע / קטנוע", icon: Bike },
+    { value: "אופניים חשמליים", label: "אופניים חשמליים", icon: Zap },
+    { value: "רכב", label: "רכב", icon: Car },
+    { value: "טנדר", label: "טנדר", icon: Car },
+    { value: "קורקינט חשמלי", label: "קורקינט חשמלי", icon: Zap },
+    { value: "אופניים רגילים", label: "אופניים רגילים", icon: Bike },
+    { value: "הליכה", label: "הליכה", icon: MoreHorizontal },
+    { value: "אחר", label: "אחר", icon: MoreHorizontal },
   ],
   mover: [
-    { value: "טנדר", icon: Car },
-    { value: "משאית קטנה", icon: Package },
-    { value: "משאית 12 טון", icon: Package },
-    { value: "משאית 15 טון+", icon: Package },
-    { value: "צוות מובילים", icon: Boxes },
-    { value: "אחר", icon: MoreHorizontal },
+    { value: "טנדר", label: "טנדר", icon: Car },
+    { value: "משאית קטנה", label: "משאית קטנה", icon: Package },
+    { value: "משאית 12 טון", label: "משאית 12 טון", icon: Package },
+    { value: "משאית 15 טון+", label: "משאית 15 טון+", icon: Package },
+    { value: "צוות מובילים", label: "צוות מובילים", icon: Boxes },
+    { value: "אחר", label: "אחר", icon: MoreHorizontal },
   ],
 };
 
@@ -187,6 +201,8 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
   const [invoice, setInvoice] = useState<string>("");
   const [password, setPassword] = useState("");
   const [consent, setConsent] = useState(true);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [done, setDone] = useState(false);
   // Product scope: courier registration only (movers live elsewhere).
   const kind: CourierKind = "courier";
@@ -291,7 +307,8 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
     workCities.length > 0 &&
     vehicleTypes.length > 0 &&
     password.length >= 6 &&
-    consent;
+    consent &&
+    termsAccepted;
 
   if (done) {
     return (
@@ -527,7 +544,7 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
                   >
                     <Checkbox checked={on} className="pointer-events-none self-start" />
                     <v.icon className={`size-7 ${on ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className="text-xs font-medium text-center">{v.value}</span>
+                    <span className="text-xs font-medium text-center">{v.label}</span>
                   </button>
                 );
               })}
@@ -578,10 +595,10 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
           </Section>
 
           {/* 10. Consent */}
-          <section className="bg-white rounded-2xl border border-border shadow-sm p-5">
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-3">
+          <section className="bg-white rounded-2xl border border-border shadow-sm p-5 space-y-4">
+            <h2 className="text-lg font-bold flex items-center gap-2">
               <MessageCircle className="size-5 text-primary" />
-              אישור קבלת הצעות
+              אישור קבלת הצעות והסכם
             </h2>
             <label className="flex items-start gap-3 cursor-pointer">
               <Checkbox checked={consent} onCheckedChange={(v) => setConsent(Boolean(v))} className="mt-0.5" />
@@ -589,7 +606,43 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
                 אני מאשר/ת לקבל הצעות עבודה ועדכונים מ-<b>Goi</b> בוואטסאפ
               </span>
             </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <Checkbox checked={termsAccepted} onCheckedChange={(v) => setTermsAccepted(Boolean(v))} className="mt-0.5" />
+              <span className="text-sm text-foreground">
+                קראתי ואני מסכים/ה ל
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setTermsOpen(true);
+                  }}
+                  className="mx-1 font-bold text-primary underline underline-offset-2"
+                >
+                  {COURIER_AGREEMENT_TITLE}
+                </button>
+              </span>
+            </label>
           </section>
+
+          <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+            <DialogContent dir="rtl" className="max-h-[85vh] max-w-lg overflow-y-auto text-right">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="size-5 text-primary" />
+                  {COURIER_AGREEMENT_TITLE}
+                </DialogTitle>
+                <DialogDescription>גרסה {COURIER_AGREEMENT_VERSION} · ההסכם בין Goi לשליח</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 text-sm leading-relaxed text-slate-700">
+                {COURIER_AGREEMENT_SECTIONS.map((section) => (
+                  <section key={section.heading}>
+                    <h3 className="mb-1 font-bold text-slate-900">{section.heading}</h3>
+                    <p>{section.body}</p>
+                  </section>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Button
             size="lg"

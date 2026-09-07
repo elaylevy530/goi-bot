@@ -35,7 +35,7 @@ export const Route = createFileRoute("/courier/availability")({
   component: AvailabilityPage,
 });
 
-type VehicleChoice = "רכב" | "קטנוע" | "אופניים חשמליים" | "";
+type VehicleChoice = "רכב" | "קטנוע" | "אופניים חשמליים" | "טנדר" | "";
 
 const DISTANCE_OPTIONS = [
   { value: "בתוך העיר", label: "בתוך העיר" },
@@ -46,18 +46,20 @@ const DISTANCE_OPTIONS = [
 
 const VEHICLE_OPTIONS = [
   { value: "רכב", label: "רכב", Icon: CarIcon },
-  { value: "קטנוע", label: "קטנוע", Icon: ScooterIcon },
+  { value: "קטנוע", label: "אופנוע / קטנוע", Icon: ScooterIcon },
+  { value: "טנדר", label: "טנדר", Icon: CarIcon },
   { value: "אופניים חשמליים", label: "אופניים חשמליים", Icon: ElectricBikeIcon },
 ] as const;
 
 function normalizeVehicle(value: string | null | undefined): VehicleChoice {
   const v = String(value ?? "").trim();
   if (!v) return "";
-  if (v === "קטנוע" || v === "רכב" || v === "אופניים חשמליים") return v;
+  if (v === "קטנוע" || v === "רכב" || v === "אופניים חשמליים" || v === "טנדר") return v;
   if (/אופניים\s*חשמלי|e-?bike|ebike/i.test(v)) return "אופניים חשמליים";
+  if (/טנדר|משאית|van|truck|הובל/.test(v)) return "טנדר";
   if (/קטנוע|אופנוע|קורקינט/.test(v)) return "קטנוע";
   if (/אופניים/.test(v)) return "אופניים חשמליים";
-  if (/רכב|טנדר|משאית|אוטו/.test(v)) return "רכב";
+  if (/רכב|אוטו/.test(v)) return "רכב";
   return "";
 }
 

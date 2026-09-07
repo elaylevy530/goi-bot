@@ -11,6 +11,7 @@ import {
 } from "@/lib/nest-accounts";
 import { nestUploadFile } from "@/lib/nest-files";
 import { COURIER_DOCUMENT_TYPES, type CourierSelfRow } from "@/lib/courier-session";
+import { COURIER_VEHICLE_OPTIONS, canonicalizeVehicleValue } from "@/lib/courier-vehicles";
 import { cn } from "@/lib/utils";
 
 function fieldLabel(cls?: string) {
@@ -127,7 +128,7 @@ export function PersonalInlineEditor({ me, onDone }: { me: CourierSelfRow; onDon
 
 export function VehicleInlineEditor({ me, onDone }: { me: CourierSelfRow; onDone: () => void }) {
   const qc = useQueryClient();
-  const [vehicle, setVehicle] = useState(me.vehicle_type ?? "");
+  const [vehicle, setVehicle] = useState(canonicalizeVehicleValue(me.vehicle_type) || me.vehicle_type || "");
   const [vehiclePlate, setVehiclePlate] = useState(me.vehicle_plate ?? "");
 
   const save = useMutation({
@@ -155,7 +156,19 @@ export function VehicleInlineEditor({ me, onDone }: { me: CourierSelfRow; onDone
     >
       <div>
         <Label className={fieldLabel()}>כלי עבודה</Label>
-        <Input value={vehicle} onChange={(e) => setVehicle(e.target.value)} className="min-h-11 text-end" placeholder="קטנוע / רכב / אופניים חשמליים" />
+        <select
+          value={canonicalizeVehicleValue(vehicle) || vehicle}
+          onChange={(e) => setVehicle(e.target.value)}
+          className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-end text-sm"
+        >
+          <option value="">בחרו כלי עבודה</option>
+          {COURIER_VEHICLE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+          {vehicle && !COURIER_VEHICLE_OPTIONS.some((o) => o.value === canonicalizeVehicleValue(vehicle) || o.value === vehicle) && (
+            <option value={vehicle}>{vehicle}</option>
+          )}
+        </select>
       </div>
       <div>
         <Label className={fieldLabel()}>מספר רישוי</Label>

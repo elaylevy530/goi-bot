@@ -14,7 +14,10 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { CourierStatusBadge } from "@/components/StatusBadges";
-import { nestGetCourier, nestUpdateCourier } from "@/lib/nest-accounts";
+import { nestGetCourier, nestUpdateCourier, type NestCourierDocument } from "@/lib/nest-accounts";
+import { nestSignedFileUrlResolved } from "@/lib/nest-files";
+import { COURIER_DOCUMENT_TYPES } from "@/lib/courier-session";
+import { canonicalizeVehicleValue, vehicleLabel } from "@/lib/courier-vehicles";
 import {
   nestListAreas, nestListCourierTags, nestListAllTags, nestAddCourierTag, nestRemoveCourierTag,
   nestListCourierWhatsappMessages, nestListCourierEntityStatusLogs,
@@ -24,7 +27,7 @@ import { reclassifyCourier, approveCourier, getIdPhotoSignedUrl, deleteCourier }
 import { ProvisionAccountButton } from "@/components/ProvisionAccountButton";
 import { ViewPanelButton } from "@/components/ViewPanelButton";
 import {
-  ArrowRight, MessageCircle, Save, Pencil, Wand2, X, Plus, Loader2, ShieldCheck, IdCard, Trash2, Copy, Pause, Play,
+  ArrowRight, MessageCircle, Save, Pencil, Wand2, X, Plus, Loader2, ShieldCheck, IdCard, Trash2, Copy, Pause, Play, FileText,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -174,6 +177,57 @@ function PauseCourierButton({ id, isPaused, status }: { id: string; isPaused: bo
   );
 }
 
+function CourierDocumentLink({ path }: { path: string }) {
+  const { data: url, isPending } = useQuery({
+    queryKey: ["admin-courier-doc", path],
+    queryFn: () => nestSignedFileUrlResolved("courier-documents", path, 60 * 60),
+    staleTime: 20 * 60 * 1000,
+  });
+  if (isPending) return <span className="text-xs text-muted-foreground">טוען…</span>;
+  if (!url) return <span className="text-xs text-muted-foreground">הועלה</span>;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary underline">
+      צפייה במסמך
+    </a>
+  );
+}
+
+function CourierDocumentsCard({ documents }: { documents: NestCourierDocument[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="size-4" />
+          מסמכי שליח
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {COURIER_DOCUMENT_TYPES.map((meta) => {
+          const row = documents.find((d) => d.type === meta.type);
+          return (
+            <div key={meta.type} className="flex items-center justify-between gap-3 rounded-md border p-3">
+              <div>
+                <div className="text-sm font-medium">{meta.label}</div>
+                <div className="text-xs text-muted-foreground">
+                  {row?.expires_at
+                    ? `תוקף: ${new Date(row.expires_at).toLocaleDateString("he-IL")}`
+                    : "אין תאריך תוקף"}
+                  {row?.verified ? " · מאומת" : ""}
+                </div>
+              </div>
+              {row?.file_url ? (
+                <CourierDocumentLink path={row.file_url} />
+              ) : (
+                <span className="text-xs text-muted-foreground">לא הועלה</span>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 function IdPhotoViewer({ path, label = "תמונת תעודת זהות" }: { path: string; label?: string }) {
   const sign = useServerFn(getIdPhotoSignedUrl);
   const { data, isLoading, error } = useQuery({
@@ -211,7 +265,7 @@ function EditCourierDialog({ courier }: { courier: any }) {
     whatsapp_phone: courier.whatsapp_phone,
     base_city: courier.base_city ?? "",
     gender: courier.gender ?? "",
-    vehicle_type: courier.vehicle_type ?? "קטנוע",
+    vehicle_type: canonicalizeVehicleValue(courier.vehicle_type) || courier.vehicle_type || "קטנוע",
     invoice_status: courier.invoice_status ?? "לא",
     experience: courier.experience ?? "",
     courier_status: courier.courier_status as CourierStatus,
@@ -282,7 +336,12 @@ function EditCourierDialog({ courier }: { courier: any }) {
             <Label>רכב</Label>
             <Select value={form.vehicle_type} onValueChange={(v) => setForm({ ...form, vehicle_type: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{vehicleLabel(v)}</SelectItem>)}
+                {form.vehicle_type && !VEHICLE_TYPES.includes(form.vehicle_type as (typeof VEHICLE_TYPES)[number]) && (
+                  <SelectItem value={form.vehicle_type}>{vehicleLabel(form.vehicle_type)}</SelectItem>
+                )}
+              </SelectContent>
             </Select>
           </div>
           <div>
@@ -541,8 +600,8 @@ function CourierProfile() {
             <Detail label="עיר מגורים" value={c.base_city ?? "—"} />
             <Detail label="מספר ת״ז" value={c.id_number ? <span className="font-mono">{c.id_number}</span> : "—"} />
             <Detail label="מין" value={c.gender ?? "—"} />
-            <Detail label="רכב (גרסת שליח)" value={c.vehicle_label ?? c.vehicle_type ?? "—"} />
-            <Detail label="רכב (מסווג)" value={c.vehicle_type ?? "—"} />
+            <Detail label="רכב (גרסת שליח)" value={vehicleLabel(c.vehicle_label ?? c.vehicle_type)} />
+            <Detail label="רכב (מסווג)" value={vehicleLabel(c.vehicle_type)} />
             <Detail label="תיק / ארגז משלוחים" value={c.delivery_bag ?? "—"} />
             <Detail label="מרחק עבודה מועדף" value={c.max_distance?.join(", ") ?? "—"} />
             <Detail label="חשבונית" value={c.invoice_status ?? "—"} />
@@ -569,7 +628,13 @@ function CourierProfile() {
               )}
             </div>
             <Detail label="מרחק מבסיס" value={(c as any).work_distance_from_base ?? "—"} />
-            <Detail label="כלי עבודה" value={((c as any).vehicle_types as string[] | null)?.join(", ") || c.vehicle_type || "—"} />
+            <Detail
+              label="כלי עבודה"
+              value={
+                ((c as any).vehicle_types as string[] | null)?.map((v) => vehicleLabel(v)).join(", ")
+                || vehicleLabel(c.vehicle_type)
+              }
+            />
             <Detail label="ניסיון" value={(c as any).courier_experience_status ?? "—"} />
             <Detail label="ותק" value={(c as any).courier_experience_duration ?? "—"} />
             <div className="col-span-2 md:col-span-3">
@@ -590,6 +655,10 @@ function CourierProfile() {
             )}
           </CardContent>
         </Card>
+
+        <CourierDocumentsCard
+          documents={((c as { documents?: NestCourierDocument[] }).documents) ?? []}
+        />
 
         <TagsCard courierId={id} />
       </div>

@@ -15,6 +15,7 @@ import { nestListAreas, nestSendWhatsapp } from "@/lib/nest-domain";
 import { nestListCouriers } from "@/lib/nest-accounts";
 import { nestCreateJob } from "@/lib/nest-jobs";
 import { JOB_TYPES, VEHICLE_TYPES } from "@/lib/constants";
+import { vehicleLabel } from "@/lib/courier-vehicles";
 import { Copy, MessageCircle, CheckCheck, Search, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -157,7 +158,7 @@ ${description ? `הערות: ${description}\n` : ""}רוצה לקחת? השב 1.
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">ללא העדפה</SelectItem>
-                  {VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  {VEHICLE_TYPES.map((v) => <SelectItem key={v} value={v}>{vehicleLabel(v)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

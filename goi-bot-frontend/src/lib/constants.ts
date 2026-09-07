@@ -7,7 +7,15 @@ export const COURIER_STATUSES = [
 ] as const;
 export type CourierStatus = (typeof COURIER_STATUSES)[number];
 
-export const VEHICLE_TYPES = ["קטנוע","רכב","אופניים חשמליים","הליכה"] as const;
+export const VEHICLE_TYPES = [
+  "קטנוע",
+  "רכב",
+  "טנדר",
+  "אופניים חשמליים",
+  "אופניים רגילים",
+  "קורקינט חשמלי",
+  "הליכה",
+] as const;
 export const AVAILABILITY = ["בוקר","צהריים","ערב","לילה","סופ״ש"] as const;
 export const INVOICE_STATUS = ["כן","לא","תסדרו אותי"] as const;
 

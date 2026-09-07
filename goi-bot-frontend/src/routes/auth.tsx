@@ -1,23 +1,33 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Truck, Building2, ShieldCheck, Loader2, UserPlus, KeyRound } from "lucide-react";
-import { toast } from "sonner";
-import { AuthShell, AuthField, AuthInput } from "@/components/AuthShell";
 import {
-  ApiClientError,
-} from "@/lib/api-client";
+  ArrowRight,
+  Bike,
+  Eye,
+  EyeOff,
+  Loader2,
+  ShieldCheck,
+  Store,
+} from "lucide-react";
+import { toast } from "sonner";
+import { ApiClientError } from "@/lib/api-client";
 import {
   fetchNestSession,
   nestHomePath,
   nestLoginWithPhone,
 } from "@/lib/nest-auth";
+import { cn } from "@/lib/utils";
+import businessHero from "@/assets/auth/business-hero.png";
+import courierHero from "@/assets/auth/courier-hero.png";
 
 type Role = "courier" | "business";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "התחברות — Goi" }] }),
   ssr: false,
+  validateSearch: (s: Record<string, unknown>) => ({
+    role: s.role === "business" ? "business" as const : undefined,
+  }),
   beforeLoad: async () => {
     const session = await fetchNestSession();
     if (!session) return;
@@ -41,10 +51,37 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const ROLES: { key: Role; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: "courier", label: "שליח", icon: Truck },
-  { key: "business", label: "לקוח עסקי", icon: Building2 },
-];
+const COPY: Record<
+  Role,
+  {
+    hero: string;
+    title: string;
+    subtitle: string;
+    cta: string;
+    footerLead: string;
+    footerAction: string;
+    footerTo: "/join" | "/signup-business";
+  }
+> = {
+  business: {
+    hero: businessHero,
+    title: "טוב שחזרת",
+    subtitle: "המשלוחים של העסק מתחילים כאן",
+    cta: "כניסה לעסק",
+    footerLead: "עדיין לא הצטרפת?",
+    footerAction: "פתיחת חשבון עסקי",
+    footerTo: "/signup-business",
+  },
+  courier: {
+    hero: courierHero,
+    title: "טוב שחזרת",
+    subtitle: "העבודות שלך מחכות כאן",
+    cta: "כניסה לשליח",
+    footerLead: "עדיין לא הצטרפת?",
+    footerAction: "הרשמה כשליח",
+    footerTo: "/join",
+  },
+};
 
 function authErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiClientError) return err.message || fallback;
@@ -53,70 +90,35 @@ function authErrorMessage(err: unknown, fallback: string): string {
 }
 
 function AuthPage() {
-  const [role, setRole] = useState<Role>("courier");
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  const [role, setRole] = useState<Role>(search.role === "business" ? "business" : "courier");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const copy = COPY[role];
+  const setRoleAndUrl = (next: Role) => {
+    setRole(next);
+    void navigate({
+      to: "/auth",
+      search: next === "business" ? { role: "business" } : {},
+      replace: true,
+    });
+  };
 
-  const roleIcon = { courier: <Truck className="size-8" />, business: <Building2 className="size-8" /> }[role];
-
-  return (
-    <AuthShell
-      title="ברוכים הבאים ל-Goi"
-      tagline="בחר מי אתה ונעביר אותך לאזור המתאים"
-      logo={roleIcon}
-      footer={
-        <Link
-          to="/admin-login"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition"
-        >
-          <ShieldCheck className="size-4" />
-          כניסת מנהל מערכת
-        </Link>
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone.trim() || !password) return;
+    setLoading(true);
+    try {
+      const session = await nestLoginWithPhone(phone, password, role);
+      toast.success("ברוך הבא!", { duration: 1600 });
+      if (role === "courier") {
+        navigate({ to: "/courier/new-jobs", replace: true });
+      } else {
+        navigate({ to: nestHomePath(session), replace: true });
       }
-    >
-      {/* Role segmented picker — courier + business only */}
-      <div className="grid grid-cols-2 gap-1.5 mb-6 rounded-2xl bg-slate-100 p-1.5">
-        {ROLES.map(({ key, label, icon: Icon }) => {
-          const active = role === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setRole(key)}
-              className={
-                "flex flex-col items-center justify-center gap-1 py-2.5 px-1 rounded-xl transition text-[11px] sm:text-xs font-bold leading-tight text-center " +
-                (active
-                  ? "bg-background text-primary shadow-sm ring-1 ring-primary/10"
-                  : "text-muted-foreground hover:text-foreground")
-              }
-              aria-pressed={active}
-            >
-              <Icon className="size-5" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {role === "courier" && <CourierForm />}
-      {role === "business" && <BusinessForm />}
-    </AuthShell>
-  );
-}
-
-/* ---------- Courier ---------- */
-function CourierForm() {
-  const navigate = useNavigate();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone.trim() || !password) return;
-    setLoading(true);
-    try {
-      await nestLoginWithPhone(phone, password, "courier");
-      toast.success("ברוך הבא!", { duration: 1600 });
-      navigate({ to: "/courier/new-jobs", replace: true });
     } catch (err) {
       toast.error(authErrorMessage(err, "טלפון או סיסמה שגויים"));
     } finally {
@@ -125,84 +127,179 @@ function CourierForm() {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <AuthField label="מספר וואטסאפ" htmlFor="c-phone" prefix="+972">
-        <AuthInput id="c-phone" type="tel" inputMode="tel" dir="ltr" required
-          value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="50-123-4567" />
-      </AuthField>
-      <AuthField
-        label="סיסמה"
-        htmlFor="c-pwd"
-        action={
+    <div dir="rtl" className="relative isolate min-h-dvh overflow-hidden bg-[#111] font-sans text-white">
+      <img
+        key={role}
+        src={copy.hero}
+        alt=""
+        className="absolute inset-0 size-full object-cover object-[center_25%] transition-opacity duration-500"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-black via-black/80 to-transparent" />
+
+      <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6">
+        <div className="relative flex h-11 items-center justify-center">
           <Link
-            to="/courier-reset-password"
-            className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
+            to="/"
+            className="absolute start-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white ring-1 ring-white/30 backdrop-blur-sm"
           >
-            <KeyRound className="size-3" />
-            שכחתי סיסמה
+            <ArrowRight className="size-3" />
+            דף הבית
           </Link>
-        }
-      >
-        <AuthInput id="c-pwd" type="password" required value={password}
-          onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-      </AuthField>
-      <Button type="submit" disabled={loading}
-        className="w-full h-14 rounded-2xl text-base font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition">
-        {loading && <Loader2 className="size-4 animate-spin" />} כניסה למערכת
-      </Button>
-      <Button asChild variant="outline" className="w-full rounded-2xl h-12">
-        <Link to="/join">
-          <UserPlus className="size-4" />
-          הרשמה כשליח חדש
-        </Link>
-      </Button>
-    </form>
+          <div
+            className="text-[22px] font-black tracking-[0.14em] text-white"
+            style={{ fontFamily: "var(--font-wordmark)" }}
+          >
+            GOI
+          </div>
+        </div>
+
+        <div className="mt-auto -mx-4 rounded-t-[1.75rem] bg-[#0b0b0b]/82 px-5 pb-3 pt-3.5 backdrop-blur-md sm:-mx-6 sm:px-7">
+          <div className="mb-3.5 grid grid-cols-2 gap-0.5 rounded-full bg-black/50 p-0.5 ring-1 ring-white/25">
+            <RoleTab
+              active={role === "courier"}
+              icon={Bike}
+              label="שליח"
+              onClick={() => setRoleAndUrl("courier")}
+            />
+            <RoleTab
+              active={role === "business"}
+              icon={Store}
+              label="לקוח עסקי"
+              onClick={() => setRoleAndUrl("business")}
+            />
+          </div>
+
+          <h1 className="text-[22px] font-black leading-none">{copy.title}</h1>
+          <p className="mt-1.5 text-[13px] text-white/70">{copy.subtitle}</p>
+
+          <form onSubmit={submit} className="mt-4 space-y-3">
+            <label className="block text-start">
+              <span className="mb-1 block text-[11px] font-bold text-white/75">מספר טלפון</span>
+              <div className="relative flex items-center rounded-xl border border-white/30 bg-black/30 focus-within:border-[#00A86B] focus-within:ring-2 focus-within:ring-[#00A86B]/30">
+                <span
+                  dir="ltr"
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] font-medium tracking-wide text-white/55"
+                >
+                  +972
+                </span>
+                <span className="pointer-events-none absolute left-[3.85rem] top-1/2 h-4 w-px -translate-y-1/2 bg-white/25" />
+                <input
+                  id="auth-phone"
+                  type="tel"
+                  inputMode="tel"
+                  dir="ltr"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="50-123-4567"
+                  className="w-full bg-transparent py-2.5 pl-[4.75rem] pr-3.5 text-left text-[15px] font-medium text-white outline-none placeholder:text-white/35"
+                />
+              </div>
+            </label>
+
+            <label className="block text-start">
+              <span className="mb-1 block text-[11px] font-bold text-white/75">סיסמה</span>
+              <div className="flex items-center rounded-xl border border-white/30 bg-black/30 px-3.5 focus-within:border-[#00A86B] focus-within:ring-2 focus-within:ring-[#00A86B]/30">
+                <input
+                  id="auth-password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="min-w-0 flex-1 bg-transparent py-2.5 text-right text-[15px] font-medium text-white outline-none placeholder:text-white/35"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="me-0 ms-2 shrink-0 text-white/55 hover:text-white"
+                  aria-label={showPassword ? "הסתר סיסמה" : "הצג סיסמה"}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </label>
+
+            {role === "courier" ? (
+              <div className="-mt-0.5 text-start">
+                <Link
+                  to="/courier-reset-password"
+                  className="text-[13px] font-bold text-[#00A86B] underline underline-offset-4"
+                >
+                  שכחתי סיסמה?
+                </Link>
+              </div>
+            ) : (
+              <div className="-mt-0.5 text-start">
+                <span className="text-[13px] font-bold text-[#00A86B] underline underline-offset-4">
+                  שכחתי סיסמה?
+                </span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="relative mt-0.5 flex h-12 w-full items-center justify-center rounded-xl bg-[#00A86B] text-[15px] font-black text-white transition active:scale-[0.98] disabled:opacity-70"
+            >
+              {loading ? <Loader2 className="size-5 animate-spin" /> : copy.cta}
+              <span className="absolute left-1.5 grid size-9 place-items-center rounded-full bg-white/15">
+                <ArrowRight className="size-3.5" />
+              </span>
+            </button>
+          </form>
+
+          <p className="mt-3.5 text-center text-[13px] text-white/65">
+            {copy.footerLead}{" "}
+            <Link
+              to={copy.footerTo}
+              className="font-bold text-[#00A86B] underline underline-offset-4"
+            >
+              {copy.footerAction}
+            </Link>
+          </p>
+
+          <div className="mt-3 text-center">
+            <Link
+              to="/admin-login"
+              className="inline-flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/70"
+            >
+              <ShieldCheck className="size-3" />
+              כניסת מנהל מערכת
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-/* ---------- Business ---------- */
-function BusinessForm() {
-  const navigate = useNavigate();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone.trim() || !password) return;
-    setLoading(true);
-    try {
-      const session = await nestLoginWithPhone(phone, password, "business");
-      toast.success("ברוך הבא!", { duration: 1600 });
-      navigate({ to: nestHomePath(session), replace: true });
-    } catch (err) {
-      toast.error(authErrorMessage(err, "טלפון או סיסמה שגויים"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
+function RoleTab({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: typeof Bike;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <AuthField label="טלפון" htmlFor="b-phone" prefix="+972">
-        <AuthInput id="b-phone" type="tel" inputMode="tel" dir="ltr" required
-          value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="50-123-4567" />
-      </AuthField>
-      <AuthField label="סיסמה" htmlFor="b-pwd">
-        <AuthInput id="b-pwd" type="password" required value={password}
-          onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-      </AuthField>
-      <Button type="submit" disabled={loading}
-        className="w-full h-14 rounded-2xl text-base font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition">
-        {loading && <Loader2 className="size-4 animate-spin" />} כניסה למערכת
-      </Button>
-      <p className="text-center text-sm text-muted-foreground">
-        עוד אין חשבון?{" "}
-        <Link to="/signup-business" className="text-primary font-bold mr-1 underline underline-offset-4">
-          הירשם כעסק
-        </Link>
-      </p>
-    </form>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex items-center justify-center gap-1.5 rounded-full py-2 text-[13px] font-bold transition",
+        active
+          ? "bg-[#00A86B] text-white shadow-[0_0_14px_rgba(0,168,107,0.4)]"
+          : "text-white/75 hover:text-white",
+      )}
+    >
+      <Icon className="size-4" />
+      {label}
+    </button>
   );
 }
-

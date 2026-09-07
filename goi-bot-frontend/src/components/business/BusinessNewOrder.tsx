@@ -7,6 +7,7 @@ import { TIMING_LABELS, type Timing } from "@/config/businessCategories";
 import { BizField, bizControlClass } from "@/components/business/BizField";
 import { cn } from "@/lib/utils";
 import type { DrivingRoute, LatLng } from "@/lib/google-driving-route";
+import { BUSINESS_JOB_VEHICLES, canonicalizeVehicleValue } from "@/lib/courier-vehicles";
 
 export type ExtraStop = { place: SelectedPlace | null; text: string; name: string; phone: string };
 
@@ -14,7 +15,7 @@ type DeliveryType = { key: string; label: string };
 type PricingModel = "fixed_price" | "distance_based" | "quote_request";
 
 const STEPS = ["מסלול", "פרטי משלוח", "סיכום"] as const;
-const VEHICLES = ["אופנוע", "רכב", "טנדר"] as const;
+const VEHICLES = BUSINESS_JOB_VEHICLES;
 
 type Props = {
   pickupText: string;
@@ -365,17 +366,17 @@ function DetailsStep(props: Props) {
             <div className="grid grid-cols-3 gap-2">
               {VEHICLES.map((v) => (
                 <button
-                  key={v}
+                  key={v.value}
                   type="button"
-                  onClick={() => props.onVehicle(v)}
+                  onClick={() => props.onVehicle(v.value)}
                   className={cn(
                     "h-11 rounded-lg border text-sm font-medium",
-                    props.vehicle === v
+                    canonicalizeVehicleValue(props.vehicle) === v.value
                       ? "border-primary bg-primary-soft text-primary"
                       : "border-border bg-surface text-text-subtle hover:bg-muted",
                   )}
                 >
-                  {v}
+                  {v.label}
                 </button>
               ))}
             </div>

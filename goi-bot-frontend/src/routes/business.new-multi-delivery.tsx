@@ -26,6 +26,7 @@ import {
 import { createMultiStopJob } from "@/lib/multi-stop.functions";
 import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import { nestComputePrice, nestGetPricing } from "@/lib/nest-domain";
+import { COURIER_VEHICLE_OPTIONS } from "@/lib/courier-vehicles";
 
 export const Route = createFileRoute("/business/new-multi-delivery")({
   head: () => ({ meta: [{ title: "משלוח מרובה נקודות — Goi" }] }),
@@ -188,11 +189,9 @@ function NewMultiDeliveryPage() {
                     <SelectValue placeholder="לא משנה" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="הולך רגל">הולך רגל</SelectItem>
-                    <SelectItem value="אופניים">אופניים</SelectItem>
-                    <SelectItem value="קורקינט / אופנוע">קורקינט / אופנוע</SelectItem>
-                    <SelectItem value="רכב">רכב</SelectItem>
-                    <SelectItem value="טנדר">טנדר</SelectItem>
+                    {COURIER_VEHICLE_OPTIONS.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

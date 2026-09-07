@@ -154,7 +154,7 @@ export class AccountsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("admin", "manager")
   getCourier(@Param("id", ParseUUIDPipe) id: string) {
-    return this.accounts.getCourier(id);
+    return this.accounts.getCourierAdminView(id);
   }
 
   @Patch("couriers/:id")

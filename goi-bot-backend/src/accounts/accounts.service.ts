@@ -411,17 +411,16 @@ export class AccountsService implements OnModuleInit {
     return this.couriers.save(courier);
   }
 
-  async listMyDocuments(userId: string): Promise<CourierDocument[]> {
-    const courier = await this.getMyCourier(userId);
+  async listDocumentsForCourier(courierId: string): Promise<CourierDocument[]> {
     const rows = await this.courierDocuments.find({
-      where: { courier_id: courier.id },
+      where: { courier_id: courierId },
     });
     const byType = new Map(rows.map((row) => [row.type, row]));
     return COURIER_DOCUMENT_TYPES.map((type) => {
       const existing = byType.get(type);
       if (existing) return existing;
       return this.courierDocuments.create({
-        courier_id: courier.id,
+        courier_id: courierId,
         type,
         file_url: null,
         expires_at: null,
@@ -429,6 +428,18 @@ export class AccountsService implements OnModuleInit {
       });
     });
   }
+
+  async listMyDocuments(userId: string): Promise<CourierDocument[]> {
+    const courier = await this.getMyCourier(userId);
+    return this.listDocumentsForCourier(courier.id);
+  }
+
+  async getCourierAdminView(id: string) {
+    const courier = await this.getCourier(id);
+    const documents = await this.listDocumentsForCourier(id);
+    return { ...courier, documents };
+  }
+
 
   async updateMyDocument(
     userId: string,
