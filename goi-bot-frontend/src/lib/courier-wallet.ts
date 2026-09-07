@@ -8,6 +8,7 @@ export type WalletJobRef = {
   customer_price?: unknown;
   job_number?: string | number | null;
   delivered_at?: string | null;
+  created_at?: string | null;
   job_date?: string | null;
   status?: string | null;
   delivery_status?: string | null;
@@ -22,9 +23,16 @@ export type WalletOutcome = {
 };
 
 export type WalletCommission = {
+  id?: string;
   amount?: unknown;
   created_at?: string | null;
+  walleted_at?: string | null;
+  kind?: string | null;
 };
+
+export function isWalletedCommission(c: WalletCommission) {
+  return c.walleted_at !== null;
+}
 
 export type WalletWithdrawal = {
   amount?: number | string | null;
@@ -88,7 +96,7 @@ export function isWalletCompletedOutcome(outcome: WalletOutcome) {
 
 export function outcomeEarnedAt(outcome: WalletOutcome) {
   const job = outcomeJob(outcome);
-  return outcome.delivered_at || job?.delivered_at || job?.job_date || outcome.created_at || null;
+  return job?.job_date || outcome.delivered_at || job?.delivered_at || outcome.created_at || job?.created_at || null;
 }
 
 export function outcomeCourierPay(outcome: WalletOutcome) {
@@ -162,7 +170,9 @@ export function summarizeCourierWallet({
   };
 
   for (const o of completed) add(outcomeEarnedAt(o), outcomeCourierPay(o));
-  for (const c of commissions) add(c.created_at, Number(c.amount ?? 0) || 0);
+  const walletedCommissions = commissions.filter(isWalletedCommission);
+  for (const c of walletedCommissions) add(c.created_at, Number(c.amount ?? 0) || 0);
+  const affiliateEarned = walletedCommissions.reduce((s, c) => s + (Number(c.amount ?? 0) || 0), 0);
 
   const currentKey = currentIsraelYearMonthKey(now);
   const months: WalletMonthRow[] = [...monthMap.entries()]
@@ -193,5 +203,6 @@ export function summarizeCourierWallet({
     unlockingAmount: currentMonthEarned,
     unlockDateLabel: formatIsraelDate(unlockOn),
     unlockOn,
+    affiliateEarned,
   };
 }

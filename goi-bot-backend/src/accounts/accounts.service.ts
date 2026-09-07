@@ -64,6 +64,7 @@ export type CourierReferralsPayload = {
     kind: "courier" | "business";
     amount: number;
     created_at: Date;
+    walleted_at: Date | null;
   }[];
   commission_ils: number;
   totals: {
@@ -73,6 +74,8 @@ export type CourierReferralsPayload = {
     businesses_active: number;
     profit: number;
     pending: number;
+    in_wallet: number;
+    available_to_wallet: number;
   };
 };
 
@@ -211,6 +214,18 @@ export class AccountsService implements OnModuleInit {
     await this.dataSource.query(
       `CREATE INDEX IF NOT EXISTS IDX_referral_commissions_beneficiary ON referral_commissions (beneficiary_courier_id)`,
     );
+    const walletedCol = await this.dataSource.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'referral_commissions' AND column_name = 'walleted_at'`,
+    );
+    if (!Array.isArray(walletedCol) || walletedCol.length === 0) {
+      await this.dataSource.query(
+        `ALTER TABLE referral_commissions ADD COLUMN walleted_at timestamptz`,
+      );
+      await this.dataSource.query(
+        `UPDATE referral_commissions SET walleted_at = created_at WHERE walleted_at IS NULL`,
+      );
+    }
 
     const missingReferral = await this.couriers.find({
       where: { referral_code: IsNull() },
@@ -284,10 +299,14 @@ export class AccountsService implements OnModuleInit {
     const profitByBusiness = new Map<string, number>();
     let profit = 0;
     let pending = 0;
+    let inWallet = 0;
+    let availableToWallet = 0;
     for (const row of mine) {
       const amount = Number(row.amount) || 0;
       profit += amount;
-      if (isCurrentIsraelMonth(row.created_at)) pending += amount;
+      if (row.walleted_at) inWallet += amount;
+      else availableToWallet += amount;
+      if (isCurrentIsraelMonth(row.created_at) && !row.walleted_at) pending += amount;
       if (row.kind === "courier" && row.source_courier_id) {
         profitByCourier.set(
           row.source_courier_id,
@@ -344,6 +363,7 @@ export class AccountsService implements OnModuleInit {
         kind: row.kind,
         amount: Number(row.amount) || 0,
         created_at: row.created_at,
+        walleted_at: row.walleted_at ?? null,
       })),
       commission_ils: REFERRAL_COMMISSION_ILS,
       totals: {
@@ -353,8 +373,30 @@ export class AccountsService implements OnModuleInit {
         businesses_active: businessesActive,
         profit,
         pending,
+        in_wallet: inWallet,
+        available_to_wallet: availableToWallet,
       },
     };
+  }
+
+  async moveMyReferralCommissionsToWallet(userId: string) {
+    const me = await this.getMyCourier(userId);
+    const pending = await this.commissions.find({
+      where: { beneficiary_courier_id: me.id, walleted_at: IsNull() },
+    });
+    const amount = pending.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    if (pending.length === 0) {
+      return { moved: 0, amount: 0 };
+    }
+    const now = new Date();
+    await this.commissions
+      .createQueryBuilder()
+      .update(ReferralCommission)
+      .set({ walleted_at: now })
+      .where("beneficiary_courier_id = :id", { id: me.id })
+      .andWhere("walleted_at IS NULL")
+      .execute();
+    return { moved: pending.length, amount };
   }
 
   private async completedJobsByCourier(ids: string[]): Promise<Map<string, number>> {

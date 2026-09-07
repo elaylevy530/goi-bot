@@ -147,10 +147,18 @@ export function nestListMyCourierReferrals() {
       kind?: "courier" | "business";
       amount?: number;
       created_at?: string;
+      walleted_at?: string | null;
     }[];
     commission_ils?: number;
     totals?: Record<string, number>;
   }>("/api/accounts/couriers/me/referrals", options());
+}
+
+export function nestMoveReferralCommissionsToWallet() {
+  return apiFetch<{ moved: number; amount: number }>("/api/accounts/couriers/me/referrals/wallet", {
+    method: "POST",
+    ...options(),
+  });
 }
 
 export function nestListMyDeclinedOffers() {

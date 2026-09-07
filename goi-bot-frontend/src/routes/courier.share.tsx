@@ -1,11 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bike,
   Building2,
-  ChevronDown,
-  Coins,
   Copy,
   Info,
   Share2,
@@ -20,7 +18,7 @@ import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { ScooterIcon } from "@/components/courier/work-area-visuals";
 import { ApiClientError } from "@/lib/api-client";
 import { getNestAccessToken } from "@/lib/nest-auth";
-import { nestListMyCourierReferrals } from "@/lib/nest-domain";
+import { nestListMyCourierReferrals, nestMoveReferralCommissionsToWallet } from "@/lib/nest-domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/courier/share")({
@@ -49,6 +47,7 @@ type ReferralPayload = {
     kind?: "courier" | "business";
     amount?: number;
     created_at?: string;
+    walleted_at?: string | null;
   }[];
   commission_ils?: number;
   totals?: {
@@ -58,6 +57,8 @@ type ReferralPayload = {
     businesses_active?: number;
     profit?: number;
     pending?: number;
+    in_wallet?: number;
+    available_to_wallet?: number;
   };
 };
 
@@ -87,10 +88,10 @@ async function fetchReferrals(): Promise<ReferralPayload> {
 }
 
 function SharePage() {
+  const qc = useQueryClient();
   const { data: me, isPending: mePending } = useMyCourier();
   const [tab, setTab] = useState<"courier" | "business">("courier");
   const [showAll, setShowAll] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const code = referralCode(me);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://goi.co.il";
   const courierLink = code ? `${origin}/join?ref=${encodeURIComponent(code)}` : "";
@@ -111,6 +112,9 @@ function SharePage() {
   const list = tab === "courier" ? couriers : businesses;
   const visible = showAll ? list : list.slice(0, 4);
   const totals = data?.totals ?? {};
+  const totalProfit = Number(totals.profit ?? 0);
+  const availableToWallet = Number(totals.available_to_wallet ?? totals.pending ?? 0);
+  const inWallet = Number(totals.in_wallet ?? 0);
 
   const copy = async (value = link) => {
     if (!value) return;
@@ -141,102 +145,135 @@ function SharePage() {
     }
   };
 
+  const moveToWallet = useMutation({
+    mutationFn: nestMoveReferralCommissionsToWallet,
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["courier-referrals"] });
+      qc.invalidateQueries({ queryKey: ["wallet"] });
+      if (!res.amount) {
+        toast.message("אין רווח חדש למשיכה לארנק");
+        return;
+      }
+      toast.success(`₪ ${money(res.amount)} עברו לארנק תחת עמלות אפילייאט`);
+    },
+    onError: (e: Error) => toast.error(e.message || "לא הצלחנו להעביר לארנק"),
+  });
+
   const couriersRegistered = totals.couriers_registered ?? couriers.length;
   const couriersActive = totals.couriers_active ?? couriers.filter((c) => c.status === "פעיל").length;
   const businessesRegistered = totals.businesses_registered ?? businesses.length;
   const businessesActive = totals.businesses_active ?? businesses.filter((b) => b.status === "פעיל").length;
   const referredTotal = couriersRegistered + businessesRegistered;
   const stats = useMemo(() => ([
-    { icon: Users, value: String(referredTotal), label: "סה״כ הפניות", hint: "שליחים ועסקים" },
-    { icon: Bike, value: String(couriersActive), label: "שליחים פעילים", hint: `מתוך ${couriersRegistered} שנרשמו` },
-    { icon: Store, value: String(businessesActive), label: "עסקים פעילים", hint: `מתוך ${businessesRegistered} שנרשמו` },
-    { icon: Coins, value: `₪ ${money(Number(totals.profit ?? 0))}`, label: "סה״כ רווח", hint: "מכל המשלוחים שהושלמו" },
-    { icon: Wallet, value: `₪ ${money(Number(totals.pending ?? 0))}`, label: "ממתין לתשלום", hint: "ייפתח בארנק ב-1 לחודש" },
-  ]), [referredTotal, couriersActive, couriersRegistered, businessesActive, businessesRegistered, totals.profit, totals.pending]);
+    { icon: Users, value: String(referredTotal), label: "הפניות", hint: "שליחים ועסקים" },
+    { icon: Bike, value: String(couriersActive), label: "שליחים", hint: `פעילים מתוך ${couriersRegistered}` },
+    { icon: Store, value: String(businessesActive), label: "עסקים", hint: `פעילים מתוך ${businessesRegistered}` },
+  ]), [referredTotal, couriersActive, couriersRegistered, businessesActive, businessesRegistered]);
 
   return (
     <CourierShell fullBleed>
       <div dir="rtl" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#F3F6F4]">
         <header className="relative z-20 shrink-0 border-b border-black/5 bg-white/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 lg:max-w-5xl">
             <CourierMenuButton className="size-11 border-0 bg-[#F3F6F4] shadow-none" />
             <h1 className="min-w-0 flex-1 text-center text-lg font-extrabold text-text-strong">שתף והרוויח</h1>
             <CourierBellButton className="size-11 border-0 bg-[#F3F6F4] shadow-none" />
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-8">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
-            <section className="relative overflow-hidden rounded-[1.5rem] bg-[#164A28] text-primary-foreground shadow-[0_16px_40px_rgba(12,40,18,0.28)]">
-              <div className="pointer-events-none absolute -left-10 top-6 size-40 rounded-full bg-white/10 blur-2xl" aria-hidden />
-              <div className="pointer-events-none absolute -right-8 -top-10 size-36 rounded-full bg-black/20 blur-2xl" aria-hidden />
-              <div className="relative flex items-stretch gap-2 sm:gap-4">
-                <div className="min-w-0 flex-1 p-4 sm:p-5 lg:p-7">
-                  <p className="text-[1.65rem] font-black leading-tight sm:text-3xl lg:text-4xl">תרוויח מכל הפניה!</p>
-                  <p className="mt-2 max-w-md text-[13px] leading-relaxed text-primary-foreground/80 sm:text-sm">
-                    שתף שליחים ועסקים — ₪1.50 על כל משלוח שהושלם, ו־₪3 אם גייסת את שני הצדדים לאותו משלוח.
-                  </p>
-                  <div className="mt-4 max-w-lg space-y-2 lg:max-w-5xl">
-                    <LinkRow
-                      label="שליחים"
-                      value={linkReady ? courierLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
-                      onCopy={() => void copy(courierLink)}
-                      disabled={!linkReady}
-                      copyLabel="העתק קישור לשליחים"
-                    />
-                    {moreOpen && (
-                      <LinkRow
-                        label="עסקים"
-                        value={linkReady ? businessLink : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
-                        onCopy={() => void copy(businessLink)}
-                        disabled={!linkReady}
-                        copyLabel="העתק קישור לעסקים"
-                      />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMoreOpen((v) => !v)}
-                    className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-primary-foreground/90"
-                  >
-                    עוד אפשרויות לשיתוף
-                    <ChevronDown className={cn("size-4 transition-transform", moreOpen && "rotate-180")} />
-                  </button>
-                </div>
-                <div className="relative min-h-[158px] w-[38%] min-w-[132px] max-w-[280px] shrink-0 self-stretch sm:min-h-[200px] sm:w-[42%] lg:min-h-[240px] lg:w-[300px]">
-                  <img
-                    src="/courier/share-hero.png?v=2"
-                    alt=""
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[118%] w-full object-contain object-bottom drop-shadow-[0_18px_24px_rgba(0,0,0,0.28)]"
-                  />
-                </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
+            <section className="overflow-hidden rounded-[1.5rem] bg-[#104421] text-white shadow-[0_12px_28px_rgba(12,40,18,0.22)]">
+              <div className="relative h-48 w-full overflow-hidden sm:h-56">
+                <img
+                  src="/courier/share-hero.png?v=4"
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-contain object-bottom"
+                />
+              </div>
+              <div className="space-y-3 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+                <h2 className="text-[1.45rem] font-black leading-snug tracking-tight">תרוויחו מכל הפניה</h2>
+                <p className="text-[14px] leading-relaxed text-white">
+                  שתפו קישור לשליחים או לעסקים. ₪1.50 על כל משלוח שהושלם, ו־₪3 אם גייסתם את שני הצדדים לאותו משלוח.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void copy(courierLink)}
+                  disabled={!linkReady}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-extrabold text-[#104421] disabled:opacity-60"
+                >
+                  <Copy className="size-4" />
+                  {linkReady ? "העתק קישור לשליחים" : mePending ? "טוען קישור…" : "הקישור יופיע בעוד רגע"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copy(businessLink)}
+                  disabled={!linkReady}
+                  className="flex min-h-11 w-full items-center justify-center rounded-full bg-white/12 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  העתק קישור לעסקים
+                </button>
               </div>
             </section>
 
-            <section>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                {stats.map((s, i) => {
-                  const Icon = s.icon;
-                  return (
-                    <div
-                      key={s.label}
-                      className={cn(
-                        "rounded-[1.15rem] border border-black/5 bg-white p-3 shadow-[0_8px_20px_rgba(16,24,40,0.06)]",
-                        i === stats.length - 1 && "col-span-2 sm:col-span-1",
-                      )}
-                    >
-                      <span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary">
-                        <Icon className="size-4" aria-hidden />
-                      </span>
-                      <p className="mt-2 break-words text-[17px] font-black tabular-nums leading-tight text-text-strong sm:text-lg">
-                        {s.value}
-                      </p>
-                      <p className="mt-1 text-[12px] font-bold text-text-strong">{s.label}</p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-text-muted">{s.hint}</p>
-                    </div>
-                  );
-                })}
+            <section className="rounded-[1.35rem] border border-black/5 bg-white p-4 shadow-[0_8px_20px_rgba(16,24,40,0.06)]">
+              <p className="text-[12px] font-bold text-text-muted">סה״כ רווח מאפילייאט</p>
+              <p className="mt-1 text-3xl font-black tabular-nums text-text-strong">₪ {money(totalProfit)}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
+                <div className="rounded-2xl bg-[#F3F6F4] px-3 py-2">
+                  <p className="font-bold text-text-muted">זמין למשיכה לארנק</p>
+                  <p className="mt-0.5 text-base font-black tabular-nums text-primary">₪ {money(availableToWallet)}</p>
+                </div>
+                <div className="rounded-2xl bg-[#F3F6F4] px-3 py-2">
+                  <p className="font-bold text-text-muted">כבר בארנק</p>
+                  <p className="mt-0.5 text-base font-black tabular-nums text-text-strong">₪ {money(inWallet)}</p>
+                </div>
               </div>
+              <button
+                type="button"
+                disabled={moveToWallet.isPending || availableToWallet <= 0}
+                onClick={() => moveToWallet.mutate()}
+                className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-deep text-sm font-extrabold text-primary-foreground disabled:opacity-50"
+              >
+                <Wallet className="size-4" />
+                {moveToWallet.isPending ? "מעביר לארנק…" : "משוך לארנק"}
+              </button>
+              <p className="mt-2 text-center text-[11px] leading-snug text-text-muted">
+                {availableToWallet > 0
+                  ? "הסכום ייכנס לארנק תחת רווח מעמלות אפילייאט"
+                  : inWallet > 0
+                    ? "כל הרווח כבר בארנק תחת עמלות אפילייאט"
+                    : "עמלות נכנסות אחרי משלוח שנמסר"}
+              </p>
+              {inWallet > 0 && (
+                <Link
+                  to="/courier/wallet"
+                  className="mt-2 flex min-h-10 items-center justify-center text-sm font-bold text-primary"
+                >
+                  מעבר לארנק
+                </Link>
+              )}
+            </section>
+
+            <section className="grid grid-cols-3 gap-2">
+              {stats.map((s) => {
+                const Icon = s.icon;
+                return (
+                  <div
+                    key={s.label}
+                    className="rounded-[1.15rem] border border-black/5 bg-white p-3 shadow-[0_8px_20px_rgba(16,24,40,0.06)]"
+                  >
+                    <span className="grid size-8 place-items-center rounded-xl bg-primary-soft text-primary">
+                      <Icon className="size-4" aria-hidden />
+                    </span>
+                    <p className="mt-2 break-words text-[16px] font-black tabular-nums leading-tight text-text-strong">
+                      {s.value}
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold leading-snug text-text-strong">{s.label}</p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-text-muted">{s.hint}</p>
+                  </div>
+                );
+              })}
             </section>
 
             <div className="grid grid-cols-2 gap-2">
@@ -304,7 +341,6 @@ function SharePage() {
                           {row.jobs_completed != null ? ` · ${row.jobs_completed} משלוחים` : ""}
                         </p>
                       </div>
-                      <p className="hidden shrink-0 text-[11px] text-text-muted sm:block">{joinDate(row.created_at)}</p>
                       <div className="shrink-0 text-left">
                         <StatusPill status={row.status} />
                         <p className="mt-1 text-sm font-extrabold tabular-nums text-primary">₪ {money(Number(row.your_profit ?? 0))}</p>
@@ -313,28 +349,13 @@ function SharePage() {
                   ))}
                 </ul>
               )}
-              {tab === "courier" && businesses.length > 0 && (
-                <div className="flex items-center justify-between rounded-[1.15rem] border border-black/5 bg-white px-3 py-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-text-strong">
-                    <Store className="size-4 text-primary" />
-                    {totals.businesses_active ?? businesses.length} עסקים פעילים
-                  </div>
-                  <p className="text-sm font-extrabold text-primary">
-                    ₪ {money(businesses.reduce((s, b) => s + Number(b.your_profit ?? 0), 0))}
-                  </p>
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-[1.15rem] border border-black/5 bg-white px-4 py-3 text-sm text-text-subtle">
-              משיכה מהארנק החל מ־₪400. העמלות נכנסות אחרי שמשלוח מסומן כנמסר.
             </section>
 
             {commissions.length > 0 && (
               <section className="space-y-2">
-                <h2 className="text-sm font-extrabold text-text-strong">עמלות לפי משלוח</h2>
+                <h2 className="text-sm font-extrabold text-text-strong">עמלות אחרונות</h2>
                 <ul className="flex flex-col gap-2">
-                  {commissions.slice(0, 12).map((row) => (
+                  {commissions.slice(0, 8).map((row) => (
                     <li
                       key={row.id ?? `${row.job_id}-${row.created_at}`}
                       className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-black/5 bg-white px-3 py-3"
@@ -344,7 +365,8 @@ function SharePage() {
                           {row.kind === "business" ? "הפניית עסק" : "הפניית שליח"}
                         </p>
                         <p className="mt-0.5 text-[11px] text-text-muted">
-                          {row.created_at ? new Date(row.created_at).toLocaleDateString("he-IL") : ""}
+                          {row.walleted_at ? "בארנק" : "ממתין למשיכה לארנק"}
+                          {row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString("he-IL")}` : ""}
                         </p>
                       </div>
                       <p className="text-sm font-extrabold tabular-nums text-primary">
@@ -357,28 +379,12 @@ function SharePage() {
             )}
 
             <section className="space-y-3">
-              <h2 className="text-sm font-extrabold text-text-strong">דרכים לשיתוף</h2>
-              <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
-                <ShareCircle label="עוד אפשרויות" onClick={() => void share()} icon={<Share2 className="size-5" />} />
-                <ShareCircle
-                  label="אינסטגרם"
-                  onClick={() => void share("ig")}
-                  icon={<span className="text-[11px] font-black">IG</span>}
-                  className="bg-[linear-gradient(135deg,#f9ce34,#ee2a7b,#6228d7)] text-white"
-                />
-                <ShareCircle
-                  label="פייסבוק"
-                  onClick={() => void share("fb")}
-                  icon={<span className="text-sm font-black">f</span>}
-                  className="bg-[#1877F2] text-white"
-                />
-                <ShareCircle
-                  label="וואטסאפ"
-                  onClick={() => void share("wa")}
-                  icon={<span className="text-[11px] font-black">WA</span>}
-                  className="bg-[#25D366] text-white"
-                />
-                <ShareCircle label="העתק קישור" onClick={() => void copy()} icon={<Copy className="size-5" />} />
+              <h2 className="text-sm font-extrabold text-text-strong">שיתוף מהיר</h2>
+              <div className="grid grid-cols-4 gap-2">
+                <ShareCircle label="וואטסאפ" onClick={() => void share("wa")} icon={<span className="text-[11px] font-black">WA</span>} className="bg-[#25D366] text-white" />
+                <ShareCircle label="פייסבוק" onClick={() => void share("fb")} icon={<span className="text-sm font-black">f</span>} className="bg-[#1877F2] text-white" />
+                <ShareCircle label="אינסטגרם" onClick={() => void share("ig")} icon={<span className="text-[11px] font-black">IG</span>} className="bg-[linear-gradient(135deg,#f9ce34,#ee2a7b,#6228d7)] text-white" />
+                <ShareCircle label="עוד" onClick={() => void share()} icon={<Share2 className="size-5" />} />
               </div>
             </section>
 
@@ -387,7 +393,7 @@ function SharePage() {
               <div>
                 <p className="font-extrabold text-text-strong">איך זה עובד?</p>
                 <p className="mt-0.5 leading-relaxed">
-                  ₪1.50 לכל משלוח ששליח שגייסת ביצע · ₪1.50 לכל משלוח שעסק שגייסת שיגר · ₪3 אם שניהם שלך על אותו משלוח
+                  ₪1.50 לכל משלוח של שליח שגייסתם · ₪1.50 לכל משלוח של עסק שגייסתם · ₪3 אם שניהם שלכם. לחצו «משוך לארנק» כדי להעביר את הרווח לארנק.
                 </p>
               </div>
             </div>
@@ -395,36 +401,6 @@ function SharePage() {
         </div>
       </div>
     </CourierShell>
-  );
-}
-
-function LinkRow({
-  label,
-  value,
-  onCopy,
-  disabled,
-  copyLabel,
-}: {
-  label: string;
-  value: string;
-  onCopy: () => void;
-  disabled: boolean;
-  copyLabel: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-2xl bg-black/25 px-3 py-2">
-      <p className="w-14 shrink-0 text-[11px] font-bold text-primary-foreground/70">{label}</p>
-      <p className="min-w-0 flex-1 truncate text-left text-xs font-semibold" dir="ltr">{value}</p>
-      <button
-        type="button"
-        onClick={onCopy}
-        disabled={disabled}
-        className="grid size-10 place-items-center rounded-full bg-white text-primary disabled:opacity-50"
-        aria-label={copyLabel}
-      >
-        <Copy className="size-4" />
-      </button>
-    </div>
   );
 }
 
@@ -450,7 +426,7 @@ function ShareCircle({
   className?: string;
 }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-[4.5rem] flex-col items-center gap-1.5">
+    <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5">
       <span className={cn("grid size-12 place-items-center rounded-2xl border border-black/5 bg-white text-primary shadow-[0_8px_18px_rgba(16,24,40,0.08)]", className)}>
         {icon}
       </span>

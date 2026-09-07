@@ -50,6 +50,12 @@ export class AccountsController {
     return this.accounts.getMyReferrals(auth.userId);
   }
 
+  @Post("couriers/me/referrals/wallet")
+  @UseGuards(JwtAuthGuard)
+  moveCourierReferralsToWallet(@CurrentUser() auth: AuthUserContext) {
+    return this.accounts.moveMyReferralCommissionsToWallet(auth.userId);
+  }
+
   @Patch("couriers/me")
   @UseGuards(JwtAuthGuard)
   updateMyCourier(

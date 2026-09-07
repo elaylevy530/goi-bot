@@ -28,6 +28,9 @@ export class ReferralCommission {
   @Column({ type: "numeric", default: 0 })
   amount!: string;
 
+  @Column({ type: "timestamptz", nullable: true })
+  walleted_at!: Date | null;
+
   @Index()
   @Column({ type: "uuid", nullable: true })
   source_courier_id!: string | null;

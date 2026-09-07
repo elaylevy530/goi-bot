@@ -33,6 +33,7 @@ import {
   isPaidWithdrawal,
   isPreviousIsraelMonth,
   isRejectedWithdrawal,
+  isWalletedCommission,
   isWalletCompletedOutcome,
   outcomeEarnedAt,
   outcomeJob,
@@ -158,6 +159,7 @@ function WalletPage() {
     reserved,
     unlockingAmount,
     unlockDateLabel,
+    affiliateEarned,
   } = wallet;
   const pending = withdrawals.filter((w) => isOpenWithdrawal(w.status));
   const latestPending = pending
@@ -220,12 +222,11 @@ function WalletPage() {
         items.push({ id: `tip-${o.id}`, kind: "tip", title: `טיפ ${no}`.trim(), at, amount: tip, status: "אושרה" });
       }
     }
-    for (const c of commissions) {
-      const kindLabel = c.kind === "business" ? "עסק שגייסת" : "שליח שגייסת";
+    for (const c of commissions.filter(isWalletedCommission)) {
       items.push({
         id: `ref-${c.id}`,
         kind: "referral",
-        title: `עמלה ${kindLabel}`,
+        title: "רווח מעמלות אפילייאט",
         at: c.created_at || "",
         amount: Number(c.amount ?? 0),
         status: isPreviousIsraelMonth(c.created_at) ? "אושרה" : "ממתינה",
@@ -321,6 +322,11 @@ function WalletPage() {
       toast.success("פרטי הבנק נשמרו");
       setBankEditOpen(false);
       qc.invalidateQueries({ queryKey: ["my-courier-me"] });
+      if (available > 0 && !latestPending) {
+        setFieldError(null);
+        setAmount(String(Number(available.toFixed(2))));
+        setWithdrawOpen(true);
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -387,6 +393,14 @@ function WalletPage() {
                 <p className="mt-1 text-[11px] text-text-muted">רק רווחי {currentMonthLabel}. חודשים קודמים זמינים עכשיו</p>
               </div>
             </div>
+
+            {affiliateEarned > 0 && (
+              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+                <p className="text-xs font-bold text-text-strong">רווח מעמלות אפילייאט</p>
+                <p className="mt-1 text-[11px] text-text-muted">הועבר ממסך שתף והרוויח</p>
+                <p className="mt-2 text-xl font-black tabular-nums text-primary">₪ {money(affiliateEarned)}</p>
+              </div>
+            )}
 
             <div className="rounded-card border border-border bg-surface p-3 shadow-card">
               <div className="flex items-start justify-between gap-2">
@@ -510,10 +524,18 @@ function WalletPage() {
                 <Wallet className="size-4" aria-hidden />
               </div>
               <div className="min-w-0 flex-1 text-right">
-                <p className="text-sm font-bold text-text-strong">סכום מומלץ למשיכה</p>
-                <p className="text-[11px] text-text-muted">אפשר למשוך גם פחות — לפי יתרת החודשים הסגורים</p>
+                <p className="text-sm font-bold text-text-strong">
+                  {available > 0 ? "סכום שאפשר למשוך עכשיו" : "סכום מומלץ למשיכה"}
+                </p>
+                <p className="text-[11px] text-text-muted">
+                  {available > 0
+                    ? "רווחי חודשים שנסגרו — אפשר למשוך גם פחות"
+                    : "אחרי שהחודש ייסגר אפשר למשוך את הרווחים"}
+                </p>
               </div>
-              <p className="text-sm font-extrabold tabular-nums text-text-strong">₪ {money(RECOMMENDED_WITHDRAWAL)}</p>
+              <p className="text-sm font-extrabold tabular-nums text-text-strong">
+                ₪ {money(available > 0 ? available : RECOMMENDED_WITHDRAWAL)}
+              </p>
             </div>
 
             <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-sm text-text">

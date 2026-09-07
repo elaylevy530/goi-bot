@@ -323,9 +323,11 @@ export class DomainService {
   async withdrawableBalanceForCourier(courierId: string) {
     const monthStart = `date_trunc('month', NOW() AT TIME ZONE '${ISRAEL_TZ}')`;
     const earnedAt = `COALESCE(
+      CASE WHEN j.job_date IS NOT NULL THEN j.job_date::timestamp ELSE NULL END,
       o.delivered_at AT TIME ZONE '${ISRAEL_TZ}',
       j.delivered_at AT TIME ZONE '${ISRAEL_TZ}',
-      CASE WHEN j.job_date IS NOT NULL THEN j.job_date::timestamp ELSE NULL END
+      o.created_at AT TIME ZONE '${ISRAEL_TZ}',
+      j.created_at AT TIME ZONE '${ISRAEL_TZ}'
     )`;
     const payExpr =
       "COALESCE(NULLIF(j.suggested_courier_payment, 0), NULLIF(j.payment, 0), NULLIF(j.customer_price, 0), 0) + COALESCE(o.tip_amount, 0)";
@@ -346,7 +348,10 @@ export class DomainService {
         "earned",
       )
       .where("j.selected_courier_id = :courierId", { courierId })
-      .andWhere("j.status = :done", { done: "הושלמה" })
+      .andWhere("(j.status = :done OR j.delivery_status IN (:...delivered))", {
+        done: "הושלמה",
+        delivered: ["delivered", "נמסר"],
+      })
       .andWhere("o.id IS NULL")
       .andWhere(`${earnedAt} IS NOT NULL`)
       .andWhere(`${earnedAt} < ${monthStart}`)
@@ -356,6 +361,7 @@ export class DomainService {
       .createQueryBuilder("c")
       .select("COALESCE(SUM(c.amount), 0)", "earned")
       .where("c.beneficiary_courier_id = :courierId", { courierId })
+      .andWhere("c.walleted_at IS NOT NULL")
       .andWhere(
         `(EXTRACT(YEAR FROM (c.created_at AT TIME ZONE '${ISRAEL_TZ}'))::int * 12
           + EXTRACT(MONTH FROM (c.created_at AT TIME ZONE '${ISRAEL_TZ}'))::int)

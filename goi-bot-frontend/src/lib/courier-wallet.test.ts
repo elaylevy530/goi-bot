@@ -53,6 +53,21 @@ describe("courier wallet month split", () => {
     expect(summary.currentMonthEarned).toBe(0);
   });
 
+  it("keeps an August job in August even if it was marked delivered in September", () => {
+    const summary = summarizeCourierWallet({
+      now,
+      outcomes: [
+        {
+          delivered_at: "2026-09-02T08:00:00.000Z",
+          jobs: { status: "הושלמה", job_date: "2026-08-28", suggested_courier_payment: 236 },
+        },
+      ],
+    });
+    expect(summary.available).toBe(236);
+    expect(summary.closedMonths.find((m) => m.key === "2026-08")?.earned).toBe(236);
+    expect(summary.currentMonthEarned).toBe(0);
+  });
+
   it("subtracts paid and pending withdrawals from available closed-month pay", () => {
     const summary = summarizeCourierWallet({
       now,
@@ -64,5 +79,18 @@ describe("courier wallet month split", () => {
     });
     expect(summary.available).toBe(35);
     expect(summary.currentMonthEarned).toBe(0);
+  });
+
+  it("keeps affiliate commissions out of the wallet until they are moved", () => {
+    const summary = summarizeCourierWallet({
+      now,
+      outcomes: [],
+      commissions: [
+        { amount: 12, created_at: "2026-08-04T08:00:00.000Z", walleted_at: null },
+        { amount: 9, created_at: "2026-08-18T08:00:00.000Z", walleted_at: "2026-09-07T08:00:00.000Z" },
+      ],
+    });
+    expect(summary.affiliateEarned).toBe(9);
+    expect(summary.available).toBe(9);
   });
 });

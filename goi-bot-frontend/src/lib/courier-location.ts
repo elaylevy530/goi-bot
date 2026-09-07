@@ -55,23 +55,40 @@ export async function isDeviceLocationActive(opts?: {
   });
 }
 
+function readGpsPosition(options: PositionOptions) {
+  return new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      reject,
+      options,
+    );
+  });
+}
+
+export function isGpsPermissionDenied(err: unknown) {
+  const code = err && typeof err === "object" && "code" in err ? Number((err as { code: unknown }).code) : NaN;
+  return code === 1;
+}
+
 export async function requestCourierGpsFix(): Promise<{ lat: number; lng: number }> {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     throw new Error("הדפדפן לא תומך במיקום");
   }
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
-          reject(new Error(COURIER_GPS_REQUIRED_MESSAGE));
-          return;
-        }
-        reject(new Error("לא הצלחנו לזהות מיקום. נסה שוב עם GPS דולק"));
-      },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 20_000 },
-    );
-  });
+  try {
+    return await readGpsPosition({ enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 });
+  } catch (err) {
+    if (isGpsPermissionDenied(err)) {
+      throw new Error(COURIER_GPS_REQUIRED_MESSAGE);
+    }
+    try {
+      return await readGpsPosition({ enableHighAccuracy: false, timeout: 8_000, maximumAge: 120_000 });
+    } catch (retryErr) {
+      if (isGpsPermissionDenied(retryErr)) {
+        throw new Error(COURIER_GPS_REQUIRED_MESSAGE);
+      }
+      throw new Error("לא הצלחנו לזהות מיקום. נסה שוב עם GPS דולק");
+    }
+  }
 }
 
 /** Go available without requiring GPS. Nearby matching stays on when location sharing is already enabled. */
@@ -84,10 +101,19 @@ export async function goCourierOnlineWithGps() {
 }
 
 export async function enableCourierLocationSharing() {
-  const { lat, lng } = await requestCourierGpsFix();
+  let coords: { lat: number; lng: number } | null = null;
+  try {
+    coords = await requestCourierGpsFix();
+  } catch (err) {
+    if (err instanceof Error && err.message === COURIER_GPS_REQUIRED_MESSAGE) {
+      throw new Error(
+        "הדפדפן חסם מיקום. היכנסו להגדרות המכשיר, אפשרו מיקום ל־Goi, ואז לחצו שוב «הדליקו מיקום».",
+      );
+    }
+  }
   await nestUpdateMyCourier({
     location_sharing_enabled: true,
-    last_lat: lat,
-    last_lng: lng,
+    ...(coords ? { last_lat: coords.lat, last_lng: coords.lng } : {}),
   });
+  return { hasFix: !!coords };
 }

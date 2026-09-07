@@ -22,6 +22,13 @@ describe("isLocationActiveFromSignals", () => {
     expect(isLocationActiveFromSignals({ liveFix: false, permission: "unsupported", sharingEnabled: true })).toBe(false);
   });
 
+  it("detects browser permission-denied GPS errors", async () => {
+    const { isGpsPermissionDenied } = await import("@/lib/courier-location");
+    expect(isGpsPermissionDenied({ code: 1 })).toBe(true);
+    expect(isGpsPermissionDenied({ code: 2 })).toBe(false);
+    expect(isGpsPermissionDenied({ code: 3 })).toBe(false);
+  });
+
   it("falls back to sharing only when the browser cannot report permission", () => {
     expect(isLocationActiveFromSignals({ liveFix: false, permission: "unknown", sharingEnabled: true })).toBe(true);
     expect(isLocationActiveFromSignals({ liveFix: false, permission: "unknown", sharingEnabled: false })).toBe(false);

@@ -26,9 +26,13 @@ export function EnableLocationSheet({ open, onOpenChange }: Props) {
     setPending(true);
     setHint(null);
     try {
-      await enableCourierLocationSharing();
+      const res = await enableCourierLocationSharing();
       await qc.invalidateQueries({ queryKey: ["my-courier-me"] });
-      toast.success("מיקום דולק — תקבלו גם הצעות לפי קרבה");
+      toast.success(
+        res.hasFix
+          ? "מיקום דולק — תקבלו גם הצעות לפי קרבה"
+          : "מיקום דולק. אם אין נקודה עדיין, ודאו ש־GPS במכשיר דולק",
+      );
       setHint(null);
       onOpenChange(false);
     } catch (e) {
