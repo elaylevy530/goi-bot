@@ -1,7 +1,7 @@
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 
 export const COURIER_GPS_REQUIRED_MESSAGE =
-  "יש לאשר מיקום (GPS) כדי להיות זמין. בלי מיקום אי אפשר לתעדף משלוחים לידך.";
+  "לא הצלחנו לקבל מיקום. אפשר להיות זמין גם בלי GPS — המשלוחים יגיעו לפי האזורים והערים שבחרת.";
 
 export async function requestCourierGpsFix(): Promise<{ lat: number; lng: number }> {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -22,12 +22,11 @@ export async function requestCourierGpsFix(): Promise<{ lat: number; lng: number
   });
 }
 
+/** Go available without requiring GPS. Nearby matching stays on when location sharing is already enabled. */
+export async function goCourierOnline() {
+  await nestUpdateMyCourier({ accepting_jobs: true });
+}
+
 export async function goCourierOnlineWithGps() {
-  const { lat, lng } = await requestCourierGpsFix();
-  await nestUpdateMyCourier({
-    last_lat: lat,
-    last_lng: lng,
-    location_sharing_enabled: true,
-    accepting_jobs: true,
-  });
+  return goCourierOnline();
 }

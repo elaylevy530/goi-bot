@@ -131,7 +131,7 @@ export function useCourierGpsTracker({
         setState({ permission: "denied" });
         if (!warnedRef.current) {
           warnedRef.current = true;
-          toast.error("הרשאת מיקום נדחתה - הבוט לא יוכל לשלוח לך הצעות לפי קרבה", { duration: 6000 });
+          toast.error("הרשאת מיקום נדחתה — עדיין תקבל משלוחים לפי האזורים והערים שבחרת", { duration: 6000 });
         }
       }
     };

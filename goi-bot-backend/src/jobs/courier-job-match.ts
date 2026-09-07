@@ -139,6 +139,34 @@ function hasFreshGps(courier?: {
   return new Date(courier.last_location_at).getTime() >= Date.now() - 30 * 60 * 1000;
 }
 
+function pickupMatchesWorkAreas(
+  job: { pickup_area?: string | null; pickup_address?: string | null } | null | undefined,
+  courier: {
+    working_areas?: string[] | null;
+    pickup_areas?: string[] | null;
+    base_city?: string | null;
+    custom_work_area?: string | null;
+  } | null | undefined,
+) {
+  const pickup = String(job?.pickup_area || job?.pickup_address || "").trim();
+  const areas = [
+    ...(courier?.working_areas ?? []),
+    ...(courier?.pickup_areas ?? []),
+    courier?.base_city,
+    courier?.custom_work_area,
+  ]
+    .filter(Boolean)
+    .map((a) => String(a).trim())
+    .filter(Boolean);
+  if (areas.some((a) => a.includes("כל הארץ"))) return true;
+  if (!pickup) return true;
+  const p = pickup.toLowerCase();
+  return areas.some((area) => {
+    const a = area.toLowerCase();
+    return p.includes(a) || a.includes(p);
+  });
+}
+
 export function courierIsNearbyOrMatching(
   job?: {
     pickup_lat?: number | null;
@@ -164,19 +192,7 @@ export function courierIsNearbyOrMatching(
     const km = distanceKm(job?.pickup_lat, job?.pickup_lng, courier.last_lat, courier.last_lng);
     if (km != null && km <= radius) return true;
   }
-
-  const pickup = String(job?.pickup_area || job?.pickup_address || "").trim();
-  const areas = [
-    ...(courier.working_areas ?? []),
-    ...(courier.pickup_areas ?? []),
-    courier.base_city,
-    courier.custom_work_area,
-  ]
-    .filter(Boolean)
-    .map(String);
-  if (areas.some((a) => a.includes("כל הארץ"))) return true;
-  if (!pickup) return true;
-  return areas.some((a) => a.includes(pickup) || pickup.includes(a));
+  return pickupMatchesWorkAreas(job, courier);
 }
 
 export function pickDispatchCouriers<T extends {

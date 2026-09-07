@@ -230,7 +230,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   useCourierGpsTracker({
     enabled:
       isAvailable &&
-      (me?.location_sharing_enabled ?? true) &&
+      me?.location_sharing_enabled === true &&
       !(
         typeof window !== "undefined" &&
         !!window.sessionStorage.getItem("goi_nest_preview")

@@ -417,7 +417,7 @@ function AvailabilityPage() {
                 <div className="min-w-0 flex-1 text-right">
                   <p className="text-sm font-extrabold text-text-strong">שיתוף מיקום בזמן אמת</p>
                   <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
-                    בלי מיקום, ההצעות מתאימות רק לפי אזורי העבודה שבחרת
+                    אופציונלי. עם מיקום תקבל גם הצעות לפי קרבה, ובלי — לפי האזורים והערים שבחרת
                   </p>
                 </div>
               </div>
@@ -431,7 +431,7 @@ function AvailabilityPage() {
               <div className="min-w-0 flex-1 text-right">
                 <h2 className="text-sm font-extrabold text-text-strong">איך זה עובד?</h2>
                 <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
-                  Goi ישלח לך הצעות לפי האזורים והערים שבחרת, כלי התחבורה והמיקום שלך בזמן אמת.
+                  Goi ישלח לך הצעות לפי האזורים והערים שבחרת וגם לפי GPS כששיתוף מיקום דולק. אפשר להיות זמין גם בלי GPS.
                 </p>
               </div>
             </section>

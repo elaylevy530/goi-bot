@@ -5,6 +5,7 @@ import {
   isCourierReceivingJobs,
   isJobSkippedAtCurrentPrice,
   jobOfferPay,
+  matchesCourier,
   mergeCourierSkipRows,
 } from "./courier-live-jobs";
 
@@ -87,5 +88,51 @@ describe("vehicle size hierarchy", () => {
         { vehicle_type: "רכב" },
       ),
     ).toBe(true);
+  });
+});
+
+describe("courier matching is GPS or work areas", () => {
+  const job = {
+    job_type: "משלוח",
+    pickup_area: "חדרה",
+    pickup_address: "הרצל 1, חדרה",
+    pickup_lat: 32.43,
+    pickup_lng: 34.92,
+  };
+
+  it("matches by marked city without GPS", () => {
+    expect(
+      matchesCourier(job, {
+        vehicle_type: "רכב",
+        working_areas: ["השרון", "חדרה"],
+        location_sharing_enabled: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("matches by live GPS even when the city is not selected", () => {
+    expect(
+      matchesCourier(job, {
+        vehicle_type: "רכב",
+        working_areas: ["תל אביב"],
+        location_sharing_enabled: true,
+        last_lat: 32.43,
+        last_lng: 34.92,
+        work_distance_from_base: "15 ק״מ",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not match a far GPS courier whose cities do not include the pickup", () => {
+    expect(
+      matchesCourier(job, {
+        vehicle_type: "רכב",
+        working_areas: ["אילת"],
+        location_sharing_enabled: true,
+        last_lat: 29.55,
+        last_lng: 34.95,
+        work_distance_from_base: "15 ק״מ",
+      }),
+    ).toBe(false);
   });
 });

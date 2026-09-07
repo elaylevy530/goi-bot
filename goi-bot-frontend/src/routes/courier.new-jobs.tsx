@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   nestAddCourierDecline,
   nestClaimJob,
-  nestRemoveCourierDecline,
   nestCourierActiveJobCount,
   nestListCourierDeclines,
   nestListCourierOffers,
@@ -305,28 +304,7 @@ function NewJobsPage() {
   }) => {
     hideJobLocally(job);
     persistSkip({ id: job.id, offerId: job.offerId });
-    toast(t.jobRemoved, {
-      action: {
-        label: "בטל דילוג",
-        onClick: () => {
-          if (!me?.id) return;
-          sessionSkippedRef.current.delete(job.id);
-          setSessionSkipGen((n) => n + 1);
-          qc.setQueryData(
-            ["courier-job-declines", me.id],
-            (old: { job_id: string }[] | undefined) => (old ?? []).filter((r) => r.job_id !== job.id),
-          );
-          void nestRemoveCourierDecline(job.id)
-            .then(() => {
-              qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
-              qc.invalidateQueries({ queryKey: ["new-jobs"] });
-              qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
-              qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
-            })
-            .catch((e) => toast.error(e instanceof Error ? e.message : "לא הצלחנו לבטל"));
-        },
-      },
-    });
+    toast(t.jobRemoved);
   };
 
   const visibleOpenJobs = useMemo(
@@ -960,17 +938,6 @@ function AcceptJobsToggle({
   }, [me, approved]);
 
   const requestPermissionsOnce = async () => {
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      try {
-        await new Promise<void>((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            () => resolve(),
-            () => resolve(),
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
-          );
-        });
-      } catch {}
-    }
     try {
       const { enablePushForCourier, pushSupported } = await import("@/lib/push/subscribe");
       if (pushSupported() && me?.id) {
