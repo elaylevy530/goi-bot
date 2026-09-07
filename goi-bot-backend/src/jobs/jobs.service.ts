@@ -1111,13 +1111,26 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async respondToOffer(userId: string, offerId: string, response: "accepted" | "declined") {
     const courier = await this.requireCourier(userId);
-    if (courier.courier_status !== "פעיל" || courier.is_paused) {
-      return { ok: false as const, reason: "not_active" };
-    }
 
     const offer = await this.offers.findOne({
       where: { id: offerId, courier_id: courier.id },
     });
+
+    if (response === "declined") {
+      if (offer?.response === "pending") {
+        offer.response = "declined";
+        offer.responded_at = new Date();
+        await this.offers.save(offer);
+      }
+      if (offer?.job_id) {
+        await this.addCourierDecline(userId, offer.job_id);
+      }
+      return { ok: true as const, response: "declined" as const };
+    }
+
+    if (courier.courier_status !== "פעיל" || courier.is_paused) {
+      return { ok: false as const, reason: "not_active" };
+    }
     if (!offer) throw new NotFoundException("Offer not found");
 
     const job = await this.jobs.findOne({ where: { id: offer.job_id } });
@@ -1128,16 +1141,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         await this.offers.save(offer);
       }
       return { ok: false as const, reason: "closed" };
-    }
-
-    if (response === "declined") {
-      if (offer.response === "pending") {
-        offer.response = "declined";
-        offer.responded_at = new Date();
-        await this.offers.save(offer);
-      }
-      await this.addCourierDecline(userId, job.id);
-      return { ok: true as const, response: "declined" as const };
     }
 
     if (job.pricing_type === "quote_request") {

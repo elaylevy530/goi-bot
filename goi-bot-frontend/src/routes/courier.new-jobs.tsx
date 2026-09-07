@@ -24,6 +24,8 @@ import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag, MapPin } from "
 import { useGpsLiveStatus } from "@/hooks/useCourierGpsTracker";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { ApiClientError } from "@/lib/api-client";
+import { isNestPreviewReadOnly } from "@/lib/nest-preview-cache";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
 import { COURIER_JOBS_RESTRICTED_MESSAGE, isCourierApproved, isCourierJobsRestricted, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay } from "@/lib/courier-live-jobs";
 import { ContactBlock } from "@/routes/courier.history";
@@ -264,18 +266,24 @@ function NewJobsPage() {
 
   const persistSkip = (job: { id: string; offerId?: string }, price: number) => {
     if (!me?.id) return;
+    if (isNestPreviewReadOnly()) return;
     void (async () => {
       try {
-        await Promise.all([
-          nestAddCourierDecline(job.id, price),
-          job.offerId ? nestRespondOffer(job.offerId, "declined") : Promise.resolve(),
-        ]);
+        await nestAddCourierDecline(job.id, Number.isFinite(price) ? price : 0);
       } catch (e) {
+        if (e instanceof ApiClientError && e.code === "preview_read_only") return;
         toast.error(e instanceof Error ? e.message : "שגיאה");
         qc.invalidateQueries({ queryKey: ["courier-job-declines", me.id] });
         qc.invalidateQueries({ queryKey: ["new-jobs"] });
         qc.invalidateQueries({ queryKey: ["courier-open-jobs"] });
         qc.invalidateQueries({ queryKey: ["courier-quote-requests"] });
+        return;
+      }
+      if (!job.offerId) return;
+      try {
+        await nestRespondOffer(job.offerId, "declined");
+      } catch {
+        /* skip already saved on the decline row */
       }
     })();
   };
