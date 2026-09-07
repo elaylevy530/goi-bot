@@ -1,29 +1,27 @@
 /** Canonical stored vehicle values — shared by join, courier, business, and admin. */
 export const COURIER_VEHICLE_OPTIONS = [
-  { value: "קטנוע", label: "אופנוע / קטנוע" },
+  { value: "רכב", label: "רכב" },
+  { value: "רכב מסחרי", label: "רכב מסחרי" },
   { value: "אופניים חשמליים", label: "אופניים חשמליים" },
   { value: "אופניים רגילים", label: "אופניים רגילים" },
   { value: "קורקינט חשמלי", label: "קורקינט חשמלי" },
-  { value: "רכב", label: "רכב" },
-  { value: "טנדר", label: "טנדר" },
-  { value: "הליכה", label: "הליכה" },
+  { value: "קטנוע", label: "קטנוע" },
 ] as const;
 
 /** Vehicles a business can require on a delivery job. */
-export const BUSINESS_JOB_VEHICLES = [
-  { value: "קטנוע", label: "אופנוע / קטנוע" },
-  { value: "רכב", label: "רכב" },
-  { value: "טנדר", label: "טנדר" },
-] as const;
+export const BUSINESS_JOB_VEHICLES = COURIER_VEHICLE_OPTIONS;
 
 export const COURIER_VEHICLE_VALUES = COURIER_VEHICLE_OPTIONS.map((o) => o.value);
 
 export function canonicalizeVehicleValue(raw?: string | null): string {
   const v = String(raw ?? "").trim();
   if (!v) return "";
-  if (v === "אופנוע" || v === "קורקינט / אופנוע") return "קטנוע";
+  if (COURIER_VEHICLE_VALUES.includes(v as (typeof COURIER_VEHICLE_VALUES)[number])) return v;
+  if (v === "טנדר" || v === "משאית" || v === "van") return "רכב מסחרי";
+  if (v === "אופנוע" || v === "קורקינט / אופנוע" || v === "אופנוע / קטנוע") return "קטנוע";
   if (v === "הולך רגל") return "הליכה";
-  if (v === "אופניים") return "אופניים חשמליים";
+  if (v === "אופניים") return "אופניים רגילים";
+  if (v === "קורקינט") return "קורקינט חשמלי";
   return v;
 }
 

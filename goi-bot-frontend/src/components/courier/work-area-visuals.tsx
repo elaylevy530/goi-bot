@@ -5,43 +5,130 @@ function iconClass(className?: string) {
   return cn("size-8", className);
 }
 
-export function ScooterIcon({ className }: { className?: string }) {
+type IconProps = { className?: string };
+
+/** Sedan / private car */
+export function CarIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
-      <circle cx="14" cy="34" r="6" stroke="currentColor" strokeWidth="2.2" />
-      <circle cx="36" cy="34" r="6" stroke="currentColor" strokeWidth="2.2" />
-      <path d="M14 34h12.5c2.2 0 3.4-2.6 2.2-4.4L24 22" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M24 22h6.5l3 8.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M24 22V13h8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M20 13h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path
+        d="M9 29.5h30M11.5 29.5 16 20.8A3.2 3.2 0 0 1 18.9 19h10.2a3.2 3.2 0 0 1 2.9 1.8L36.5 29.5"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 29.5h3.2l.9-2.4A2.8 2.8 0 0 1 14.7 25h18.6a2.8 2.8 0 0 1 2.6 1.7l1 2.8H40"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="16.5" cy="33" r="3.3" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="31.5" cy="33" r="3.3" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M21 19.8v5.8M27.5 19.8v5.8" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
 }
 
-export function CarIcon({ className }: { className?: string }) {
+/** Commercial van / cargo vehicle */
+export function CommercialVanIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
-      <path d="M10 30h28" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M12 30 16.5 20.5A3 3 0 0 1 19.2 19h9.6a3 3 0 0 1 2.7 1.5L36 30" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-      <path d="M8 30h4l.8-2.2A3 3 0 0 1 15.6 26h16.8a3 3 0 0 1 2.8 1.8L36 30h4" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-      <circle cx="16" cy="32.5" r="3.2" stroke="currentColor" strokeWidth="2.2" />
-      <circle cx="32" cy="32.5" r="3.2" stroke="currentColor" strokeWidth="2.2" />
-      <path d="M20 19.5v6.5M28 19.5v6.5" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M8 31.5V18.5A2.5 2.5 0 0 1 10.5 16H27v15.5"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M27 16h5.2a3 3 0 0 1 2.6 1.5L40 28.5v3"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path d="M8 31.5h32" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M27 16v15.5M11 22h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="16" cy="34.2" r="3.2" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="34" cy="34.2" r="3.2" stroke="currentColor" strokeWidth="2.2" />
     </svg>
   );
 }
 
-export function ElectricBikeIcon({ className }: { className?: string }) {
+/** Regular bicycle */
+export function BikeIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
-      <circle cx="14" cy="34" r="6" stroke="currentColor" strokeWidth="2.2" />
-      <circle cx="36" cy="34" r="6" stroke="currentColor" strokeWidth="2.2" />
-      <path d="M14 34h8l4-10h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M26 24 30 34h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M22 24V16h8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M26 12l-2.5 5h5L26 12Z" fill="currentColor" />
+      <circle cx="13.5" cy="33" r="6.2" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="34.5" cy="33" r="6.2" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M13.5 33 22 21.5h9.5L34.5 33" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M22 21.5 17 33M24.5 21.5 28.5 33" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M20.5 21.5h12.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M31.5 21.5V16.5h7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19.5 18.5h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
+}
+
+/** Electric bicycle — bicycle plus charge mark */
+export function ElectricBikeIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
+      <circle cx="13.5" cy="33" r="6.2" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="34.5" cy="33" r="6.2" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M13.5 33 22 21.5h9.5L34.5 33" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M22 21.5 17 33M24.5 21.5 28.5 33" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M20.5 21.5h12.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M31.5 21.5V16.5h7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M24 11.5 21 17h5.5L23.5 22" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Standing electric kick scooter */
+export function KickScooterIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
+      <circle cx="14" cy="35" r="5.2" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="35" cy="35" r="5.2" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M14 35h18.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M32.5 35 30 14.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M24.5 14.5h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M24 10 21.2 15.5h5.2L23.6 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Seated moped / קטנוע */
+export function ScooterIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={iconClass(className)} aria-hidden>
+      <circle cx="14" cy="34.5" r="5.6" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="35" cy="34.5" r="5.6" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M14 34.5h10.5c2.4 0 3.6-2.8 2.2-4.7L22.5 22" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 25.5h12l4 9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22.5 22V13.5h9.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19.5 13.5h16" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" />
+      <path d="M22.5 22h8.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const VEHICLE_ICON_BY_VALUE: Record<string, typeof CarIcon> = {
+  רכב: CarIcon,
+  "רכב מסחרי": CommercialVanIcon,
+  טנדר: CommercialVanIcon,
+  "אופניים חשמליים": ElectricBikeIcon,
+  "אופניים רגילים": BikeIcon,
+  אופניים: BikeIcon,
+  "קורקינט חשמלי": KickScooterIcon,
+  קורקינט: KickScooterIcon,
+  קטנוע: ScooterIcon,
+  אופנוע: ScooterIcon,
+};
+
+export function CourierVehicleIcon({ value, className }: { value: string; className?: string }) {
+  const Icon = VEHICLE_ICON_BY_VALUE[value] ?? CarIcon;
+  return <Icon className={className} />;
 }
 
 export function RegionNorthIcon({ className }: { className?: string }) {

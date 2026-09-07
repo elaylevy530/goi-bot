@@ -10,9 +10,7 @@ import { CourierBellButton, CourierMenuButton } from "@/components/CourierSideDr
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
 import { Switch } from "@/components/ui/switch";
 import {
-  CarIcon,
-  ElectricBikeIcon,
-  ScooterIcon,
+  CourierVehicleIcon,
   WorkAreaRegionIcon,
 } from "@/components/courier/work-area-visuals";
 import { WorkAreaCityPicker } from "@/components/courier/WorkAreaPicker";
@@ -27,6 +25,7 @@ import {
   workAreaSelectionError,
   WORK_AREA_CARDS,
 } from "@/lib/regions";
+import { COURIER_VEHICLE_OPTIONS, canonicalizeVehicleValue } from "@/lib/courier-vehicles";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -35,7 +34,7 @@ export const Route = createFileRoute("/courier/availability")({
   component: AvailabilityPage,
 });
 
-type VehicleChoice = "רכב" | "קטנוע" | "אופניים חשמליים" | "טנדר" | "";
+type VehicleChoice = (typeof COURIER_VEHICLE_OPTIONS)[number]["value"] | "";
 
 const DISTANCE_OPTIONS = [
   { value: "בתוך העיר", label: "בתוך העיר" },
@@ -44,22 +43,11 @@ const DISTANCE_OPTIONS = [
   { value: "כל הארץ", label: "כל הארץ" },
 ] as const;
 
-const VEHICLE_OPTIONS = [
-  { value: "רכב", label: "רכב", Icon: CarIcon },
-  { value: "קטנוע", label: "אופנוע / קטנוע", Icon: ScooterIcon },
-  { value: "טנדר", label: "טנדר", Icon: CarIcon },
-  { value: "אופניים חשמליים", label: "אופניים חשמליים", Icon: ElectricBikeIcon },
-] as const;
-
 function normalizeVehicle(value: string | null | undefined): VehicleChoice {
-  const v = String(value ?? "").trim();
-  if (!v) return "";
-  if (v === "קטנוע" || v === "רכב" || v === "אופניים חשמליים" || v === "טנדר") return v;
-  if (/אופניים\s*חשמלי|e-?bike|ebike/i.test(v)) return "אופניים חשמליים";
-  if (/טנדר|משאית|van|truck|הובל/.test(v)) return "טנדר";
-  if (/קטנוע|אופנוע|קורקינט/.test(v)) return "קטנוע";
-  if (/אופניים/.test(v)) return "אופניים חשמליים";
-  if (/רכב|אוטו/.test(v)) return "רכב";
+  const canonical = canonicalizeVehicleValue(value);
+  if (COURIER_VEHICLE_OPTIONS.some((o) => o.value === canonical)) {
+    return canonical as Exclude<VehicleChoice, "">;
+  }
   return "";
 }
 
@@ -252,10 +240,9 @@ function AvailabilityPage() {
                     title="סוג כלי התחבורה שלך"
                     subtitle="נתאים לך משלוחים שמתאימים לכלי"
                   />
-                  <div className="grid grid-cols-3 gap-2">
-                    {VEHICLE_OPTIONS.map((option) => {
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {COURIER_VEHICLE_OPTIONS.map((option) => {
                       const on = vehicle === option.value;
-                      const Icon = option.Icon;
                       return (
                         <button
                           key={option.value}
@@ -284,7 +271,7 @@ function AvailabilityPage() {
                               on ? "bg-white text-primary shadow-sm" : "bg-white/70 text-text-strong",
                             )}
                           >
-                            <Icon className="size-8" />
+                            <CourierVehicleIcon value={option.value} className="size-8" />
                           </span>
                           <span className="text-center text-[11px] font-extrabold leading-tight text-text-strong">
                             {option.label}

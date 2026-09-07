@@ -1,5 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { splitWorkingAreas } from "@/lib/regions";
+import {
+  expandWorkAreasForCards,
+  NATIONWIDE_WORK_AREA,
+  splitWorkingAreas,
+  WORK_AREA_CARDS,
+  workAreaOf,
+} from "@/lib/regions";
 
 export type CourierSelfRow = {
   id?: string;
@@ -71,9 +77,21 @@ export function courierActiveStatus(
 export function formatCourierWorkAreas(
   me: Pick<CourierSelfRow, "working_areas" | "base_city"> | null | undefined,
 ): string | null {
-  const { selected, legacy } = splitWorkingAreas(me?.working_areas);
-  const parts = [...selected, ...legacy];
-  if (parts.length) return parts.join(" · ");
+  const stored = me?.working_areas ?? [];
+  if (stored.some((a) => a === NATIONWIDE_WORK_AREA || a.includes(NATIONWIDE_WORK_AREA))) {
+    return NATIONWIDE_WORK_AREA;
+  }
+  const regionLabels = expandWorkAreasForCards(stored).map((storedArea) => {
+    const card = WORK_AREA_CARDS.find((c) => c.stored === storedArea);
+    return card?.label ?? storedArea.replace(/^אזור\s+/, "");
+  });
+  if (regionLabels.length) return regionLabels.join(" · ");
+
+  const { legacy } = splitWorkingAreas(stored);
+  const fromCities = [...new Set(legacy.map((city) => workAreaOf(city)).filter(Boolean))]
+    .map((area) => WORK_AREA_CARDS.find((c) => c.stored === area)?.label ?? String(area).replace(/^אזור\s+/, ""));
+  if (fromCities.length) return fromCities.join(" · ");
+
   const city = me?.base_city?.trim();
   return city || null;
 }

@@ -324,7 +324,7 @@ export class DomainService {
     const earnedRow = await this.outcomes
       .createQueryBuilder("o")
       .innerJoin(Job, "j", "j.id = o.job_id")
-      .select("COALESCE(SUM(COALESCE(j.payment, 0) + COALESCE(o.tip_amount, 0)), 0)", "earned")
+      .select("COALESCE(SUM(COALESCE(j.suggested_courier_payment, j.payment, 0) + COALESCE(o.tip_amount, 0)), 0)", "earned")
       .where("o.courier_id = :courierId", { courierId })
       .andWhere("o.delivered_at IS NOT NULL")
       .andWhere("COALESCE(o.was_cancelled, false) = false")
@@ -350,10 +350,10 @@ export class DomainService {
     const commissions = Number(commissionRow?.earned ?? 0);
     const rows = await this.withdrawals.find({ where: { courier_id: courierId } });
     const paidOut = rows
-      .filter((w) => w.status === "שולמה")
+      .filter((w) => w.status === "שולמה" || w.status === "paid")
       .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
     const reserved = rows
-      .filter((w) => w.status !== "נדחתה" && w.status !== "שולמה")
+      .filter((w) => w.status !== "נדחתה" && w.status !== "rejected" && w.status !== "שולמה" && w.status !== "paid")
       .reduce((sum, w) => sum + Number(w.amount ?? 0), 0);
     return Math.max(0, earned + commissions - paidOut - reserved);
   }
@@ -375,7 +375,7 @@ export class DomainService {
         throw new BadRequestException("סכום משיכה לא תקין");
       }
       const existing = await this.withdrawals.find({ where: { courier_id: courierId } });
-      const hasPending = existing.some((w) => w.status !== "נדחתה" && w.status !== "שולמה");
+      const hasPending = existing.some((w) => w.status !== "נדחתה" && w.status !== "rejected" && w.status !== "שולמה" && w.status !== "paid");
       if (hasPending) {
         throw new BadRequestException("יש כבר בקשת משיכה ממתינה");
       }

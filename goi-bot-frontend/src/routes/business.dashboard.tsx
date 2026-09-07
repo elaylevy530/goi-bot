@@ -282,9 +282,12 @@ function BusinessDashboard() {
                   className="biz-input appearance-none pe-9"
                   aria-label="סוג רכב"
                 >
-                  <option value="קטנוע">אופנוע / קטנוע</option>
+                  <option value="קטנוע">קטנוע</option>
                   <option value="רכב">רכב</option>
-                  <option value="טנדר">טנדר / משא</option>
+                  <option value="רכב מסחרי">רכב מסחרי</option>
+                  <option value="אופניים חשמליים">אופניים חשמליים</option>
+                  <option value="אופניים רגילים">אופניים רגילים</option>
+                  <option value="קורקינט חשמלי">קורקינט חשמלי</option>
                 </select>
               </div>
             </div>

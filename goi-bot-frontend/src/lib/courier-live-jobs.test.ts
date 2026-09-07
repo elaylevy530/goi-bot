@@ -75,6 +75,13 @@ describe("vehicle size hierarchy", () => {
     expect(courierVehicleFitsJob({ vehicle_required: "רכב" }, { vehicle_type: "אופנוע" })).toBe(false);
   });
 
+  it("lets a commercial vehicle take car jobs and keeps a kick scooter on bicycle jobs", () => {
+    expect(courierVehicleFitsJob({ vehicle_required: "רכב" }, { vehicle_type: "רכב מסחרי" })).toBe(true);
+    expect(courierVehicleFitsJob({ vehicle_required: "רכב" }, { vehicle_type: "קורקינט חשמלי" })).toBe(false);
+    expect(courierVehicleFitsJob({ vehicle_required: "אופניים רגילים" }, { vehicle_type: "קורקינט חשמלי" })).toBe(true);
+    expect(courierVehicleFitsJob({ vehicle_required: "קטנוע" }, { vehicle_type: "אופניים חשמליים" })).toBe(false);
+  });
+
   it("blocks a motorcycle from oversized cargo like a pet-food sack", () => {
     expect(
       courierVehicleFitsJob(

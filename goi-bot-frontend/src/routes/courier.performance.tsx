@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
+import { jobOfferPay } from "@/lib/courier-live-jobs";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,8 @@ type Period = "today" | "week" | "month" | "custom";
 type JobRef = {
   id?: string;
   payment?: number | null;
+  suggested_courier_payment?: number | null;
+  customer_price?: number | null;
   total_distance_km?: number | null;
   distance_km?: number | null;
   estimated_distance_km?: number | null;
@@ -89,7 +92,7 @@ function kmOf(o: OutcomeRow) {
 }
 
 function payOf(o: OutcomeRow) {
-  return Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0);
+  return jobOfferPay(o.jobs) + Number(o.tip_amount ?? 0);
 }
 
 function isCompleted(o: OutcomeRow) {

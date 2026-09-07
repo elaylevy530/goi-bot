@@ -27,6 +27,14 @@ import { Label } from "@/components/ui/label";
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { nestCreateWithdrawal, nestListActiveBonuses, nestListMyCourierOutcomes, nestListMyCourierReferrals, nestListWithdrawals, nestUpdateWithdrawal } from "@/lib/nest-domain";
 import { nestUploadFile } from "@/lib/nest-files";
+import { jobOfferPay } from "@/lib/courier-live-jobs";
+import {
+  isOpenWithdrawal,
+  isPaidWithdrawal,
+  isPreviousIsraelMonth,
+  isRejectedWithdrawal,
+  summarizeCourierWallet,
+} from "@/lib/courier-wallet";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/courier/wallet")({
@@ -41,7 +49,12 @@ type OutcomeRow = {
   delivered_at?: string | null;
   was_cancelled?: boolean | null;
   tip_amount?: number | null;
-  jobs?: { payment?: number | null; job_number?: string | number | null } | null;
+  jobs?: {
+    payment?: number | null;
+    suggested_courier_payment?: number | null;
+    customer_price?: number | null;
+    job_number?: string | number | null;
+  } | null;
 };
 
 type WithdrawalRow = {
@@ -78,76 +91,10 @@ function maskAccount(raw?: string | null) {
 }
 
 function displayStatus(status?: string | null) {
-  if (status === "שולמה") return { label: "הועבר לבנק", tone: "done" as const };
-  if (status === "אושרה") return { label: "אושר", tone: "done" as const };
-  if (status === "נדחתה") return { label: "נדחתה", tone: "bad" as const };
+  if (isPaidWithdrawal(status)) return { label: "הועבר לבנק", tone: "done" as const };
+  if (status === "אושרה" || String(status ?? "").toLowerCase() === "approved") return { label: "אושר", tone: "done" as const };
+  if (isRejectedWithdrawal(status)) return { label: "נדחתה", tone: "bad" as const };
   return { label: "ממתין לאישור", tone: "wait" as const };
-}
-
-const ISRAEL_TZ = "Asia/Jerusalem";
-
-function israelCalendarParts(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: ISRAEL_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const num = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  return { year: num("year"), month: num("month"), day: num("day") };
-}
-
-function israelYearMonthValue(d: Date) {
-  const { year, month } = israelCalendarParts(d);
-  return year * 12 + month;
-}
-
-function isPreviousIsraelMonth(iso?: string | null, now = new Date()) {
-  if (!iso) return false;
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return false;
-  return israelYearMonthValue(at) < israelYearMonthValue(now);
-}
-
-function nextWithdrawalWindowDate(now = new Date()) {
-  const { year, month } = israelCalendarParts(now);
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  return { year: nextYear, month: nextMonth, day: 1 };
-}
-
-function previousMonthLabel(now = new Date()) {
-  const { year, month } = israelCalendarParts(now);
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  return new Date(Date.UTC(prevYear, prevMonth - 1, 15, 12, 0, 0)).toLocaleDateString("he-IL", {
-    timeZone: ISRAEL_TZ,
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function formatIsraelDate(parts: { year: number; month: number; day: number }) {
-  const utc = Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0);
-  return new Date(utc).toLocaleDateString("he-IL", { timeZone: ISRAEL_TZ });
-}
-
-function israelYearMonthKey(iso?: string | null) {
-  if (!iso) return null;
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return null;
-  const { year, month } = israelCalendarParts(at);
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
-
-function labelIsraelYearMonth(key: string) {
-  const [year, month] = key.split("-").map(Number);
-  if (!year || !month) return key;
-  return new Date(Date.UTC(year, month - 1, 15, 12, 0, 0)).toLocaleDateString("he-IL", {
-    timeZone: ISRAEL_TZ,
-    month: "long",
-    year: "numeric",
-  });
 }
 
 function WalletPage() {
@@ -194,43 +141,22 @@ function WalletPage() {
     staleTime: 30_000,
   });
 
-  const completed = rows.filter((o) => o.delivered_at && !o.was_cancelled);
-  const previousJobEarned = completed
-    .filter((o) => isPreviousIsraelMonth(o.delivered_at))
-    .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-  const currentJobEarned = completed
-    .filter((o) => !isPreviousIsraelMonth(o.delivered_at))
-    .reduce((s, o) => s + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0), 0);
-  const previousCommissionEarned = commissions
-    .filter((c) => isPreviousIsraelMonth(c.created_at))
-    .reduce((s, c) => s + Number(c.amount ?? 0), 0);
-  const currentCommissionEarned = commissions
-    .filter((c) => !isPreviousIsraelMonth(c.created_at))
-    .reduce((s, c) => s + Number(c.amount ?? 0), 0);
-  const previousEarned = previousJobEarned + previousCommissionEarned;
-  const currentMonthEarned = currentJobEarned + currentCommissionEarned;
-  const paidOut = withdrawals.filter((w) => w.status === "שולמה").reduce((s, w) => s + Number(w.amount ?? 0), 0);
-  const pending = withdrawals.filter((w) => w.status !== "נדחתה" && w.status !== "שולמה");
-  const reserved = pending.reduce((s, w) => s + Number(w.amount ?? 0), 0);
-  const available = Math.max(0, previousEarned - paidOut - reserved);
-  const closedMonths = (() => {
-    const map = new Map<string, number>();
-    for (const o of completed) {
-      if (!isPreviousIsraelMonth(o.delivered_at)) continue;
-      const key = israelYearMonthKey(o.delivered_at);
-      if (!key) continue;
-      map.set(key, (map.get(key) ?? 0) + Number(o.jobs?.payment ?? 0) + Number(o.tip_amount ?? 0));
-    }
-    for (const c of commissions) {
-      if (!isPreviousIsraelMonth(c.created_at)) continue;
-      const key = israelYearMonthKey(c.created_at);
-      if (!key) continue;
-      map.set(key, (map.get(key) ?? 0) + Number(c.amount ?? 0));
-    }
-    return [...map.entries()]
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([key, earned]) => ({ key, label: labelIsraelYearMonth(key), earned }));
-  })();
+  const wallet = summarizeCourierWallet({
+    outcomes: rows,
+    commissions,
+    withdrawals,
+  });
+  const {
+    available,
+    currentMonthEarned,
+    currentMonthLabel,
+    closedMonths,
+    previousEarned,
+    reserved,
+    unlockingAmount,
+    unlockDateLabel,
+  } = wallet;
+  const pending = withdrawals.filter((w) => isOpenWithdrawal(w.status));
   const latestPending = pending
     .slice()
     .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0];
@@ -256,14 +182,13 @@ function WalletPage() {
     fillBankFields();
     setBankEditOpen(true);
   };
-  const nextWindow = nextWithdrawalWindowDate();
   const requestBlockReason = latestPending
     ? "יש כבר בקשת משיכה ממתינה"
     : !hasBank
       ? "יש למלא פרטי בנק"
       : available <= 0
         ? currentMonthEarned > 0
-          ? `אין יתרה מחודשים סגורים. משלוחי החודש ייפתחו ב-${formatIsraelDate(nextWindow)}`
+          ? `אין יתרה מחודשים סגורים. ₪ ${money(unlockingAmount)} ייפתחו למשיכה ב-${unlockDateLabel}`
           : "אין יתרה למשיכה מחודשים קודמים"
         : null;
   const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
@@ -280,7 +205,7 @@ function WalletPage() {
       status?: string | null;
     }[] = [];
     for (const o of rows.filter((r) => r.delivered_at && !r.was_cancelled)) {
-      const pay = Number(o.jobs?.payment ?? 0);
+      const pay = jobOfferPay(o.jobs);
       const tip = Number(o.tip_amount ?? 0);
       const no = o.jobs?.job_number ? `#${o.jobs.job_number}` : "";
       if (pay) {
@@ -315,7 +240,7 @@ function WalletPage() {
       items.push({
         id: `wd-${w.id}`,
         kind: "withdraw",
-        title: w.status === "שולמה"
+        title: isPaidWithdrawal(w.status)
           ? `משיכה לבנק (הועבר לחשבון ${maskAccount(w.bank_account || bank?.bank_account)})`
           : `בקשת משיכה (הוגשה בתאריך: ${w.created_at ? new Date(w.created_at).toLocaleDateString("he-IL") : ""})`,
         at: w.created_at || "",
@@ -414,10 +339,8 @@ function WalletPage() {
                   <p className="text-sm text-primary-foreground/80">יתרה זמינה למשיכה</p>
                   <p className="mt-1 text-3xl font-black tabular-nums">₪ {money(available)}</p>
                   <p className="mt-2 text-xs text-primary-foreground/70">
-                    משיכה לפי חודש סגור · עד {previousMonthLabel()}
-                    {currentMonthEarned > 0
-                      ? ` · ₪${money(currentMonthEarned)} החודש ייפתחו ב-${formatIsraelDate(nextWindow)}`
-                      : ""}
+                    מחודשים שנסגרו
+                    {reserved > 0 ? ` · ₪ ${money(reserved)} בבקשה ממתינה` : ""}
                   </p>
                 </div>
                 <div className="grid size-14 shrink-0 place-items-center rounded-card bg-primary-foreground/10">
@@ -445,48 +368,45 @@ function WalletPage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-card border border-border bg-surface p-3 shadow-card">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs font-bold text-text-strong">בקשת משיכה ממתינה</p>
-                  {latestPending && (
-                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-[10px] font-bold text-warning-text">ממתין לאישור</span>
-                  )}
+                <p className="text-xs font-bold text-text-strong">הרווחת החודש</p>
+                <p className="mt-1 text-[11px] text-text-muted">{currentMonthLabel}</p>
+                <p className="mt-2 text-xl font-black tabular-nums text-text-strong">₪ {money(currentMonthEarned)}</p>
+              </div>
+              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+                <p className="text-xs font-bold text-text-strong">יהפוך לזמין למשיכה</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <CalendarDays className="size-4 text-primary" aria-hidden />
+                  <p className="text-sm font-black tabular-nums text-text-strong">{unlockDateLabel}</p>
                 </div>
-                {latestPending ? (
-                  <>
-                    <p className="mt-2 text-xl font-black tabular-nums text-text-strong">₪ {money(Number(latestPending.amount ?? 0))}</p>
-                    <p className="mt-1 text-[11px] text-text-muted">
-                      הוגשה בתאריך: {latestPending.created_at ? new Date(latestPending.created_at).toLocaleDateString("he-IL") : "—"}
-                    </p>
-                    <WithdrawSteps status={latestPending.status} />
-                    {needsInvoice && invoiceAlreadyAttached && (
-                      <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-success-text">
-                        <FileText className="size-3.5" aria-hidden />
-                        חשבונית צורפה
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="mt-6 text-sm text-text-muted">אין בקשה ממתינה</p>
+                <p className="mt-2 text-xl font-black tabular-nums text-primary">₪ {money(unlockingAmount)}</p>
+                <p className="mt-1 text-[11px] text-text-muted">רווחי {currentMonthLabel} נפתחים ב-1 לחודש הבא</p>
+              </div>
+            </div>
+
+            <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-bold text-text-strong">בקשת משיכה ממתינה</p>
+                {latestPending && (
+                  <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-[10px] font-bold text-warning-text">ממתין לאישור</span>
                 )}
               </div>
-
-              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
-                <p className="text-xs font-bold text-text-strong">משלוחי החודש ייפתחו</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <CalendarDays className="size-4 text-primary" aria-hidden />
-                  <p className="text-lg font-black tabular-nums text-text-strong">
-                    {formatIsraelDate(nextWindow)}
-                  </p>
-                </div>
-                {currentMonthEarned > 0 ? (
+              {latestPending ? (
+                <>
+                  <p className="mt-2 text-xl font-black tabular-nums text-text-strong">₪ {money(Number(latestPending.amount ?? 0))}</p>
                   <p className="mt-1 text-[11px] text-text-muted">
-                    ₪ {money(currentMonthEarned)} עדיין לא זמינים
+                    הוגשה בתאריך: {latestPending.created_at ? new Date(latestPending.created_at).toLocaleDateString("he-IL") : "—"}
                   </p>
-                ) : null}
-                <span className="mt-2 inline-flex rounded-pill bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-success-text">
-                  החל מ-1 לחודש, על חודשים קודמים
-                </span>
-              </div>
+                  <WithdrawSteps status={latestPending.status} />
+                  {needsInvoice && invoiceAlreadyAttached && (
+                    <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-success-text">
+                      <FileText className="size-3.5" aria-hidden />
+                      חשבונית צורפה
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-text-muted">אין בקשה ממתינה</p>
+              )}
             </div>
 
             {needsInvoice && latestPending && !invoiceAlreadyAttached && (
@@ -555,19 +475,30 @@ function WalletPage() {
               )}
             </div>
 
-            {closedMonths.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-sm font-extrabold text-text-strong">חודשים סגורים למשיכה</h2>
+            <section className="space-y-2">
+              <h2 className="text-sm font-extrabold text-text-strong">חודשים קודמים</h2>
+              {closedMonths.length === 0 ? (
+                <p className="rounded-card border border-border bg-surface px-3 py-4 text-sm text-text-muted">
+                  אין עדיין חודש סגור. רווחי {currentMonthLabel} ייפתחו ב-{unlockDateLabel}.
+                </p>
+              ) : (
                 <ul className="flex flex-col gap-2">
                   {closedMonths.map((month) => (
                     <li key={month.key} className="flex items-center justify-between gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
-                      <p className="text-sm font-bold text-text-strong">{month.label}</p>
+                      <div className="min-w-0 text-right">
+                        <p className="text-sm font-bold text-text-strong">{month.label}</p>
+                        <p className="text-[11px] text-text-muted">סה״כ שהרווחת בחודש</p>
+                      </div>
                       <p className="text-sm font-extrabold tabular-nums text-primary">₪ {money(month.earned)}</p>
                     </li>
                   ))}
+                  <li className="flex items-center justify-between gap-3 rounded-card border border-primary/20 bg-primary-soft px-3 py-3">
+                    <p className="text-sm font-extrabold text-text-strong">סה״כ חודשים סגורים</p>
+                    <p className="text-sm font-black tabular-nums text-primary">₪ {money(previousEarned)}</p>
+                  </li>
                 </ul>
-              </section>
-            )}
+              )}
+            </section>
 
             <div className="flex min-h-12 items-center gap-3 rounded-card border border-border bg-surface px-3 py-3 shadow-card">
               <div className="grid size-9 place-items-center rounded-pill bg-primary-soft text-primary">
@@ -582,7 +513,7 @@ function WalletPage() {
 
             <div className="flex items-start gap-2 rounded-card bg-muted px-3 py-3 text-sm text-text">
               <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <p>משיכה לפי חודש שנסגר: בספטמבר אפשר למשוך את אוגוסט, באוקטובר את ספטמבר, וכן הלאה. משלוחי החודש הנוכחי ייפתחו ב-1 לחודש הבא.</p>
+              <p>משיכה רק על חודש שנסגר: מה-1 לחודש אפשר למשוך את החודש הקודם. רווחי {currentMonthLabel} ייפתחו ב-{unlockDateLabel}.</p>
             </div>
 
             <section className="space-y-2">
@@ -676,9 +607,9 @@ function WalletPage() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-text-subtle">
-              יתרה זמינה מחודשים סגורים: ₪ {money(available)}
-              {currentMonthEarned > 0
-                ? `. משלוחי החודש (₪ ${money(currentMonthEarned)}) ייפתחו ב-${formatIsraelDate(nextWindow)}`
+              יתרה זמינה למשיכה: ₪ {money(available)}
+              {unlockingAmount > 0
+                ? `. ₪ ${money(unlockingAmount)} מרווחי ${currentMonthLabel} ייפתחו ב-${unlockDateLabel}`
                 : ""}
             </p>
             {closedMonths.length > 0 && (

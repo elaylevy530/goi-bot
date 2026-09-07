@@ -20,9 +20,9 @@ function textBlob(...values: unknown[]) {
 export function classifyVehicle(raw?: string | null): VehicleClass | null {
   const t = String(raw ?? "").trim().toLowerCase();
   if (!t) return null;
-  if (/טנדר|משאית|van|truck|הובל/.test(t)) return "van";
-  if (/רכב|מכונית|auto\b|car\b/.test(t) && !/דו.?גלגל|אופנוע|קטנוע/.test(t)) return "car";
-  if (/אופנוע|קטנוע|motorcycle|scooter/.test(t)) return "moto";
+  if (/רכב מסחרי|טנדר|משאית|van|truck|הובל/.test(t)) return "van";
+  if (/רכב|מכונית|auto\b|car\b/.test(t) && !/דו.?גלגל|אופנוע|קטנוע|מסחרי/.test(t)) return "car";
+  if (/אופנוע|קטנוע|motorcycle/.test(t) && !/קורקינט/.test(t)) return "moto";
   if (/אופניים|קורקינט|הליכה|bicycle|bike|walk|רגל/.test(t)) return "bike";
   return null;
 }
@@ -59,7 +59,7 @@ function inferSizeClass(job?: {
     job?.job_type,
   );
   if (!blob) return null;
-  if (/טנדר|הובל|רהיט|ספה|מקרר|ארון/.test(blob)) return "van";
+  if (/טנדר|רכב מסחרי|הובל|רהיט|ספה|מקרר|ארון/.test(blob)) return "van";
   if (/שק|מזון חיות|חנות חיות|מעל 20|עד 30|כבד מאוד/.test(blob)) return "car";
   if (/גדול|20\s*ק/.test(blob)) return "car";
   if (/בינוני|10\s*ק/.test(blob)) return "moto";

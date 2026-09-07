@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { nestRegisterCourier } from "@/lib/nest-auth";
 import {
   CheckCircle2, Loader2, User, Phone, MapPin, Bike,
-  Car, Zap, MoreHorizontal, Package,
+  Car, MoreHorizontal, Package,
   Boxes, ClipboardList, MessageCircle, Lock,
   Briefcase, Bell, ThumbsUp, Sparkles, Send,
   Camera, Upload, X, KeyRound, FileText,
@@ -17,6 +17,8 @@ import { WorkAreaPicker } from "@/components/courier/WorkAreaPicker";
 import { composeWorkingAreas, workAreaSelectionError } from "@/lib/regions";
 import { toast } from "sonner";
 import { cacheCourierKind } from "@/lib/courier-kind";
+import { COURIER_VEHICLE_OPTIONS } from "@/lib/courier-vehicles";
+import { CourierVehicleIcon } from "@/components/courier/work-area-visuals";
 import {
   Dialog,
   DialogContent,
@@ -32,17 +34,11 @@ import {
 
 type CourierKind = "courier" | "mover";
 
-const VEHICLES_BY_KIND: Record<CourierKind, { value: string; label: string; icon: typeof Bike }[]> = {
-  courier: [
-    { value: "קטנוע", label: "אופנוע / קטנוע", icon: Bike },
-    { value: "אופניים חשמליים", label: "אופניים חשמליים", icon: Zap },
-    { value: "רכב", label: "רכב", icon: Car },
-    { value: "טנדר", label: "טנדר", icon: Car },
-    { value: "קורקינט חשמלי", label: "קורקינט חשמלי", icon: Zap },
-    { value: "אופניים רגילים", label: "אופניים רגילים", icon: Bike },
-    { value: "הליכה", label: "הליכה", icon: MoreHorizontal },
-    { value: "אחר", label: "אחר", icon: MoreHorizontal },
-  ],
+const VEHICLES_BY_KIND: Record<CourierKind, { value: string; label: string; icon?: typeof Bike }[]> = {
+  courier: COURIER_VEHICLE_OPTIONS.map((o) => ({
+    value: o.value,
+    label: o.label,
+  })),
   mover: [
     { value: "טנדר", label: "טנדר", icon: Car },
     { value: "משאית קטנה", label: "משאית קטנה", icon: Package },
@@ -543,7 +539,11 @@ export function JoinPage({ referredBy }: { referredBy?: string }) {
                     }`}
                   >
                     <Checkbox checked={on} className="pointer-events-none self-start" />
-                    <v.icon className={`size-7 ${on ? "text-primary" : "text-muted-foreground"}`} />
+                    {v.icon ? (
+                      <v.icon className={`size-7 ${on ? "text-primary" : "text-muted-foreground"}`} />
+                    ) : (
+                      <CourierVehicleIcon value={v.value} className={`size-8 ${on ? "text-primary" : "text-muted-foreground"}`} />
+                    )}
                     <span className="text-xs font-medium text-center">{v.label}</span>
                   </button>
                 );

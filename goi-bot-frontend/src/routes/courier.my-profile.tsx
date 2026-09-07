@@ -193,7 +193,7 @@ function MyProfilePage() {
               <div className="flex flex-col items-center text-center">
                 <MapPin className="mb-2 size-5 text-primary-foreground/90" />
                 <div className="mb-1 text-xs text-primary-foreground/70">אזורי עבודה</div>
-                <div className="font-bold text-primary-foreground">{workAreas ?? "טרם הוזן"}</div>
+                <div className="font-bold leading-tight text-primary-foreground line-clamp-2">{workAreas ?? "טרם הוזן"}</div>
                 <Link
                   to="/courier/availability"
                   className="mt-1 flex items-center gap-1 text-xs text-primary-foreground"
