@@ -17,8 +17,8 @@ import {
   nestLoginWithPhone,
 } from "@/lib/nest-auth";
 import { cn } from "@/lib/utils";
-import businessHero from "@/assets/auth/business-hero.png";
-import courierHero from "@/assets/auth/courier-hero.png";
+import businessHero from "@/assets/auth/business-hero.jpg";
+import courierHero from "@/assets/auth/courier-hero.jpg";
 
 type Role = "courier" | "business";
 
@@ -132,10 +132,14 @@ function AuthPage() {
         key={role}
         src={copy.hero}
         alt=""
-        className="absolute inset-0 size-full object-cover object-[center_25%] transition-opacity duration-500"
+        width={1440}
+        height={2560}
+        decoding="async"
+        fetchPriority="high"
+        className="pointer-events-none absolute inset-0 size-full object-cover object-[center_22%]"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-black via-black/80 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black via-black/75 to-transparent" />
 
       <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6">
         <div className="relative flex h-11 items-center justify-center">
@@ -154,7 +158,7 @@ function AuthPage() {
           </div>
         </div>
 
-        <div className="mt-auto -mx-4 rounded-t-[1.75rem] bg-[#0b0b0b]/82 px-5 pb-3 pt-3.5 backdrop-blur-md sm:-mx-6 sm:px-7">
+        <div className="mt-auto -mx-4 rounded-t-[1.75rem] bg-[#0b0b0b]/92 px-5 pb-3 pt-3.5 sm:-mx-6 sm:px-7">
           <div className="mb-3.5 grid grid-cols-2 gap-0.5 rounded-full bg-black/50 p-0.5 ring-1 ring-white/25">
             <RoleTab
               active={role === "courier"}
