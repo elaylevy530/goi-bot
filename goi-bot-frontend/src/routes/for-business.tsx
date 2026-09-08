@@ -4,18 +4,18 @@ import { Building2, UtensilsCrossed, Store, Flower2, Package, Sparkles, ArrowLef
 const GREEN = "#128C7E";
 const WA_GREEN = "#25D366";
 
-const SITE_URL = "https://goi-bot.lovable.app";
+const SITE_URL = "https://goi.co.il";
 
 export const Route = createFileRoute("/for-business")({
   head: () => ({
     meta: [
-      { title: "Goi לעסקים — בקרוב | פתרון משלוחים לעסקים" },
+      { title: "Goi לעסקים בקרוב | פתרון משלוחים לעסקים" },
       {
         name: "description",
         content:
-          "שירות Goi לעסקים בבנייה — פתרון משלוחים חכם למסעדות, חנויות ועסקים קטנים. השאירו פרטים ונעדכן כשהשירות יושק.",
+          "שירות Goi לעסקים בבנייה. פתרון משלוחים חכם למסעדות, חנויות ועסקים קטנים. השאירו פרטים ונעדכן כשהשירות יושק.",
       },
-      { property: "og:title", content: "Goi לעסקים — בקרוב" },
+      { property: "og:title", content: "Goi לעסקים בקרוב" },
       { property: "og:description", content: "אנחנו בונים את השירות המושלם לעסקים. הצטרפו לרשימת ההמתנה." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: SITE_URL + "/for-business" },
@@ -78,7 +78,7 @@ function ForBusinessPage() {
           </h1>
 
           <p className="text-[17px] lg:text-[19px] text-black/65 leading-relaxed mb-3">
-            פתרון משלוחים חכם למסעדות, חנויות, פרחים, מזון ועסקים קטנים —
+            פתרון משלוחים חכם למסעדות, חנויות, פרחים, מזון ועסקים קטנים.
             הזמנה בלחיצה, מעקב חי, וחשבונית חודשית מרוכזת.
           </p>
           <p className="text-[15px] text-black/50 mb-10">
@@ -108,16 +108,20 @@ function ForBusinessPage() {
       {/* Footer */}
       <footer className="border-t border-black/5 py-6 text-center text-[13px] text-black/45 flex flex-col items-center gap-3">
         <div className="flex items-center gap-5 flex-wrap justify-center">
-          <Link to="/business-login" className="inline-flex items-center gap-1.5 font-semibold text-black/70 hover:text-black transition-colors">
+          <Link
+            to="/auth"
+            search={{ role: "business" }}
+            className="inline-flex items-center gap-1.5 font-semibold text-black/70 hover:text-black transition-colors"
+          >
             כניסת עסקים
             <ArrowLeft size={14} />
           </Link>
-          <Link to="/customer-login" className="inline-flex items-center gap-1.5 font-semibold text-black/70 hover:text-black transition-colors">
-            כניסה לפרטיים
+          <Link to="/auth" className="inline-flex items-center gap-1.5 font-semibold text-black/70 hover:text-black transition-colors">
+            כניסת שליחים
             <ArrowLeft size={14} />
           </Link>
         </div>
-        <div>© {new Date().getFullYear()} Goi · כל הזכויות שמורות</div>
+        <div>© {new Date().getFullYear()} Goi. כל הזכויות שמורות</div>
       </footer>
     </div>
   );

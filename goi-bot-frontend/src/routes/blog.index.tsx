@@ -6,7 +6,7 @@ import { externalApps } from "@/lib/external-apps";
 export const Route = createFileRoute("/blog/")({
   head: () => ({
     meta: [
-      { title: "הפניה — בלוג Goi" },
+      { title: "הפניה לבלוג Goi" },
       { name: "robots", content: "noindex" },
     ],
   }),

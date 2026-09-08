@@ -17,6 +17,10 @@ const COURIER_LOGIN = "/auth";
 const BUSINESS_LOGIN = "/auth";
 const ADMIN_LOGIN = "/admin-login";
 
+function Latin({ children }: { children: ReactNode }) {
+  return <bdi className="latin">{children}</bdi>;
+}
+
 function Arrow() {
   return <span className="arrow">←</span>;
 }
@@ -158,11 +162,11 @@ function Hero() {
             אפליקציה אחת.<span className="accent">רשת שליחים שלמה.</span>
           </h1>
           <p>
-            GOI מחברת את העסק שלכם בזמן אמת לרשת משולבת של חברות משלוחים ושליחים עצמאיים. המטרה פשוטה: שתמיד יהיה שליח זמין לעסק שלכם. כשיש משלוח פותחים הזמנה באפליקציה ועוקבים עד המסירה.
+            <Latin>GOI</Latin> מחברת את העסק שלכם בזמן אמת לרשת משולבת של חברות משלוחים ושליחים עצמאיים. המטרה פשוטה: שתמיד יהיה שליח זמין לעסק שלכם. כשיש משלוח פותחים הזמנה באפליקציה ועוקבים עד המסירה.
           </p>
           <div className="hero-actions">
             <Link to={BUSINESS_SIGNUP} className="btn btn-primary">
-              אני עסק — בואו נתחיל <Arrow />
+              אני עסק, בואו נתחיל <Arrow />
             </Link>
             <a href="#how" className="btn btn-ghost">
               לראות איך זה עובד
@@ -186,7 +190,7 @@ function Hero() {
               <svg className="proof-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4Z" />
               </svg>{" "}
-              חברות + עצמאיים
+              חברות ועצמאיים
             </span>
           </div>
         </div>
@@ -204,7 +208,7 @@ function Hero() {
                 <span className="stop-dot" />
                 <div>
                   <small>איסוף</small>
-                  <strong>פיצה נונה · דיזנגוף 72</strong>
+                  <strong>פיצה נונה, דיזנגוף 72</strong>
                 </div>
               </div>
               <div className="stop">
@@ -220,7 +224,7 @@ function Hero() {
                 <span className="avatar">🛵</span>
                 <div>
                   <strong>איתי בדרך אליך</strong>
-                  <small>קטנוע · 4.9 ★</small>
+                  <small>קטנוע, 4.9 ★</small>
                 </div>
               </div>
               <span className="price">₪29</span>
@@ -269,14 +273,14 @@ function Network() {
       <div className="goi-wrap">
         <Reveal className="network-panel">
           <div className="network-copy">
-            <span className="eyebrow">הכוח של GOI הוא הרשת</span>
+            <span className="eyebrow">הכוח של <Latin>GOI</Latin> הוא הרשת</span>
             <h2>
               לא שליח אחד.
               <br />
               רשת שלמה מאחוריכם.
             </h2>
             <p>
-              בצד השני של האפליקציה נמצאים גם שליחים עצמאיים וגם חברות משלוחים. GOI מרכזת את הזמינות במקום אחד ומחברת כל הזמנה לשליח מתאים באזור — כך שלעסק יש כתובת אחת לכל המשלוחים המקומיים.
+              בצד השני של האפליקציה נמצאים גם שליחים עצמאיים וגם חברות משלוחים. <Latin>GOI</Latin> מרכזת את הזמינות במקום אחד ומחברת כל הזמנה לשליח מתאים באזור. כך שלעסק יש כתובת אחת לכל המשלוחים המקומיים.
             </p>
             <div className="network-points">
               <div className="network-point">
@@ -332,14 +336,14 @@ function Business() {
             <h2>
               מהדלפק, מהחנות
               <br />
-              או מהמשרד — ללקוח.
+              או מהמשרד עד הלקוח.
             </h2>
           </div>
-          <p>משלוח אחד באמצע היום או עומס של הזמנות בערב — מזמינים לפי הצורך ומקבלים שליח מתאים באזור.</p>
+          <p>משלוח אחד באמצע היום או עומס של הזמנות בערב. מזמינים לפי הצורך ומקבלים שליח מתאים באזור.</p>
         </Reveal>
         <div className="business-grid">
           <article className="business-card reveal" style={{ ["--card-glow" as string]: "rgba(255,138,50,.15)" }}>
-            <span className="card-num">01 / מסעדות</span>
+            <span className="card-num">מסעדות</span>
             <div className="business-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M16 3c3 2 4 5 4 9h-4v9M16 3v18" />
@@ -352,7 +356,7 @@ function Business() {
             </a>
           </article>
           <article className="business-card reveal" style={{ ["--card-glow" as string]: "rgba(103,167,255,.15)" }}>
-            <span className="card-num">02 / חנויות</span>
+            <span className="card-num">חנויות</span>
             <div className="business-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M4 8h16l-1 13H5L4 8Z" />
@@ -360,13 +364,13 @@ function Business() {
               </svg>
             </div>
             <h3>הלקוח רוצה את זה עוד היום</h3>
-            <p>אופנה, פארם, פרחים, מתנות או מוצר מהמדף — מוציאים משלוח ישירות מהסניף ומגיעים ללקוח היום.</p>
+            <p>אופנה, פארם, פרחים, מתנות או מוצר מהמדף. מוציאים משלוח ישירות מהסניף ומגיעים ללקוח היום.</p>
             <a className="card-link" href="#how" aria-label="איך זה עובד לחנויות">
               ↗
             </a>
           </article>
           <article className="business-card reveal">
-            <span className="card-num">03 / עסקים</span>
+            <span className="card-num">עסקים</span>
             <div className="business-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 7h18v13H3zM7 7V4h10v3" />
@@ -374,7 +378,7 @@ function Business() {
               </svg>
             </div>
             <h3>משהו חייב להגיע עכשיו</h3>
-            <p>מסמך, מפתח, חבילה קטנה, חלק או ציוד דחוף — שליח נקודתי מהעסק ללקוח או לעסק אחר, באותו היום.</p>
+            <p>מסמך, מפתח, חבילה קטנה, חלק או ציוד דחוף. שליח נקודתי מהעסק ללקוח או לעסק אחר, באותו היום.</p>
             <a className="card-link" href="#how" aria-label="איך זה עובד לעסקים">
               ↗
             </a>
@@ -402,14 +406,14 @@ function Fits() {
       <div className="goi-wrap">
         <Reveal className="section-head">
           <div>
-            <span className="eyebrow">למי GOI מתאימה?</span>
+            <span className="eyebrow">למי <Latin>GOI</Latin> מתאימה?</span>
             <h2>
               לכל עסק שצריך להגיע
               <br />
               ללקוח עוד היום.
             </h2>
           </div>
-          <p>אם המוצר כבר אצלכם והלקוח נמצא בעיר או באזור סמוך — GOI יכולה לחבר אתכם לשליח שייקח אותו מכאן לשם.</p>
+          <p>אם המוצר כבר אצלכם והלקוח נמצא בעיר או באזור סמוך, <Latin>GOI</Latin> יכולה לחבר אתכם לשליח שייקח אותו מכאן לשם.</p>
         </Reveal>
         <div className="fit-grid">
           {items.map((item) => (
@@ -424,7 +428,7 @@ function Fits() {
         </div>
         <Reveal className="fit-bottom">
           <b>לא מצאתם את התחום שלכם?</b>
-          <span>אם זה משלוח מקומי מהיום להיום — כנראה ש־GOI מתאימה גם לכם.</span>
+          <span>אם זה משלוח מקומי מהיום להיום, כנראה שהשירות של <Latin>GOI</Latin> מתאים גם לכם.</span>
         </Reveal>
       </div>
     </section>
@@ -442,10 +446,10 @@ function Local() {
             <br />
             המשלוח שהעסק צריך עכשיו.
           </h3>
-          <p>GOI לא מחליפה מחסן ולא מנהלת מלאי. אנחנו מחברים את העסק לשליח זמין כדי להוציא הזמנה מקומית במהירות — נקודה לנקודה.</p>
+          <p><Latin>GOI</Latin> לא מחליפה מחסן ולא מנהלת מלאי. אנחנו מחברים את העסק לשליח זמין כדי להוציא הזמנה מקומית במהירות, נקודה לנקודה.</p>
           <div className="scope-note">
             <b>חשוב לדעת</b>
-            <span>השירות מיועד למשלוחים מהיום להיום ועכשיו לעכשיו, ולא לשירותי Fulfillment, הפצה ארצית או לוגיסטיקת איקומרס.</span>
+            <span>השירות מיועד למשלוחים מהיום להיום ועכשיו לעכשיו, ולא למילוי הזמנות מחסן, הפצה ארצית או לוגיסטיקה של חנויות אונליין.</span>
           </div>
         </Reveal>
         <Reveal className="local-options">
@@ -458,9 +462,9 @@ function Local() {
             </span>
             <div>
               <strong>עכשיו לעכשיו</strong>
-              <p>הזמנה דחופה, מנה מוכנה או לקוח שמחכה — מחפשים שליח זמין ברגע זה.</p>
+              <p>הזמנה דחופה, מנה מוכנה או לקוח שמחכה. מחפשים שליח זמין ברגע זה.</p>
             </div>
-            <span>ON DEMAND</span>
+            <span>מיידי</span>
           </article>
           <article className="local-option">
             <span className="local-option-icon">
@@ -473,7 +477,7 @@ function Local() {
               <strong>מהיום להיום</strong>
               <p>פותחים מראש משלוח שצריך לצאת בהמשך היום ובוחרים את חלון הזמן המתאים.</p>
             </div>
-            <span>SAME DAY</span>
+            <span>היום</span>
           </article>
           <article className="local-option">
             <span className="local-option-icon">
@@ -483,9 +487,9 @@ function Local() {
             </span>
             <div>
               <strong>משלוח מקומי</strong>
-              <p>אותה עיר או אזור סמוך — מהעסק ללקוח במסלול קצר וברור.</p>
+              <p>אותה עיר או אזור סמוך, מהעסק ללקוח במסלול קצר וברור.</p>
             </div>
-            <span>LOCAL</span>
+            <span>מקומי</span>
           </article>
         </Reveal>
       </div>
@@ -502,7 +506,7 @@ function How({
 }) {
   const steps = [
     ["01", "פותחים משלוח", "כתובת איסוף, כתובת מסירה ומה שולחים. פחות מדקה וסיימתם."],
-    ["02", "GOI מוצאת שליח", "המערכת מאתרת שליח זמין ומתאים באזור ושולחת אותו לאיסוף."],
+    ["02", "מוצאים שליח זמין", "המערכת מאתרת שליח מתאים באזור ושולחת אותו לאיסוף."],
     ["03", "עוקבים עד המסירה", "רואים סטטוס בזמן אמת ומקבלים אישור כשהמשלוח הגיע ליעד."],
   ] as const;
 
@@ -559,7 +563,7 @@ function How({
                 </div>
                 <div>
                   <small>זמן משוער</small>
-                  <strong>18–24 דק׳</strong>
+                  <strong>18 עד 24 דק׳</strong>
                 </div>
                 <div>
                   <small>מחיר</small>
@@ -613,7 +617,7 @@ function Numbers() {
           <span>לפתיחת משלוח</span>
         </div>
         <div className="number">
-          <strong>LIVE</strong>
+          <strong>חי</strong>
           <span>מעקב עד הלקוח</span>
         </div>
         <div className="number">
@@ -638,7 +642,7 @@ function Couriers() {
               יכול להפוך להכנסה.
             </h2>
             <p>
-              מצטרפים למערך השליחים העצמאיים של GOI, מתחברים לאפליקציה כשנוח ורואים משלוחים קרובים באזור. לפני שלוקחים עבודה רואים את המסלול, המרחק והתגמול — והבחירה תמיד שלכם.
+              מצטרפים למערך השליחים העצמאיים של <Latin>GOI</Latin>. מתחברים לאפליקציה כשנוח ורואים משלוחים קרובים באזור. לפני שלוקחים עבודה רואים את המסלול, המרחק והתגמול, והבחירה תמיד שלכם.
             </p>
             <div className="courier-benefits">
               <span>
@@ -667,13 +671,13 @@ function Couriers() {
               <strong>
                 משלוח קרוב אליך <b>₪38</b>
               </strong>
-              <small>2.4 ק״מ · מוכן לאיסוף</small>
+              <small>2.4 ק״מ, מוכן לאיסוף</small>
             </div>
             <div className="job-card job-b">
               <strong>
                 קו חלוקה <b>₪126</b>
               </strong>
-              <small>5 נקודות · 11.2 ק״מ</small>
+              <small>5 נקודות, 11.2 ק״מ</small>
             </div>
             <div className="scooter">
               <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
@@ -702,7 +706,7 @@ function Tech() {
               במסך אחד.
             </h2>
           </div>
-          <p>הזמנות, שליחים, סטטוסים, היסטוריה וחיובים — כל מה שהעסק צריך כדי לנהל את המשלוחים היומיים.</p>
+          <p>הזמנות, שליחים, סטטוסים, היסטוריה וחיובים. כל מה שהעסק צריך כדי לנהל את המשלוחים היומיים.</p>
         </Reveal>
         <div className="tech-grid">
           <article className="tech-card featured reveal">
@@ -711,13 +715,13 @@ function Tech() {
             <div className="integration-row">
               <span className="integration">קופות</span>
               <span className="integration">אתר הזמנות</span>
-              <span className="integration">WhatsApp</span>
-              <span className="integration">API</span>
+              <span className="integration">וואטסאפ</span>
+              <span className="integration">ממשק</span>
             </div>
           </article>
           <article className="tech-card reveal">
             <h3>יודעים מה קורה. בכל רגע.</h3>
-            <p>מרגע פתיחת המשלוח ועד אישור המסירה — העסק והלקוח מקבלים תמונה ברורה, בלי טלפונים מיותרים.</p>
+            <p>מרגע פתיחת המשלוח ועד אישור המסירה, העסק והלקוח מקבלים תמונה ברורה, בלי טלפונים מיותרים.</p>
             <div className="live-bar">
               <div>
                 <small>סטטוס נוכחי</small>
@@ -742,7 +746,7 @@ function Cta() {
       <div className="goi-wrap">
         <Reveal className="cta-box">
           <h2>צריכים משלוח? הרשת כבר מחכה.</h2>
-          <p>בלי מינימום, בלי התחייבות ובלי להחזיק שליח קבוע. פותחים את האפליקציה רק כשצריך ו־GOI מחברת אתכם לשליח זמין.</p>
+          <p>בלי מינימום, בלי התחייבות ובלי להחזיק שליח קבוע. פותחים את האפליקציה רק כשצריך. <Latin>GOI</Latin> מחברת אתכם לשליח זמין.</p>
           <div className="cta-actions">
             <Link to={BUSINESS_SIGNUP} className="btn btn-dark">
               פתיחת חשבון לעסק <Arrow />
@@ -766,7 +770,7 @@ function Footer() {
             <a className="logo" href="#top">
               GO<span>I</span>
             </a>
-            <p>משלוחים מקומיים לעסקים — עכשיו לעכשיו ומהיום להיום. בלי הובלות ובלי לקוחות פרטיים.</p>
+            <p>משלוחים מקומיים לעסקים. עכשיו לעכשיו ומהיום להיום. בלי הובלות ובלי לקוחות פרטיים.</p>
           </div>
           <div className="footer-col">
             <h4>לעסקים</h4>

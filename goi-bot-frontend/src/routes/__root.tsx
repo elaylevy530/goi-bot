@@ -77,7 +77,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-const SITE_URL = "https://goi-bot.lovable.app";
+const SITE_URL = "https://goi.co.il";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -89,21 +89,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Goi" },
-      { title: "Goi — משלוחים לעסקים ולשליחים" },
+      { title: "Goi משלוחים לעסקים ולשליחים" },
       {
         name: "description",
         content:
-          "Goi מחברת עסקים לשליחים עצמאיים בישראל. משלוחים מהעסק — בלי הובלות ובלי הזמנות מלקוחות פרטיים.",
+          "Goi מחברת עסקים לשליחים עצמאיים בישראל. משלוחים מהעסק, בלי הובלות ובלי הזמנות מלקוחות פרטיים.",
       },
       { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1" },
       { name: "googlebot", content: "index, follow" },
       { property: "og:site_name", content: "Goi" },
       { property: "og:locale", content: "he_IL" },
       { property: "og:type", content: "website" },
-      { property: "og:title", content: "Goi — משלוחים לעסקים ולשליחים" },
+      { property: "og:title", content: "Goi משלוחים לעסקים ולשליחים" },
       { property: "og:description", content: "פלטפורמת משלוחים לעסקים ולשליחים בישראל. בלי הובלות ובלי לקוחות פרטיים." },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Goi — משלוחים לעסקים ולשליחים" },
+      { name: "twitter:title", content: "Goi משלוחים לעסקים ולשליחים" },
       { name: "twitter:description", content: "פלטפורמת משלוחים לעסקים ולשליחים בישראל." },
     ],
     links: [

@@ -3,6 +3,8 @@
   min-height: 100vh;
   isolation: isolate;
   position: relative;
+  direction: rtl;
+  text-align: right;
 }
 
 
@@ -109,7 +111,7 @@
       box-shadow: 0 0 16px var(--green);
     }
     .goi-landing .brand-lockup{ display:flex; align-items:center; gap:14px; min-width:max-content; }
-    .goi-landing .brand-note{ padding-right:14px; border-right:1px solid rgba(255,255,255,.13); color:#8f9b92; font-size:.72rem; line-height:1.25; max-width:115px; }
+    .goi-landing .brand-note{ padding-inline-start:14px; border-inline-start:1px solid rgba(255,255,255,.13); color:#8f9b92; font-size:.72rem; line-height:1.25; max-width:115px; }
     .goi-landing .nav-links{ display: flex; align-items: center; gap: 21px; margin-inline: auto; }
     .goi-landing .nav-links a{ color: #c9d2cb; font-size: .94rem; transition: .2s; }
     .goi-landing .nav-links a:hover{ color: white; }
@@ -137,6 +139,7 @@
     .goi-landing .btn-primary:hover{ box-shadow: 0 16px 45px rgba(57, 218, 49, .31); }
     .goi-landing .btn-ghost{ color: white; border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.035); }
     .goi-landing .btn-dark{ color: white; background: #0b130d; border-color: rgba(255,255,255,.12); }
+    .goi-landing .latin{ unicode-bidi:isolate; direction:ltr; }
     .goi-landing .arrow{ direction: ltr; font-size: 1.15em; }
     .goi-landing .menu-btn{ display: none; width: 46px; height: 46px; padding: 0; border-radius: 14px; }
 
@@ -396,7 +399,7 @@
     .goi-landing .local-option-icon svg{ width:25px; height:25px; }
     .goi-landing .local-option strong{ display:block; font-size:1rem; }
     .goi-landing .local-option p{ margin:3px 0 0; color:#859188; font-size:.79rem; }
-    .goi-landing .local-option > span:last-child{ direction:ltr; color:#6d7a70; font-size:.8rem; }
+    .goi-landing .local-option > span:last-child{ color:#6d7a70; font-size:.8rem; }
 
     .goi-landing .how{ overflow:hidden; }
     .goi-landing .how::before{ content:""; position:absolute; inset:100px 0 auto; height:520px; background:linear-gradient(90deg,transparent,rgba(66,218,50,.045),transparent); z-index:-1; }
@@ -498,7 +501,7 @@
     .goi-landing .job-card{ position:absolute; padding:14px 16px; border-radius:18px; background:rgba(8,17,10,.88); border:1px solid rgba(255,255,255,.12); backdrop-filter:blur(12px); box-shadow:0 15px 40px rgba(0,0,0,.24); }
     .goi-landing .job-card strong{ display:block; font-size:.9rem; }
     .goi-landing .job-card small{ color:#91a094; font-size:.7rem; }
-    .goi-landing .job-card b{ color:#88ff72; font-size:.95rem; margin-right:15px; }
+    .goi-landing .job-card b{ color:#88ff72; font-size:.95rem; margin-inline-start:15px; }
     .goi-landing .job-a{ top:27px; right:0; transform:rotate(3deg); }
     .goi-landing .job-b{ bottom:26px; left:8%; transform:rotate(-3deg); }
     .goi-landing .scooter{ position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%); width:95px; height:95px; border-radius:28px; display:grid; place-items:center; background:linear-gradient(135deg,#a3ff85,#42d632); color:#061007; box-shadow:0 20px 50px rgba(48,213,46,.32); }
@@ -547,7 +550,7 @@
 
     @media (max-width: 930px){
       .goi-landing .nav-links, .goi-landing .nav-actions .btn-ghost:not(.menu-btn){ display:none; }
-      .goi-landing .nav-actions{ margin-right:auto; }
+      .goi-landing .nav-actions{ margin-inline-start:auto; }
       .goi-landing .nav-actions .menu-btn{ display:inline-grid; place-items:center; }
       .goi-landing .nav.open .nav-links{ display:flex; position:absolute; top:74px; right:20px; left:20px; padding:18px; flex-direction:column; align-items:stretch; border:1px solid var(--line); border-radius:20px; background:#0a140d; box-shadow:var(--shadow); }
       .goi-landing .hero{ padding-top:126px; }
