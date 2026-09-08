@@ -18,8 +18,10 @@ import {
 import { CourierAvatar } from "@/components/CourierAvatar";
 import { CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierShell, useMyCourier } from "@/components/CourierShell";
-import { nestGetMyCourierStats, nestListMyCourierOutcomes } from "@/lib/nest-domain";
+import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import { deliveryMins, pickupMins, type RatingOutcome } from "@/lib/courier-ratings";
+import { ratingValue } from "@/lib/courier-live-stats";
+import { useMyCourierLiveStats } from "@/hooks/useMyCourierLiveStats";
 import { useCourierTerms } from "@/lib/courier-kind";
 import { cn } from "@/lib/utils";
 
@@ -89,15 +91,10 @@ function inRange(o: OutcomeRow, start: Date, end: Date) {
 function RatingsPage() {
   const t = useCourierTerms();
   const { data: me } = useMyCourier();
+  const live = useMyCourierLiveStats(me?.id);
   const [rangeKey, setRangeKey] = useState<RangeKey>("30");
   const [showAllReviews, setShowAllReviews] = useState(false);
   const range = rangeFor(rangeKey);
-
-  const { data: statsRow } = useQuery({
-    queryKey: ["courier-ratings-stats", me?.id],
-    enabled: !!me?.id,
-    queryFn: () => nestGetMyCourierStats(),
-  });
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["courier-ratings-outcomes", me?.id],
@@ -106,19 +103,14 @@ function RatingsPage() {
     queryFn: () => nestListMyCourierOutcomes() as Promise<OutcomeRow[]>,
   });
 
-  const ratedAll = rows.filter((o) => o.customer_rating != null && Number(o.customer_rating) > 0);
-  const liveAvg = avg(ratedAll.map((o) => Number(o.customer_rating)));
-  const score = liveAvg ?? (statsRow?.avg_rating != null ? Number(statsRow.avg_rating) : null);
+  const ratedAll = rows.filter((o) => ratingValue(o) != null);
+  const score = live.avgRating;
 
   const dist = [5, 4, 3, 2, 1].map((star) => {
     const count = ratedAll.filter((o) => Math.round(Number(o.customer_rating)) === star).length;
     const pct = ratedAll.length ? Math.round((count / ratedAll.length) * 100) : 0;
     return { star, count, pct };
   });
-
-  const lastMonthStart = startOfDay(new Date());
-  lastMonthStart.setDate(lastMonthStart.getDate() - 29);
-  const ratingsLastMonth = ratedAll.filter((o) => inRange(o, lastMonthStart, new Date())).length;
 
   const completedAll = rows.filter((o) => o.delivered_at && !o.was_cancelled);
   const cancelledAll = rows.filter((o) => o.was_cancelled);
@@ -135,11 +127,11 @@ function RatingsPage() {
   const kpi = (set: OutcomeRow[]) => {
     const done = set.filter((o) => o.delivered_at && !o.was_cancelled);
     const cancelled = set.filter((o) => o.was_cancelled);
-    const rated = done.filter((o) => o.customer_rating != null);
+    const rated = done.filter((o) => ratingValue(o) != null);
     const onTime = done.filter((o) => !o.was_late);
     return {
       jobs: done.length,
-      rating: avg(rated.map((o) => Number(o.customer_rating))),
+      rating: avg(rated.map((o) => ratingValue(o)!)),
       pickup: avg(done.map(pickupMins).filter((n): n is number => n != null)),
       delivery: avg(done.map(deliveryMins).filter((n): n is number => n != null)),
       onTime: done.length ? (onTime.length / done.length) * 100 : null,
@@ -186,6 +178,9 @@ function RatingsPage() {
                     <Star className="size-6 fill-warning text-warning" aria-hidden />
                   </p>
                   <p className="mt-1 text-sm font-bold text-primary-foreground/90">{ratingLabel(score)}</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-primary-foreground/75">
+                    {live.ratingCount > 0 ? `${live.ratingCount} דירוגים` : "אין דירוגים עדיין"}
+                  </p>
                 </div>
                 <div className="w-[42%] space-y-1">
                   {dist.map((d) => (
@@ -210,7 +205,7 @@ function RatingsPage() {
                 <HeroStat icon={<Shield className="size-3.5" />} value={completionPct != null ? `${completionPct}%` : "—"} label={`אחוז השלמת ${t.jobPlural}`} />
                 <HeroStat icon={<Clock className="size-3.5" />} value={pickupAvgAll != null ? fmtMins(pickupAvgAll) : "—"} label="זמן הגעה ממוצע לאיסוף" />
                 <HeroStat icon={<Target className="size-3.5" />} value={onTimePct != null ? `${onTimePct}%` : "—"} label="אחוז מסירה בזמן" />
-                <HeroStat icon={<ThumbsUp className="size-3.5" />} value={String(ratingsLastMonth)} label="דירוגים בחודש האחרון" />
+                <HeroStat icon={<ThumbsUp className="size-3.5" />} value={String(live.deliveriesThisMonth)} label={`שליחויות ${live.monthLabel}`} />
               </div>
             </section>
 

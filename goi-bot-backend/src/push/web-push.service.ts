@@ -163,19 +163,27 @@ export class WebPushService {
     const plaintext = new TextEncoder().encode(JSON.stringify(payload));
     const body = await this.encryptAes128Gcm(sub, plaintext);
 
+    const topic = String(payload.tag ?? "goi")
+      .replace(/[^a-zA-Z0-9\-_]/g, "")
+      .slice(0, 32) || "goi";
     const res = await fetch(sub.endpoint, {
       method: "POST",
       headers: {
         Authorization: auth,
         TTL: "300",
         Urgency: "high",
+        Topic: topic,
         "Content-Encoding": "aes128gcm",
         "Content-Type": "application/octet-stream",
         "Content-Length": String(body.byteLength),
       },
       body: body as BodyInit,
     });
-    return { endpoint: sub.endpoint, ok: res.ok, status: res.status, gone: res.status === 404 || res.status === 410 };
+    const gone = res.status === 404 || res.status === 410;
+    if (!res.ok && !gone) {
+      this.logger.warn(`web-push failed status=${res.status}`);
+    }
+    return { endpoint: sub.endpoint, ok: res.ok, status: res.status, gone };
   }
 
   async sendPushBatch(subs: PushSub[], payload: PushPayload): Promise<SendResult[]> {

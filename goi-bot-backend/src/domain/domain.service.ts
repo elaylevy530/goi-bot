@@ -420,6 +420,7 @@ export class DomainService {
       row.receipt_url = String(body.receipt_url);
       return this.withdrawals.save(row);
     }
+    const previous = row.status;
     const status = String(body.status || "").trim();
     const allowed = ["ממתינה", "אושרה", "שולמה", "נדחתה"];
     if (!allowed.includes(status)) {
@@ -445,7 +446,31 @@ export class DomainService {
       if (body.reference_number != null) row.reference_number = String(body.reference_number);
     }
     if (body.receipt_url != null) row.receipt_url = String(body.receipt_url);
-    return this.withdrawals.save(row);
+    const saved = await this.withdrawals.save(row);
+    if (previous !== saved.status && (saved.status === "אושרה" || saved.status === "שולמה" || saved.status === "נדחתה")) {
+      const title =
+        saved.status === "שולמה"
+          ? "המשיכה שולמה"
+          : saved.status === "אושרה"
+            ? "בקשת המשיכה אושרה"
+            : "בקשת המשיכה נדחתה";
+      const text =
+        saved.status === "נדחתה"
+          ? (saved.rejection_reason?.trim() || "אפשר לבדוק את הפרטים בארנק")
+          : saved.status === "שולמה"
+            ? "הכסף בדרך. הפרטים בארנק"
+            : "אפשר לראות את הסטטוס בארנק";
+      void this.adminPush
+        .notifyAudience({
+          courierId: saved.courier_id,
+          title,
+          body: text,
+          url: "/courier/wallet",
+          tag: `goi-withdraw-${saved.id}`,
+        })
+        .catch(() => undefined);
+    }
+    return saved;
   }
 
   listBonuses() { return this.bonuses.find({ order: { sort_order: "ASC", created_at: "DESC" } }); }

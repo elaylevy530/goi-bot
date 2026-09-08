@@ -7,6 +7,7 @@ import { Customer } from "../accounts/entities/customer.entity";
 import { IntegrationRequestLog } from "../accounts/entities/integration-request-log.entity";
 import { Job } from "../jobs/entities/job.entity";
 import { JobStop } from "../jobs/entities/job-stop.entity";
+import { JobsModule } from "../jobs/jobs.module";
 import { IntakeController } from "./intake.controller";
 import { IntakeService } from "./intake.service";
 import { TrackingController } from "./tracking.controller";
@@ -18,6 +19,7 @@ import { TrackingController } from "./tracking.controller";
  */
 @Module({
   imports: [
+    JobsModule,
     TypeOrmModule.forFeature([
       Job,
       JobStop,

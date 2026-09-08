@@ -25,6 +25,7 @@ export class HealthController {
       env: this.config.get<string>("nodeEnv") ?? "development",
       database,
       synchronize: this.config.get<boolean>("database.synchronize") ?? false,
+      push: !!(this.config.get<string>("vapid.publicKey") && this.config.get<string>("vapid.privateKey")),
       timestamp: new Date().toISOString(),
     };
   }

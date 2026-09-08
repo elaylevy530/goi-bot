@@ -8,6 +8,7 @@ import { BusinessIntegration } from "../accounts/entities/business-integration.e
 import { Customer } from "../accounts/entities/customer.entity";
 import { IntegrationRequestLog } from "../accounts/entities/integration-request-log.entity";
 import { Job } from "../jobs/entities/job.entity";
+import { JobsService } from "../jobs/jobs.service";
 
 const payloadSchema = z.object({
   customer_name: z.string().trim().min(1).max(120),
@@ -52,6 +53,7 @@ export class IntakeService {
     private readonly jobs: Repository<Job>,
     @InjectRepository(IntegrationRequestLog)
     private readonly logs: Repository<IntegrationRequestLog>,
+    private readonly jobsService: JobsService,
   ) {}
 
   async handle(token: string, rawBody: string, signature: string | undefined): Promise<IntakeResult> {
@@ -130,7 +132,7 @@ export class IntakeService {
       payment: pricingType === "fixed_price" ? String(courierPay) : "0",
       description: descriptionParts.join(" | ") || null,
       invoice_required: false,
-      status: integ.auto_mode ? "נשלחה לשליחים" : "טיוטה",
+      status: "טיוטה",
     });
 
     let saved: Job;
@@ -146,13 +148,15 @@ export class IntakeService {
       return { status: 500, body: { ok: false, error: "Failed to create job" } };
     }
 
-    if (integ.auto_mode && pricingType === "quote_request") {
-      // TODO(phase2): port notifyCouriersOfQuoteRequest once dispatch/quotes
-      // live in Nest. Job is created either way; courier notification is the
-      // only piece deferred here.
-      this.logger.warn(
-        `intake job ${saved.id} created as quote_request but courier notification is not yet ported`,
-      );
+    if (integ.auto_mode) {
+      try {
+        await this.jobsService.dispatchJob(saved.id);
+      } catch (err) {
+        this.logger.error(
+          `intake auto-dispatch failed for ${saved.id}`,
+          err instanceof Error ? err.stack : err,
+        );
+      }
     }
 
     await this.log(integ.business_id, parsed, "ok", null, saved.id);

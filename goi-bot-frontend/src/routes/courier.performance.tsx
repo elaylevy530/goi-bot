@@ -184,7 +184,7 @@ function PerformancePage() {
   const prev = useMemo(() => previousRange(period, range.start, range.end), [period, range.start, range.end]);
 
   const { data: rows = [], dataUpdatedAt, isLoading } = useQuery({
-    queryKey: ["performance-outcomes", me?.id],
+    queryKey: ["courier-ratings-outcomes", me?.id],
     enabled: !!me?.id,
     refetchInterval: 30_000,
     queryFn: () => nestListMyCourierOutcomes() as Promise<OutcomeRow[]>,

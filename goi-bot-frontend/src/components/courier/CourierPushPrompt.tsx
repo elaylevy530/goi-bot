@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { isNestPreviewReadOnly } from "@/lib/nest-preview-cache";
 import { isStandalone } from "@/lib/pwa";
 import { enablePushForCourier, ensurePushSubscriptionFresh, pushSupported } from "@/lib/push/subscribe";
+import { enablePushForBusiness } from "@/lib/push/subscribe-more";
 import { toast } from "sonner";
 
 const DISMISS_KEY = "goi:push:prompt-dismissed";
 const JUST_INSTALLED_KEY = "goi:push:just-installed";
 
 type Props = {
-  courierId?: string | null;
+  kind: "courier" | "business";
+  ownerId?: string | null;
 };
 
 function markJustInstalled() {
@@ -46,11 +48,16 @@ function dismissForSession() {
   }
 }
 
-function shouldAskOnHomeScreen() {
-  return isStandalone() || wasJustInstalled();
+function isAndroid() {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent);
 }
 
-export function CourierPushPrompt({ courierId }: Props) {
+function shouldAskForPush() {
+  return isStandalone() || wasJustInstalled() || isAndroid();
+}
+
+export function HomeScreenPushPrompt({ kind, ownerId }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -66,21 +73,25 @@ export function CourierPushPrompt({ courierId }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!courierId || !pushSupported() || isNestPreviewReadOnly()) return;
+    if (!ownerId || !pushSupported() || isNestPreviewReadOnly()) return;
 
     const run = async () => {
       if (Notification.permission === "granted") {
-        await ensurePushSubscriptionFresh(courierId).catch(() => undefined);
+        if (kind === "courier") {
+          await ensurePushSubscriptionFresh(ownerId).catch(() => undefined);
+        } else {
+          await enablePushForBusiness(ownerId).catch(() => undefined);
+        }
         return;
       }
       if (Notification.permission === "denied") return;
       if (wasDismissed()) return;
-      if (!shouldAskOnHomeScreen()) return;
+      if (!shouldAskForPush()) return;
       setOpen(true);
     };
 
     void run();
-  }, [courierId]);
+  }, [kind, ownerId]);
 
   const close = () => {
     if (pending) return;
@@ -90,11 +101,14 @@ export function CourierPushPrompt({ courierId }: Props) {
   };
 
   const enable = async () => {
-    if (!courierId) return;
+    if (!ownerId) return;
     setPending(true);
     setHint(null);
     try {
-      const res = await enablePushForCourier(courierId);
+      const res =
+        kind === "courier"
+          ? await enablePushForCourier(ownerId)
+          : await enablePushForBusiness(ownerId);
       if (!res.ok) {
         setHint(
           res.reason === "denied"
@@ -103,16 +117,20 @@ export function CourierPushPrompt({ courierId }: Props) {
         );
         return;
       }
-      toast.success("התראות דולקות — תקבלו פוש למשלוח חדש ולהודעות מהעסק");
+      toast.success(
+        kind === "courier"
+          ? "התראות דולקות — תקבלו פוש למשלוח חדש ולהודעות מהעסק"
+          : "התראות דולקות — תקבלו פוש כשהשליח כותב או יש עדכון למשלוח",
+      );
       setOpen(false);
     } catch {
-      setHint("לא הצלחנו להפעיל התראות כרגע. אפשר לנסות שוב מהגדרות החשבון.");
+      setHint("לא הצלחנו להפעיל התראות כרגע. אפשר לנסות שוב מההגדרות.");
     } finally {
       setPending(false);
     }
   };
 
-  if (!courierId || !pushSupported()) return null;
+  if (!ownerId || !pushSupported()) return null;
 
   return (
     <Sheet open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
@@ -130,7 +148,9 @@ export function CourierPushPrompt({ courierId }: Props) {
             להפעיל התראות?
           </SheetTitle>
           <SheetDescription className="mt-2 text-[13px] leading-relaxed text-text-muted">
-            כדי לקבל פוש על המסך כשנכנס משלוח חדש, הודעה מעסק, או עדכון מהמערכת — גם כשהאפליקציה סגורה.
+            {kind === "courier"
+              ? "כדי לקבל פוש על המסך כשנכנס משלוח חדש, הודעה מעסק, או עדכון מהמערכת — גם כשהאפליקציה סגורה."
+              : "כדי לקבל פוש על המסך כשהשליח כותב, או כשיש עדכון למשלוח — גם כשהאפליקציה סגורה."}
           </SheetDescription>
           {hint && (
             <p className="mt-3 text-[12px] font-semibold leading-snug text-text-muted">{hint}</p>
@@ -160,4 +180,8 @@ export function CourierPushPrompt({ courierId }: Props) {
       </SheetContent>
     </Sheet>
   );
+}
+
+export function CourierPushPrompt({ courierId }: { courierId?: string | null }) {
+  return <HomeScreenPushPrompt kind="courier" ownerId={courierId} />;
 }

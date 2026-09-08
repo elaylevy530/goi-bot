@@ -161,6 +161,7 @@ export function NestBackendStatusCard() {
             ) : health.data ? (
               <div className="text-xs text-muted-foreground text-left" dir="ltr">
                 {health.data.service} · db {health.data.database} · {health.data.env}
+                {typeof health.data.push === "boolean" ? ` · push ${health.data.push ? "on" : "off"}` : ""}
               </div>
             ) : null}
           </div>

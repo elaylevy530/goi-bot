@@ -41,6 +41,7 @@ export type BackendHealth = {
   env: string;
   database: "up" | "down";
   synchronize: boolean;
+  push?: boolean;
   timestamp: string;
 };
 

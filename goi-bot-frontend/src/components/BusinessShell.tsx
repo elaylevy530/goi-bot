@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { BusinessLogo } from "@/components/BusinessLogo";
+import { HomeScreenPushPrompt } from "@/components/courier/CourierPushPrompt";
 import { cn } from "@/lib/utils";
 import { formatHebrewDate, walletBalance } from "@/lib/business-panel";
 import { nestListWalletTransactions } from "@/lib/nest-domain";
@@ -431,6 +432,7 @@ export function BusinessShell({
           })}
         </div>
       </nav>
+      <HomeScreenPushPrompt kind="business" ownerId={me?.id} />
     </div>
   );
 }
