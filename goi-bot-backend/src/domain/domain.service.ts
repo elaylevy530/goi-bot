@@ -39,6 +39,7 @@ import { Job } from "../jobs/entities/job.entity";
 import { resolveJobTiming } from "../jobs/job-timing";
 import { withdrawableBalance } from "../accounts/courier-wallet-balance";
 import { OfferEvent } from "../jobs/entities/offer-event.entity";
+import { AdminPushService } from "../push/admin-push.service";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 
 type Mutable = Record<string, unknown>;
@@ -79,6 +80,7 @@ export class DomainService {
     @InjectRepository(RecurringOrder) private readonly recurringOrders: Repository<RecurringOrder>,
     @InjectRepository(ReferralCommission)
     private readonly referralCommissions: Repository<ReferralCommission>,
+    private readonly adminPush: AdminPushService,
   ) {}
 
   getOutcome(jobId: string) {
@@ -269,7 +271,7 @@ export class DomainService {
   listNotifications() {
     return this.notifications.find({ order: { created_at: "DESC" } });
   }
-  createNotification(userId: string, body: Mutable) {
+  async createNotification(userId: string, body: Mutable) {
     const notification = this.notifications.create({ sent_by: userId });
     Object.assign(notification, body, {
       sent_by: userId,
@@ -282,7 +284,21 @@ export class DomainService {
         courier_id: typeof body.courier_id === "string" ? body.courier_id : null,
       }),
     });
-    return this.notifications.save(notification);
+    const saved = await this.notifications.save(notification);
+    if (saved.audience === "single" && !saved.courier_id) return saved;
+    const title = saved.title?.trim() || "עדכון מ-Goi";
+    const text = saved.body?.trim() || "";
+    const url = saved.link_url?.trim() || "/courier/notifications";
+    void this.adminPush
+      .notifyAudience({
+        courierId: saved.audience === "single" ? saved.courier_id : null,
+        title,
+        body: text,
+        url,
+        tag: `goi-notice-${saved.id}`,
+      })
+      .catch(() => undefined);
+    return saved;
   }
   async updateNotification(id: string, body: Mutable) {
     const notification = await this.notifications.findOne({ where: { id } });

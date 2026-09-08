@@ -1,27 +1,14 @@
 import { apiFetch } from "@/lib/api-client";
 import { getNestAccessToken } from "@/lib/nest-auth";
-import { pushSupported, urlBase64ToUint8Array, VAPID_PUBLIC_KEY } from "./subscribe";
+import { ensureBrowserSubscription, pushSupported } from "./subscribe";
 
 type Reason = "unsupported" | "denied" | "subscribe-failed";
 type Target = { kind: "business"; businessId: string } | { kind: "customer"; userId: string };
 
 async function enablePush(path: string, id: string): Promise<{ ok: boolean; reason?: Reason }> {
   if (!pushSupported()) return { ok: false, reason: "unsupported" };
-  const registration = await navigator.serviceWorker.register("/push-sw.js", { scope: "/" });
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    if (Notification.permission === "denied") return { ok: false, reason: "denied" };
-    const permission =
-      Notification.permission === "granted"
-        ? "granted"
-        : await Notification.requestPermission();
-    if (permission !== "granted") return { ok: false, reason: "denied" };
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
-  }
-  if (!subscription) return { ok: false, reason: "subscribe-failed" };
+  const subscription = await ensureBrowserSubscription();
+  if (!subscription) return { ok: false, reason: Notification.permission === "denied" ? "denied" : "subscribe-failed" };
   await apiFetch(path, {
     method: "POST",
     accessToken: getNestAccessToken(),

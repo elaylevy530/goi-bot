@@ -29,6 +29,7 @@ import { Conversation } from "../push/entities/conversation.entity";
 import { SupportTicket } from "../support/entities/support-ticket.entity";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 import { CronSecretGuard } from "../workers/guards/cron-secret.guard";
+import { PushModule } from "../push/push.module";
 import {
   AccountDomainController,
   AreaController,
@@ -43,6 +44,7 @@ import { DomainService } from "./domain.service";
 
 @Module({
   imports: [
+    PushModule,
     TypeOrmModule.forFeature([
       JobOutcome,
       StatusLog,

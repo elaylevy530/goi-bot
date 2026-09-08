@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useCourierGpsTracker } from "@/hooks/useCourierGpsTracker";
 import { CourierDesktopNav, CourierMenuButton } from "@/components/CourierSideDrawer";
+import { CourierPushPrompt } from "@/components/courier/CourierPushPrompt";
 import { isLivePendingOffer } from "@/lib/courier-live-jobs";
 import { nestGetJob, nestListCourierOffers } from "@/lib/nest-jobs";
 
@@ -162,12 +163,16 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
       const data = e.data as { type?: string; url?: string; payload?: { title?: string; body?: string; url?: string; tag?: string } } | null;
       if (!data) return;
       if (data.type === "goi-new-job-push" && data.payload?.url) {
-        const id = parseJobIdFromUrl(data.payload.url) || data.payload.tag || String(Date.now());
+        const url = data.payload.url;
+        const tag = data.payload.tag || "";
+        const isJobPush = url.includes("/courier/new-jobs") || tag.startsWith("goi-offer");
+        if (!isJobPush) return;
+        const id = parseJobIdFromUrl(url) || tag || String(Date.now());
         raiseIncomingJobAlert({
           id,
           title: data.payload.title || "🚚 משלוח חדש",
           body: data.payload.body,
-          url: data.payload.url,
+          url,
         });
         return;
       }
@@ -308,6 +313,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
             : "overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 sm:pt-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))] lg:p-6 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] [&>*]:shrink-0"
         }`}>{children}</div>
       </main>
+      <CourierPushPrompt courierId={me?.id} />
     </div>
   );
 }

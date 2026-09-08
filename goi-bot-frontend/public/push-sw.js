@@ -2,13 +2,13 @@
 // Separate from /sw.js (which is the kill-switch app-shell cleanup worker).
 // Handles `push` events even when the PWA / browser tab is closed.
 
-const TITLE = "Goi — משלוח חדש 🚚";
+const TITLE = "Goi";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener("push", (event) => {
-  let payload = { title: TITLE, body: "משלוח חדש זמין — הקש לצפייה", url: "/courier/new-jobs", tag: "goi-offer" };
+  let payload = { title: TITLE, body: "יש עדכון חדש ב-Goi", url: "/courier/new-jobs", tag: "goi-push" };
   try {
     if (event.data) {
       const parsed = event.data.json();

@@ -14,6 +14,7 @@ import { CustomerPushSubscription } from "./entities/customer-push-subscription.
 import { OfferPushService } from "./offer-push.service";
 import { PushSubscriptionsController } from "./push-subscriptions.controller";
 import { PushSubscriptionsService } from "./push-subscriptions.service";
+import { VapidPublicController } from "./vapid-public.controller";
 import { WebPushService } from "./web-push.service";
 
 /** Push: JWT subscription CRUD + public `/api/public/hooks/chat-push`. */
@@ -28,7 +29,7 @@ import { WebPushService } from "./web-push.service";
       Customer,
     ]),
   ],
-  controllers: [ChatPushController, PushSubscriptionsController, AdminPushController],
+  controllers: [ChatPushController, PushSubscriptionsController, AdminPushController, VapidPublicController],
   providers: [
     ChatPushService,
     ChatPushGuard,
@@ -37,6 +38,6 @@ import { WebPushService } from "./web-push.service";
     PushSubscriptionsService,
     AdminPushService,
   ],
-  exports: [WebPushService, OfferPushService],
+  exports: [WebPushService, OfferPushService, AdminPushService],
 })
 export class PushModule {}

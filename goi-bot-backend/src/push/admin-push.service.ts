@@ -14,6 +14,36 @@ export class AdminPushService {
     private readonly webPush: WebPushService,
   ) {}
 
+  async notifyAudience(input: {
+    courierId?: string | null;
+    title?: string;
+    body?: string;
+    url?: string;
+    tag?: string;
+  }): Promise<{ sent: number; expired: number; failed: number }> {
+    if (input.courierId) {
+      return this.notifyCouriers({
+        courierIds: [input.courierId],
+        title: input.title,
+        body: input.body,
+        url: input.url,
+        tag: input.tag,
+      });
+    }
+    const rows = await this.courierSubs
+      .createQueryBuilder("s")
+      .select("DISTINCT s.courier_id", "courier_id")
+      .getRawMany<{ courier_id: string }>();
+    const courierIds = rows.map((r) => r.courier_id).filter(Boolean);
+    return this.notifyCouriers({
+      courierIds,
+      title: input.title,
+      body: input.body,
+      url: input.url,
+      tag: input.tag,
+    });
+  }
+
   async notifyCouriers(input: {
     courierIds: string[];
     title?: string;
