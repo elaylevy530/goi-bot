@@ -143,10 +143,15 @@ export function CourierMenuProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function NavBadge({ value }: { value: number }) {
+function NavBadge({ value, dense }: { value: number; dense?: boolean }) {
   if (!value || value <= 0) return null;
   return (
-    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-pill bg-primary px-1.5 text-[10px] font-extrabold text-primary-foreground">
+    <span
+      className={cn(
+        "inline-flex items-center justify-center rounded-pill bg-primary font-extrabold text-primary-foreground",
+        dense ? "h-4 min-w-4 px-1 text-[9px]" : "h-5 min-w-5 px-1.5 text-[10px]",
+      )}
+    >
       {value > 99 ? "99+" : value}
     </span>
   );
@@ -243,10 +248,12 @@ function DrawerNavLink({
   item,
   path,
   onNavigate,
+  dense = false,
 }: {
   item: NavItem;
   path: string;
   onNavigate?: () => void;
+  dense?: boolean;
 }) {
   const Icon = item.icon;
   const active = item.match ? item.match(path) : path === item.to;
@@ -257,27 +264,35 @@ function DrawerNavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex w-full min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-[15px] transition-colors",
+        "relative flex w-full items-center transition-colors",
+        dense
+          ? "h-8 gap-2 rounded-lg px-2.5 text-[13.5px] leading-none"
+          : "min-h-11 gap-3 rounded-xl px-3 py-2 text-[15px]",
         active
           ? "bg-primary/10 font-semibold text-courier-hero"
           : "font-medium text-text-strong hover:bg-muted/80 active:bg-muted",
       )}
     >
       {active && (
-        <span className="absolute inset-y-1.5 start-0 w-[3px] rounded-full bg-primary" aria-hidden />
+        <span
+          className={cn("absolute start-0 w-[3px] rounded-full bg-primary", dense ? "inset-y-1" : "inset-y-1.5")}
+          aria-hidden
+        />
       )}
-      <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.2 : 1.75} />
+      <Icon className={cn("shrink-0", dense ? "size-4" : "size-[18px]")} strokeWidth={active ? 2.2 : 1.75} />
       <span className="min-w-0 flex-1 truncate text-right">{item.label}</span>
-      {badge > 0 && <NavBadge value={badge} />}
+      {badge > 0 && <NavBadge value={badge} dense={dense} />}
     </Link>
   );
 }
 
-function NavSection({ title, children }: { title: string; children: ReactNode }) {
+function NavSection({ title, children, dense }: { title: string; children: ReactNode; dense?: boolean }) {
   return (
     <div>
-      <p className="px-3 pb-1 pt-3 text-[11px] font-bold text-text-muted">{title}</p>
-      <div className="space-y-0.5">{children}</div>
+      <p className={cn("font-bold text-text-muted", dense ? "px-2.5 pb-0.5 pt-1.5 text-[10px]" : "px-3 pb-1 pt-3 text-[11px]")}>
+        {title}
+      </p>
+      <div className={dense ? "space-y-0" : "space-y-0.5"}>{children}</div>
     </div>
   );
 }
@@ -336,96 +351,91 @@ function CourierSideDrawer() {
       <SheetContent
         side="right"
         dir="rtl"
-        className="inset-y-2 right-0 h-auto w-[min(340px,86vw)] max-w-[340px] gap-0 overflow-hidden rounded-l-[1.75rem] border-0 bg-surface p-0 shadow-card-strong sm:max-w-[340px] [&>button]:hidden"
+        className="inset-y-0 right-0 h-dvh max-h-dvh w-[min(300px,86vw)] max-w-[300px] gap-0 overflow-hidden rounded-none border-0 bg-surface p-0 shadow-card-strong sm:max-w-[300px] [&>button]:hidden"
       >
         <SheetTitle className="sr-only">תפריט</SheetTitle>
 
         <div
-          className="flex h-full flex-col"
+          className="flex h-full min-h-0 flex-col"
           style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
         >
-          <div className="px-4 pb-3 pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
+          <div className="shrink-0 px-3 pb-1.5 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <div className="relative shrink-0">
                   <CourierAvatar
                     path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
                     name={me?.full_name}
-                    size={52}
+                    size={36}
                   />
                   {accepting && (
                     <span
-                      className="absolute bottom-0 end-0 size-3.5 rounded-full bg-primary ring-2 ring-surface"
+                      className="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full bg-primary ring-2 ring-surface"
                       aria-hidden
                     />
                   )}
                 </div>
                 <div className="min-w-0 text-right">
-                  <p className="truncate text-[17px] font-extrabold leading-tight text-text-strong">
+                  <p className="truncate text-[15px] font-extrabold leading-tight text-text-strong">
                     {displayName}
                   </p>
-                  <p className="mt-0.5 text-xs text-text-muted">{roleLabel}</p>
+                  <p className="text-[11px] leading-tight text-text-muted">{roleLabel}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closeMenu}
                 aria-label="סגור תפריט"
-                className="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-text-strong transition-colors active:bg-border"
+                className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-text-strong transition-colors active:bg-border"
               >
-                <X className="size-5" strokeWidth={2} />
+                <X className="size-4" strokeWidth={2} />
               </button>
             </div>
 
             <div
               className={cn(
-                "mt-4 flex items-center justify-between gap-3 rounded-2xl px-3.5 py-3",
+                "mt-2 flex h-9 items-center justify-between gap-2 rounded-xl px-2.5",
                 accepting ? "bg-primary/10" : "bg-muted",
               )}
             >
-              <div className="min-w-0 flex-1 text-right">
-                <p className="text-sm font-semibold text-text-strong">זמין לקבלת עבודה</p>
-                {accepting && liveJobLocksOffline ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
-                    יש משלוח פעיל — לא ניתן לעבור למצב לא זמין
-                  </p>
-                ) : null}
-              </div>
+              <p className="min-w-0 flex-1 truncate text-right text-[13px] font-semibold text-text-strong">
+                {accepting && liveJobLocksOffline ? "משלוח פעיל — לא ניתן לכבות" : "זמין לקבלת עבודה"}
+              </p>
               <Switch
                 checked={accepting}
                 onCheckedChange={() => void handleToggleAvailability()}
                 disabled={!approved || (accepting && liveJobLocksOffline)}
                 aria-label="זמין לקבלת עבודה"
-                className="h-6 w-11 shrink-0 data-[state=checked]:bg-primary [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5"
+                className="h-5 w-9 shrink-0 data-[state=checked]:bg-primary [&>span]:size-4 data-[state=checked]:[&>span]:translate-x-4"
               />
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2" aria-label="תפריט צד">
-            <NavSection title="עבודה">
+          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1.5" aria-label="תפריט צד">
+            <NavSection title="עבודה" dense>
               {work.map((item) => (
-                <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} />
+                <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} dense />
               ))}
             </NavSection>
-            <div className="mx-3 my-2 border-t border-border" />
-            <NavSection title="החשבון שלי">
+            <div className="mx-2.5 my-1 border-t border-border" />
+            <NavSection title="החשבון שלי" dense>
               {account.map((item) => (
-                <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} />
+                <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} dense />
               ))}
             </NavSection>
           </nav>
 
-          <div className="border-t border-border/80 pt-1">
-            <InstallAppSidebarItem variant="light" />
+          <div className="shrink-0 border-t border-border/80">
+            <InstallAppSidebarItem variant="light" compact />
             <button
               type="button"
               onClick={() => void handleSignOut()}
-              className="mx-2 mb-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#E11900] hover:bg-danger-bg active:bg-danger-bg"
+              className="mx-2 mb-0.5 flex h-8 w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold text-[#E11900] hover:bg-danger-bg active:bg-danger-bg"
             >
-              <LogOut className="size-4 shrink-0" strokeWidth={1.9} />
+              <LogOut className="size-3.5 shrink-0" strokeWidth={1.9} />
               <span className="flex-1 text-right">יציאה</span>
             </button>
-            <div className="pb-[max(0.5rem,env(safe-area-inset-bottom))]" aria-hidden />
+            <div className="pb-[max(0.35rem,env(safe-area-inset-bottom))]" aria-hidden />
           </div>
         </div>
       </SheetContent>

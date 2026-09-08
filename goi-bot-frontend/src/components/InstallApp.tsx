@@ -21,8 +21,10 @@ import { toast } from "sonner";
  *  the tutorial sheet, on Android/desktop fires the native prompt. */
 export function InstallAppSidebarItem({
   variant = "dark",
+  compact = false,
 }: {
   variant?: "dark" | "light";
+  compact?: boolean;
 }) {
   const { installable, installed, install, isIOS } = useInstallPrompt();
   const [iosOpen, setIosOpen] = useState(false);
@@ -48,7 +50,11 @@ export function InstallAppSidebarItem({
     <>
       <button
         onClick={onClick}
-        className={`m-3 mb-2 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition-colors ${base}`}
+        className={
+          compact
+            ? `mx-2 mb-1 mt-1 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${base}`
+            : `m-3 mb-2 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition-colors ${base}`
+        }
         dir="rtl"
       >
         <Download className="size-4 shrink-0" />
