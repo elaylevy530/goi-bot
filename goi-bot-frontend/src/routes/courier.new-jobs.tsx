@@ -480,7 +480,7 @@ function NewJobsPage() {
               onDetails={openDetails}
               onActiveChange={setActiveOffer}
               claiming={claim.isPending || respond.isPending}
-              controlsClassName="top-[5.5rem]"
+              controlsClassName="top-[calc(max(0.5rem,env(safe-area-inset-top))+3.7rem)]"
               rightControlsClassName="top-[42%] -translate-y-1/2"
               belowControls={
                 showingOffer ? (

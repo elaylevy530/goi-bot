@@ -703,7 +703,7 @@ export function CourierJobsMap({ jobs, onClaim, onDecline, onQuote, onDetails, c
         )}
 
         {/* Floating map controls — sit below the page overlay when one is present */}
-        <div className={`absolute left-3 flex flex-col gap-2 z-10 ${controlsClassName ?? "top-3"}`}>
+        <div className={`absolute left-4 flex flex-col gap-1.5 z-10 ${controlsClassName ?? "top-3"}`}>
           {leftExtra}
           <button onClick={cycleMapType} className="size-10 rounded-full bg-surface shadow-card border border-border flex items-center justify-center text-text-strong active:scale-95" aria-label="שכבות">
             <Layers className="size-4" />
