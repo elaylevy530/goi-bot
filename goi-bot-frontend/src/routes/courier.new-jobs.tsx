@@ -19,7 +19,7 @@ import {
 import { nestUpdateMyCourier } from "@/lib/nest-accounts";
 import { LIVE_JOB_OFFLINE_ERROR, courierHasLiveActiveJob } from "@/lib/courier-session";
 import { nestListConversations } from "@/lib/nest-chat";
-import { Bell, ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
+import { ChevronDown, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { ApiClientError } from "@/lib/api-client";
@@ -27,7 +27,7 @@ import { isNestPreviewReadOnly } from "@/lib/nest-preview-cache";
 import { SubmitQuoteDialog } from "@/components/SubmitQuoteDialog";
 import { COURIER_JOBS_RESTRICTED_MESSAGE, isCourierApproved, isCourierJobsRestricted, isJobSkippedAtCurrentPrice, isLivePendingOffer, isOpenBroadcastJobForCourier, isOpenQuoteJobForCourier, jobMatchesKind, jobOfferPay, mergeCourierSkipRows } from "@/lib/courier-live-jobs";
 import { ContactBlock } from "@/routes/courier.history";
-import { CourierMenuButton } from "@/components/CourierSideDrawer";
+import { CourierBellButton, CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierJobsMap, type MapJob } from "@/components/CourierJobsMap";
 import { PullToRefresh } from "@/components/courier/PullToRefresh";
 import { SwipeConfirm } from "@/components/courier/SwipeConfirm";
@@ -457,7 +457,7 @@ function NewJobsPage() {
         {/* Floating chrome only — map fills the viewport underneath */}
         <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
           <div className="pointer-events-auto bg-gradient-to-b from-bg via-bg/70 to-transparent pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3">
-            <div className="relative flex min-h-11 items-center">
+            <div className="relative flex min-h-11 items-center justify-between">
               <CourierMenuButton className="relative z-10 size-11 shrink-0 rounded-full border border-border/70 bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)]" />
               {/* Status control only when available — hide offline capsule */}
               {(isAvailable || showingOffer) && (
@@ -465,6 +465,7 @@ function NewJobsPage() {
                   <AcceptJobsToggle me={me} compact={!showingOffer} mini={showingOffer} />
                 </div>
               )}
+              <CourierBellButton className="relative z-10 size-11 rounded-full border border-border/70 bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)]" />
             </div>
           </div>
         </div>
@@ -492,15 +493,6 @@ function NewJobsPage() {
                     דלג
                   </button>
                 ) : undefined
-              }
-              leftExtra={
-                <Link
-                  to="/courier/notifications"
-                  aria-label="התראות"
-                  className="size-11 grid place-items-center rounded-full bg-surface shadow-[0_6px_18px_rgba(16,24,40,0.12)] border border-border/70 text-text-strong active:scale-95"
-                >
-                  <Bell className="size-4" strokeWidth={2} />
-                </Link>
               }
               rightExtra={
                 <>

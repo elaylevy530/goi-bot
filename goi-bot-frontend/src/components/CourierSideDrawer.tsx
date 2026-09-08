@@ -29,7 +29,7 @@ import {
   MapPin,
   Menu,
   MessageSquare,
-  Navigation,
+  Send,
   Settings,
   Star,
   TrendingUp,
@@ -142,7 +142,7 @@ export function CourierMenuProvider({ children }: { children: ReactNode }) {
 function NavBadge({ value }: { value: number }) {
   if (!value || value <= 0) return null;
   return (
-    <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary-deep text-primary-foreground text-[10px] font-extrabold">
+    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-pill bg-primary px-1.5 text-[10px] font-extrabold text-primary-foreground">
       {value > 99 ? "99+" : value}
     </span>
   );
@@ -156,6 +156,119 @@ type NavItem = {
   badge?: number;
   match?: (path: string) => boolean;
 };
+
+function firstNameOf(name?: string | null) {
+  const trimmed = name?.trim() || "";
+  if (!trimmed) return "";
+  return trimmed.split(/\s+/)[0] || trimmed;
+}
+
+function courierNavGroups(
+  t: ReturnType<typeof termsFor>,
+  counts?: {
+    pendingOffers?: number;
+    activeJobs?: number;
+    unreadNotifications?: number;
+    unreadChat?: number;
+  } | null,
+) {
+  const work: NavItem[] = [
+    {
+      key: "new-jobs",
+      label: "עבודות חדשות",
+      to: "/courier/new-jobs",
+      icon: Inbox,
+      badge: counts?.pendingOffers ?? 0,
+      match: (p) => p === "/courier/new-jobs" || p === "/courier" || p === "/courier/dashboard",
+    },
+    {
+      key: "active",
+      label: t.activeJobs,
+      to: "/courier/active",
+      icon: Send,
+      badge: counts?.activeJobs ?? 0,
+    },
+    {
+      key: "messages",
+      label: "צ׳אט עם עסקים",
+      to: "/courier/messages",
+      icon: MessageSquare,
+      badge: counts?.unreadChat ?? 0,
+    },
+  ];
+  const account: NavItem[] = [
+    {
+      key: "history",
+      label: t.myJobs,
+      to: "/courier/performance",
+      icon: TrendingUp,
+      match: (p) => p === "/courier/performance" || p === "/courier/history",
+    },
+    { key: "wallet", label: "ארנק", to: "/courier/wallet", icon: Wallet },
+    { key: "share", label: "שתף והרוויח", to: "/courier/share", icon: Gift },
+    { key: "ratings", label: "דירוגים וביצועים", to: "/courier/ratings", icon: Star },
+    {
+      key: "work-area",
+      label: "אזורי עבודה",
+      to: "/courier/availability",
+      icon: MapPin,
+      match: (p) => p === "/courier/availability",
+    },
+    {
+      key: "notifications",
+      label: "הודעות ועדכונים",
+      to: "/courier/notifications",
+      icon: Bell,
+      badge: counts?.unreadNotifications ?? 0,
+    },
+    { key: "my-profile", label: "פרופיל אישי", to: "/courier/my-profile", icon: User },
+    { key: "account-settings", label: "הגדרות מערכת", to: "/courier/account-settings", icon: Settings },
+  ];
+  return { work, account };
+}
+
+function DrawerNavLink({
+  item,
+  path,
+  onNavigate,
+}: {
+  item: NavItem;
+  path: string;
+  onNavigate?: () => void;
+}) {
+  const Icon = item.icon;
+  const active = item.match ? item.match(path) : path === item.to;
+  const badge = item.badge ?? 0;
+  return (
+    <Link
+      to={item.to}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative flex w-full min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-[15px] transition-colors",
+        active
+          ? "bg-primary/10 font-semibold text-courier-hero"
+          : "font-medium text-text-strong hover:bg-muted/80 active:bg-muted",
+      )}
+    >
+      {active && (
+        <span className="absolute inset-y-1.5 start-0 w-[3px] rounded-full bg-primary" aria-hidden />
+      )}
+      <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.2 : 1.75} />
+      <span className="min-w-0 flex-1 truncate text-right">{item.label}</span>
+      {badge > 0 && <NavBadge value={badge} />}
+    </Link>
+  );
+}
+
+function NavSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="px-3 pb-1 pt-3 text-[11px] font-bold text-text-muted">{title}</p>
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
 
 function CourierSideDrawer() {
   const { open, setOpen, closeMenu } = useCourierMenu();
@@ -203,128 +316,61 @@ function CourierSideDrawer() {
     }
   };
 
-  const items: NavItem[] = [
-    {
-      key: "new-jobs",
-      label: "עבודות חדשות",
-      to: "/courier/new-jobs",
-      icon: Inbox,
-      badge: counts?.pendingOffers ?? 0,
-      match: (p) => p === "/courier/new-jobs" || p === "/courier" || p === "/courier/dashboard",
-    },
-    {
-      key: "active",
-      label: t.activeJobs,
-      to: "/courier/active",
-      icon: Navigation,
-      badge: counts?.activeJobs ?? 0,
-    },
-    {
-      key: "messages",
-      label: "צ׳אט עם עסקים",
-      to: "/courier/messages",
-      icon: MessageSquare,
-      badge: counts?.unreadChat ?? 0,
-    },
-    {
-      key: "history",
-      label: t.myJobs,
-      to: "/courier/performance",
-      icon: TrendingUp,
-      match: (p) => p === "/courier/performance" || p === "/courier/history",
-    },
-    {
-      key: "wallet",
-      label: "ארנק",
-      to: "/courier/wallet",
-      icon: Wallet,
-    },
-    {
-      key: "share",
-      label: "שתף והרוויח",
-      to: "/courier/share",
-      icon: Gift,
-    },
-    {
-      key: "ratings",
-      label: "דירוגים וביצועים",
-      to: "/courier/ratings",
-      icon: Star,
-    },
-    {
-      key: "work-area",
-      label: "אזורי עבודה",
-      to: "/courier/availability",
-      icon: MapPin,
-      match: (p) => p === "/courier/availability",
-    },
-    {
-      key: "notifications",
-      label: "הודעות ועדכונים",
-      to: "/courier/notifications",
-      icon: Bell,
-      badge: counts?.unreadNotifications ?? 0,
-    },
-    {
-      key: "my-profile",
-      label: "הפרופיל שלי",
-      to: "/courier/my-profile",
-      icon: User,
-    },
-    {
-      key: "account-settings",
-      label: "הגדרות חשבון",
-      to: "/courier/account-settings",
-      icon: Settings,
-    },
-  ];
+  const { work, account } = courierNavGroups(t, counts);
+  const displayName = firstNameOf(me?.full_name) || t.worker;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent
         side="right"
         dir="rtl"
-        className="w-[min(300px,88vw)] max-w-[300px] p-0 gap-0 border-0 bg-surface shadow-card-strong [&>button]:hidden"
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+        className="inset-y-2 right-0 h-auto w-[min(340px,86vw)] max-w-[340px] gap-0 overflow-hidden rounded-l-[1.75rem] border-0 bg-surface p-0 shadow-card-strong sm:max-w-[340px] [&>button]:hidden"
       >
         <SheetTitle className="sr-only">תפריט</SheetTitle>
 
-        <div className="flex h-full flex-col">
-          <div className="border-b border-border px-5 py-5">
-            <div className="flex items-start justify-between gap-3">
+        <div
+          className="flex h-full flex-col"
+          style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+        >
+          <div className="px-4 pb-3 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="relative shrink-0">
+                  <CourierAvatar
+                    path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
+                    name={me?.full_name}
+                    size={52}
+                  />
+                  {accepting && (
+                    <span
+                      className="absolute bottom-0 end-0 size-3.5 rounded-full bg-primary ring-2 ring-surface"
+                      aria-hidden
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 text-right">
+                  <p className="truncate text-[17px] font-extrabold leading-tight text-text-strong">
+                    {displayName}
+                  </p>
+                  <p className="mt-0.5 text-xs text-text-muted">{roleLabel}</p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={closeMenu}
                 aria-label="סגור תפריט"
-                className="size-10 grid place-items-center rounded-pill bg-muted text-text-strong active:bg-border transition-colors shrink-0"
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-text-strong transition-colors active:bg-border"
               >
-                <X className="size-5" />
+                <X className="size-5" strokeWidth={2} />
               </button>
-              <div className="flex items-center gap-3 min-w-0">
-                <CourierAvatar
-                  path={(me as { avatar_url?: string | null } | null | undefined)?.avatar_url}
-                  name={me?.full_name}
-                  size={48}
-                />
-                <div className="min-w-0 text-right">
-                  <p className="text-base font-bold text-text-strong truncate">
-                    {me?.full_name?.trim() || t.worker}
-                  </p>
-                  <p className="text-xs text-text-subtle mt-0.5">{roleLabel}</p>
-                </div>
-              </div>
             </div>
-          </div>
 
-          <div className="border-b border-border px-5 py-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Switch
-                checked={accepting}
-                onCheckedChange={() => void handleToggleAvailability()}
-                disabled={!approved || (accepting && liveJobLocksOffline)}
-                aria-label="זמין לקבלת עבודה"
-                className="shrink-0 data-[state=checked]:bg-primary-deep"
-              />
+            <div
+              className={cn(
+                "mt-4 flex items-center justify-between gap-3 rounded-2xl px-3.5 py-3",
+                accepting ? "bg-primary/10" : "bg-muted",
+              )}
+            >
               <div className="min-w-0 flex-1 text-right">
                 <p className="text-sm font-semibold text-text-strong">זמין לקבלת עבודה</p>
                 {accepting && liveJobLocksOffline ? (
@@ -333,52 +379,38 @@ function CourierSideDrawer() {
                   </p>
                 ) : null}
               </div>
+              <Switch
+                checked={accepting}
+                onCheckedChange={() => void handleToggleAvailability()}
+                disabled={!approved || (accepting && liveJobLocksOffline)}
+                aria-label="זמין לקבלת עבודה"
+                className="h-6 w-11 shrink-0 data-[state=checked]:bg-primary [&>span]:size-5 data-[state=checked]:[&>span]:translate-x-5"
+              />
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto overscroll-y-contain px-3 py-3 space-y-1" aria-label="תפריט צד">
-            {items.map((item) => {
-              const Icon = item.icon;
-              const active = item.match ? item.match(path) : path === item.to;
-              const badge = item.badge ?? 0;
-
-              return (
-                <Link
-                  key={item.key}
-                  to={item.to}
-                  onClick={closeMenu}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex w-full min-h-12 items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold transition-colors",
-                    active
-                      ? "bg-primary-deep text-primary-foreground shadow-fab"
-                      : "text-text-strong hover:bg-muted active:bg-muted",
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" strokeWidth={active ? 2.5 : 2} />
-                  <span className="flex-1 text-right truncate">{item.label}</span>
-                  {badge > 0 && (
-                    active ? (
-                      <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-pill bg-primary-foreground/20 text-primary-foreground text-[10px] font-extrabold">
-                        {badge > 99 ? "99+" : badge}
-                      </span>
-                    ) : (
-                      <NavBadge value={badge} />
-                    )
-                  )}
-                </Link>
-              );
-            })}
+          <nav className="flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2" aria-label="תפריט צד">
+            <NavSection title="עבודה">
+              {work.map((item) => (
+                <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} />
+              ))}
+            </NavSection>
+            <div className="mx-3 my-2 border-t border-border" />
+            <NavSection title="החשבון שלי">
+              {account.map((item) => (
+                <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} />
+              ))}
+            </NavSection>
           </nav>
 
-          <div className="border-t border-border pt-1">
+          <div className="border-t border-border/80 pt-1">
             <InstallAppSidebarItem variant="light" />
             <button
               type="button"
               onClick={() => void handleSignOut()}
-              className="m-3 mt-1 flex w-[calc(100%-1.5rem)] items-center gap-3 px-4 py-3 rounded-card text-sm font-semibold text-destructive hover:bg-danger-bg active:bg-danger-bg transition-colors"
+              className="mx-2 mb-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#E11900] hover:bg-danger-bg active:bg-danger-bg"
             >
-              <LogOut className="size-4 shrink-0" />
+              <LogOut className="size-4 shrink-0" strokeWidth={1.9} />
               <span className="flex-1 text-right">יציאה</span>
             </button>
             <div className="pb-[max(0.5rem,env(safe-area-inset-bottom))]" aria-hidden />
@@ -389,62 +421,33 @@ function CourierSideDrawer() {
   );
 }
 
-/** Round menu button used in PWA headers (opens the side drawer). */
+/** Persistent desktop sidebar. */
 export function CourierDesktopNav() {
   const { data: me } = useDrawerCourier();
   const { data: counts } = useDrawerNavCounts(me);
   const path = useRouterState({ select: (r) => r.location.pathname });
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
-  const items: NavItem[] = [
-    { key: "new-jobs", label: "עבודות חדשות", to: "/courier/new-jobs", icon: Inbox, badge: counts?.pendingOffers ?? 0, match: (p) => p === "/courier/new-jobs" || p === "/courier" || p === "/courier/dashboard" },
-    { key: "active", label: t.activeJobs, to: "/courier/active", icon: Navigation, badge: counts?.activeJobs ?? 0 },
-    { key: "messages", label: "צ׳אט עם עסקים", to: "/courier/messages", icon: MessageSquare, badge: counts?.unreadChat ?? 0 },
-    { key: "history", label: t.myJobs, to: "/courier/performance", icon: TrendingUp, match: (p) => p === "/courier/performance" || p === "/courier/history" },
-    { key: "wallet", label: "ארנק", to: "/courier/wallet", icon: Wallet },
-    { key: "share", label: "שתף והרוויח", to: "/courier/share", icon: Gift },
-    { key: "ratings", label: "דירוגים וביצועים", to: "/courier/ratings", icon: Star },
-    { key: "work-area", label: "אזורי עבודה", to: "/courier/availability", icon: MapPin, match: (p) => p === "/courier/availability" },
-    { key: "notifications", label: "הודעות ועדכונים", to: "/courier/notifications", icon: Bell, badge: counts?.unreadNotifications ?? 0 },
-    { key: "my-profile", label: "הפרופיל שלי", to: "/courier/my-profile", icon: User },
-    { key: "account-settings", label: "הגדרות חשבון", to: "/courier/account-settings", icon: Settings },
-  ];
+  const { work, account } = courierNavGroups(t, counts);
+  const displayName = firstNameOf(me?.full_name) || t.worker;
 
   return (
     <aside className="hidden h-full w-72 shrink-0 flex-col border-l border-border bg-surface lg:flex">
       <div className="border-b border-border px-5 py-5">
         <p className="text-lg font-extrabold text-text-strong">Goi שליח</p>
-        <p className="mt-1 truncate text-sm text-text-muted">{me?.full_name?.trim() || t.worker}</p>
+        <p className="mt-1 truncate text-sm text-text-muted">{displayName}</p>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="תפריט מחשב">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = item.match ? item.match(path) : path === item.to;
-          const badge = item.badge ?? 0;
-          return (
-            <Link
-              key={item.key}
-              to={item.to}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex min-h-11 w-full items-center gap-3 rounded-card px-3 py-2.5 text-sm font-semibold transition-colors",
-                active
-                  ? "bg-primary-deep text-primary-foreground shadow-fab"
-                  : "text-text-strong hover:bg-muted",
-              )}
-            >
-              <Icon className="size-4 shrink-0" strokeWidth={active ? 2.5 : 2} />
-              <span className="min-w-0 flex-1 truncate text-right">{item.label}</span>
-              {badge > 0 && (
-                <span className={cn(
-                  "inline-flex h-5 min-w-5 items-center justify-center rounded-pill px-1.5 text-[10px] font-extrabold",
-                  active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary-deep text-primary-foreground",
-                )}>
-                  {badge > 99 ? "99+" : badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto px-2 py-2" aria-label="תפריט מחשב">
+        <NavSection title="עבודה">
+          {work.map((item) => (
+            <DrawerNavLink key={item.key} item={item} path={path} />
+          ))}
+        </NavSection>
+        <div className="mx-3 my-2 border-t border-border" />
+        <NavSection title="החשבון שלי">
+          {account.map((item) => (
+            <DrawerNavLink key={item.key} item={item} path={path} />
+          ))}
+        </NavSection>
       </nav>
     </aside>
   );
