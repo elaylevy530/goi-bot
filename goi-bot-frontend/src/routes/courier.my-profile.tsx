@@ -339,7 +339,7 @@ function MyProfilePage() {
               asChild
               className="bg-primary-deep hover:bg-primary-deep/90 text-white font-bold px-6 py-6 text-base rounded-xl"
             >
-              <Link to="/courier/messages">פנה לתמיכה</Link>
+              <Link to="/courier/support">פנה לתמיכה</Link>
             </Button>
           </div>
         </div>

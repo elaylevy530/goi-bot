@@ -10,6 +10,7 @@ import {
 } from "@/lib/nest-chat";
 import { nestSignedFileUrlResolved, nestUploadFile } from "@/lib/nest-files";
 import { nestListJobs } from "@/lib/nest-jobs";
+import { BUSINESS_CHAT_CHIPS, SUPPORT_CHAT_CHIPS } from "@/lib/chat-quick-replies";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -63,8 +64,8 @@ function formatSize(b: number | null | undefined) {
 }
 
 function titleFor(c: ConversationRow, viewer: ViewerRole) {
-  if (c.kind === "courier_support") return viewer === "admin" ? `תמיכה · ${c.courier?.full_name ?? "שליח"}` : "תמיכת המערכת";
-  if (c.kind === "business_support") return viewer === "admin" ? `תמיכה · ${c.business?.name ?? "עסק"}` : "תמיכת המערכת";
+  if (c.kind === "courier_support") return viewer === "admin" ? `תמיכה · ${c.courier?.full_name ?? "שליח"}` : "תמיכת Goi";
+  if (c.kind === "business_support") return viewer === "admin" ? `תמיכה · ${c.business?.name ?? "עסק"}` : "תמיכת Goi";
   if (c.kind === "guest_support") {
     const guest = c.job?.guest_name?.trim() || c.subject || "לקוח";
     const num = c.job?.job_number ? `#${c.job.job_number}` : null;
@@ -97,12 +98,26 @@ function shortTimeAgo(iso: string) {
 type AdminFilter = "all" | "courier_support" | "business_support" | "courier_business" | "guest_support" | "unread";
 type CourierFilter = "all" | "support" | "customers";
 
-export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: ViewerRole; initialConversationId?: string }) {
+type ChatInbox = "all" | "business" | "support";
+
+export function ChatCenter({
+  viewerRole,
+  initialConversationId,
+  inbox = "all",
+}: {
+  viewerRole: ViewerRole;
+  initialConversationId?: string;
+  inbox?: ChatInbox;
+}) {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(initialConversationId ?? null);
-  const [mobileView, setMobileView] = useState<"list" | "thread">(initialConversationId ? "thread" : "list");
+  const [mobileView, setMobileView] = useState<"list" | "thread">(
+    initialConversationId || inbox === "support" ? "thread" : "list",
+  );
   const [adminFilter, setAdminFilter] = useState<AdminFilter>("all");
-  const [courierFilter, setCourierFilter] = useState<CourierFilter>("all");
+  const [courierFilter, setCourierFilter] = useState<CourierFilter>(
+    inbox === "support" ? "support" : inbox === "business" ? "customers" : "all",
+  );
   const [search, setSearch] = useState("");
 
   // Sync when caller passes a new initial conversation id (e.g. opened from a deep link)
@@ -125,6 +140,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
   // Ensure support conversation exists for the current courier/business viewer
   useEffect(() => {
     if (viewerRole === "admin") return;
+    if (inbox === "business") return;
     if (isLoading) return;
     const hasSupport = conversations.some(
       (c) => (viewerRole === "courier" && c.kind === "courier_support") || (viewerRole === "business" && c.kind === "business_support"),
@@ -141,12 +157,19 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversations.length, isLoading, viewerRole]);
+  }, [conversations.length, isLoading, viewerRole, inbox]);
 
-  // Auto-select first conversation
+  // Auto-select first conversation in this inbox
   useEffect(() => {
-    if (!activeId && conversations.length > 0) setActiveId(conversations[0].id);
-  }, [conversations, activeId]);
+    if (activeId) return;
+    const list =
+      inbox === "support"
+        ? conversations.filter((c) => c.kind === "courier_support" || c.kind === "business_support")
+        : inbox === "business"
+          ? conversations.filter((c) => c.kind === "courier_business")
+          : conversations;
+    if (list[0]) setActiveId(list[0].id);
+  }, [conversations, activeId, inbox]);
 
   // Poll Nest for new messages.
   useEffect(() => {
@@ -165,8 +188,9 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       if (adminFilter === "unread") list = list.filter((c) => c.unread_admin > 0);
       else if (adminFilter !== "all") list = list.filter((c) => c.kind === adminFilter);
     } else if (viewerRole === "courier") {
-      if (courierFilter === "support") list = list.filter((c) => c.kind === "courier_support");
-      else if (courierFilter === "customers") list = list.filter((c) => c.kind === "courier_business");
+      const forced = inbox === "support" ? "support" : inbox === "business" ? "customers" : courierFilter;
+      if (forced === "support") list = list.filter((c) => c.kind === "courier_support");
+      else if (forced === "customers") list = list.filter((c) => c.kind === "courier_business");
     }
     const q = search.trim().toLowerCase();
     if (q) {
@@ -177,7 +201,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       });
     }
     return list;
-  }, [conversations, adminFilter, courierFilter, search, viewerRole]);
+  }, [conversations, adminFilter, courierFilter, search, viewerRole, inbox]);
 
   const adminCounts = useMemo(() => {
     if (viewerRole !== "admin") return null;
@@ -235,7 +259,11 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[340px_minmax(0,1fr)] gap-3 flex-1 min-h-0 md:min-h-[520px]">
       {/* List */}
-      <aside className={`flex flex-col overflow-hidden ${mobileView === "thread" ? "hidden md:flex" : "flex"} ${
+      <aside className={`flex flex-col overflow-hidden ${
+        inbox === "support" && viewerRole === "courier"
+          ? "hidden"
+          : mobileView === "thread" ? "hidden md:flex" : "flex"
+      } ${
         viewerRole === "courier" ? "bg-transparent" : "bg-card border rounded-2xl"
       }`}>
         {viewerRole !== "courier" && (
@@ -251,16 +279,24 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
           <div className="space-y-3 pb-3">
             <div className="flex items-center justify-end gap-3 px-1">
               <div className="min-w-0 text-right">
-                <h1 className="text-xl font-extrabold text-text-strong leading-tight">צ׳אט</h1>
+                <h1 className="text-xl font-extrabold text-text-strong leading-tight">
+                  {inbox === "support" ? "צ׳אט עם התמיכה" : inbox === "business" ? "צ׳אט עם עסקים" : "צ׳אט"}
+                </h1>
                 <p className="text-xs text-text-muted mt-0.5">
-                  {courierCounts.unreadAll > 0 ? `${courierCounts.unreadAll} הודעות חדשות` : "הכל מעודכן"}
+                  {inbox === "support"
+                    ? (courierCounts.unreadSupport > 0 ? `${courierCounts.unreadSupport} הודעות חדשות` : "בוט Goi עונה מיד · נציג לפי הצורך")
+                    : inbox === "business"
+                      ? (courierCounts.unreadCustomers > 0 ? `${courierCounts.unreadCustomers} הודעות חדשות` : "שיחות לפי משלוח פעיל")
+                      : (courierCounts.unreadAll > 0 ? `${courierCounts.unreadAll} הודעות חדשות` : "הכל מעודכן")}
                 </p>
               </div>
               <div className="size-11 rounded-card bg-primary text-primary-foreground grid place-items-center shadow-card shrink-0">
-                <MessageSquare className="size-5" />
+                {inbox === "support" ? <LifeBuoy className="size-5" /> : <MessageSquare className="size-5" />}
               </div>
             </div>
 
+            {inbox === "all" && (
+              <>
             <div className="relative">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-text-muted pointer-events-none" />
               <Input
@@ -296,13 +332,27 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
                 </button>
               ))}
             </div>
+              </>
+            )}
+
+            {inbox === "business" && (
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-text-muted pointer-events-none" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="חיפוש עסק או משלוח..."
+                  className="h-11 rounded-card border-border bg-surface pr-10 text-sm"
+                />
+              </div>
+            )}
           </div>
         )}
 
-        {viewerRole !== "admin" && (
+        {viewerRole !== "admin" && inbox !== "support" && (
           <StartChatPanel
             viewerRole={viewerRole}
-            panelFilter={viewerRole === "courier" ? courierFilter : "all"}
+            panelFilter={viewerRole === "courier" ? (inbox === "business" ? "customers" : courierFilter) : "all"}
             onStart={openConversation}
           />
         )}
@@ -436,9 +486,17 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
       </aside>
 
       {/* Thread */}
-      <section className={`bg-card border rounded-2xl flex flex-col overflow-hidden ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
+      <section className={`bg-card border rounded-2xl flex flex-col overflow-hidden ${
+        inbox === "support" && viewerRole === "courier"
+          ? "flex"
+          : mobileView === "list" ? "hidden md:flex" : "flex"
+      }`}>
         {activeConv ? (
-          <Thread conv={activeConv} viewerRole={viewerRole} onBack={() => setMobileView("list")} />
+          <Thread
+            conv={activeConv}
+            viewerRole={viewerRole}
+            onBack={inbox === "support" && viewerRole === "courier" ? undefined : () => setMobileView("list")}
+          />
         ) : (
           <div className="flex-1 grid place-items-center text-muted-foreground text-sm">בחר שיחה כדי להתחיל</div>
         )}
@@ -447,7 +505,7 @@ export function ChatCenter({ viewerRole, initialConversationId }: { viewerRole: 
   );
 }
 
-function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRole: ViewerRole; onBack: () => void }) {
+function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRole: ViewerRole; onBack?: () => void }) {
   const qc = useQueryClient();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -615,15 +673,28 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
   };
 
   const participantLocked = !!conv.hidden_from_participants && viewerRole !== "admin";
+  const quickChips =
+    conv.kind === "courier_business"
+      ? BUSINESS_CHAT_CHIPS
+      : conv.kind === "courier_support" || conv.kind === "business_support"
+        ? SUPPORT_CHAT_CHIPS
+        : [];
 
   return (
     <>
       <div className="px-4 py-3 border-b flex items-center gap-2">
+        {onBack && (
         <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack} aria-label="חזרה">
           <ArrowRight className="size-4" />
         </Button>
+        )}
         <div className="flex-1 min-w-0">
           <div className="font-bold truncate">{titleFor(conv, viewerRole)}</div>
+          {conv.kind === "courier_support" || conv.kind === "business_support" ? (
+            <div className="text-[11px] text-muted-foreground truncate">
+              {conv.subject === "human" ? "נציג אנושי יחזור אליכם" : "בוט Goi · בחרו נושא או כתבו חופשי"}
+            </div>
+          ) : null}
           {conv.kind === "courier_business" && conv.job && (
             <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
               <Briefcase className="size-3" />
@@ -727,7 +798,29 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
         </div>
       )}
 
-      {!participantLocked && <form onSubmit={handleSubmit} className="border-t p-3 flex items-center gap-2">
+      {!participantLocked && !recording && quickChips.length > 0 && (
+        <div className="border-t px-3 pt-2 pb-1">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            {quickChips.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                disabled={sending}
+                onClick={() => {
+                  if (sending) return;
+                  setSending(true);
+                  void send.mutateAsync({ text: chip }).finally(() => setSending(false));
+                }}
+                className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-strong active:bg-muted disabled:opacity-50"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!participantLocked && <form onSubmit={handleSubmit} className={`${quickChips.length && !recording ? "pt-1" : "border-t"} px-3 pb-3 flex items-center gap-2`}>
         <input
           ref={fileRef}
           type="file"

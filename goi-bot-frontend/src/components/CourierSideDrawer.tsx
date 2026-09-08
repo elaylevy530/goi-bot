@@ -25,6 +25,7 @@ import {
   Bell,
   Gift,
   Inbox,
+  LifeBuoy,
   LogOut,
   MapPin,
   Menu,
@@ -80,15 +81,18 @@ function useDrawerNavCounts(courier?: { id?: string } | null) {
         if (isOpenBroadcastJobForCourier(j, courier)) unique.add(j.id);
       }
       const unreadNotifications = (notifications as { read_at?: string | null }[]).filter((n) => !n.read_at).length;
-      const unreadChat = (conversations as { unread_courier?: number }[]).reduce(
-        (n, c) => n + Number(c.unread_courier ?? 0),
-        0,
-      );
+      const unreadChat = (conversations as { kind?: string; unread_courier?: number }[])
+        .filter((c) => c.kind === "courier_business")
+        .reduce((n, c) => n + Number(c.unread_courier ?? 0), 0);
+      const unreadSupport = (conversations as { kind?: string; unread_courier?: number }[])
+        .filter((c) => c.kind === "courier_support")
+        .reduce((n, c) => n + Number(c.unread_courier ?? 0), 0);
       return {
         pendingOffers: unique.size,
         activeJobs,
         unreadNotifications,
         unreadChat,
+        unreadSupport,
       };
     },
   });
@@ -170,6 +174,7 @@ function courierNavGroups(
     activeJobs?: number;
     unreadNotifications?: number;
     unreadChat?: number;
+    unreadSupport?: number;
   } | null,
 ) {
   const work: NavItem[] = [
@@ -194,6 +199,13 @@ function courierNavGroups(
       to: "/courier/messages",
       icon: MessageSquare,
       badge: counts?.unreadChat ?? 0,
+    },
+    {
+      key: "support",
+      label: "צ׳אט עם התמיכה",
+      to: "/courier/support",
+      icon: LifeBuoy,
+      badge: counts?.unreadSupport ?? 0,
     },
   ];
   const account: NavItem[] = [

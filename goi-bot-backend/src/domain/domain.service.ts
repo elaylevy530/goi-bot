@@ -20,6 +20,12 @@ import { TeamMember } from "../accounts/entities/team-member.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
 import type { AppRole } from "../auth/auth.types";
 import { Message } from "../chat/entities/message.entity";
+import {
+  isSupportConversationKind,
+  replyToSupport,
+  SUPPORT_HANDOFF_SUBJECT,
+  SUPPORT_WELCOME,
+} from "../chat/support-bot";
 import { ExpressPricingRule } from "../jobs/entities/express-pricing-rule.entity";
 import { JobOutcome } from "../jobs/entities/job-outcome.entity";
 import { StatusLog } from "../jobs/entities/status-log.entity";
@@ -187,6 +193,9 @@ export class DomainService {
           hidden_from_participants: false,
         }),
       );
+      if (isSupportConversationKind(kind)) {
+        await this.postSupportBotMessage(conversation, userId, SUPPORT_WELCOME);
+      }
     }
     await this.assertConversationAccess(conversation, userId, roles);
     return conversation;
@@ -244,17 +253,57 @@ export class DomainService {
     }));
     conversation.last_message_at = message.created_at;
     conversation.last_message_preview = message.body?.slice(0, 250) ?? message.attachment_name;
+    const supportBotOpen =
+      isSupportConversationKind(conversation.kind) &&
+      senderRole !== "admin" &&
+      conversation.subject !== SUPPORT_HANDOFF_SUBJECT;
+    if (isSupportConversationKind(conversation.kind) && senderRole === "admin") {
+      conversation.subject = SUPPORT_HANDOFF_SUBJECT;
+    }
     if (conversation.kind === "guest_support") {
       // Admin reply → guest unread; guest messages are posted via public API.
       if (senderRole === "admin") conversation.unread_guest += 1;
       else conversation.unread_admin += 1;
     } else {
-      if (senderRole !== "admin") conversation.unread_admin += 1;
+      if (senderRole !== "admin" && !supportBotOpen) conversation.unread_admin += 1;
       if (senderRole !== "courier") conversation.unread_courier += 1;
       if (senderRole !== "business") conversation.unread_business += 1;
     }
     await this.conversations.save(conversation);
+
+    if (supportBotOpen) {
+      const bot = replyToSupport(message.body);
+      if (bot.handoff) {
+        conversation.subject = SUPPORT_HANDOFF_SUBJECT;
+        conversation.unread_admin += 1;
+        await this.conversations.save(conversation);
+      }
+      await this.postSupportBotMessage(conversation, userId, bot.reply);
+    }
     return message;
+  }
+
+  private async postSupportBotMessage(conversation: Conversation, actorUserId: string, body: string) {
+    const botMessage = await this.messages.save(
+      this.messages.create({
+        conversation_id: conversation.id,
+        sender_user_id: actorUserId,
+        sender_role: "admin",
+        body,
+        attachment_url: null,
+        attachment_kind: null,
+        attachment_name: null,
+        attachment_mime: null,
+        attachment_size: null,
+        duration_ms: null,
+      }),
+    );
+    conversation.last_message_at = botMessage.created_at;
+    conversation.last_message_preview = body.slice(0, 250);
+    if (conversation.kind === "courier_support") conversation.unread_courier += 1;
+    if (conversation.kind === "business_support") conversation.unread_business += 1;
+    await this.conversations.save(conversation);
+    return botMessage;
   }
 
   async markRead(id: string, userId: string, roles: AppRole[]) {

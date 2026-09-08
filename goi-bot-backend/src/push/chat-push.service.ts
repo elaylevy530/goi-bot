@@ -43,9 +43,15 @@ export class ChatPushService {
     const conv = await this.conversations.findOne({ where: { id: payload.conversation_id } });
     if (!conv) return { ok: true };
 
-    // Only per-job chat gets push. Support chats are handled elsewhere.
-    if (conv.kind !== "courier_business") return { ok: true };
+    // Per-job chat, plus support replies from a human/bot to the other side.
     if (conv.hidden_from_participants) return { ok: true };
+    if (
+      conv.kind !== "courier_business" &&
+      conv.kind !== "courier_support" &&
+      conv.kind !== "business_support"
+    ) {
+      return { ok: true };
+    }
 
     const bodyPreview = (payload.body_preview ?? "").trim() || "הודעה חדשה";
 
@@ -70,7 +76,7 @@ export class ChatPushService {
       jobs.push(this.notifyBusiness(conv.business_id, conv.id, senderName, bodyPreview));
     }
     if (notifyCourier && conv.courier_id) {
-      jobs.push(this.notifyCourier(conv.courier_id, conv.id, senderName, bodyPreview));
+      jobs.push(this.notifyCourier(conv.courier_id, conv.id, conv.kind, senderName, bodyPreview));
     }
 
     await Promise.allSettled(jobs);
@@ -90,13 +96,22 @@ export class ChatPushService {
     if (gone.length) await this.businessSubs.delete({ endpoint: In(gone) });
   }
 
-  private async notifyCourier(courierId: string, convId: string, senderName: string, body: string) {
+  private async notifyCourier(
+    courierId: string,
+    convId: string,
+    convKind: Conversation["kind"],
+    senderName: string,
+    body: string,
+  ) {
     const subs = await this.courierSubs.find({ where: { courier_id: courierId } });
     if (!subs.length) return;
     const results = await this.webPush.sendPushBatch(subs, {
       title: `הודעה מ${senderName}`,
       body,
-      url: `/courier/messages?c=${convId}`,
+      url:
+        convKind === "courier_support"
+          ? `/courier/support?c=${convId}`
+          : `/courier/messages?c=${convId}`,
       tag: `chat-${convId}`,
     });
     const gone = results.filter((r) => r.gone).map((r) => r.endpoint);

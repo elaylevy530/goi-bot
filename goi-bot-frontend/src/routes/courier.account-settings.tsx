@@ -54,7 +54,7 @@ type SettingItem = {
   subtitle: string;
   iconColor: string;
   iconBg: string;
-  to?: "/courier/messages";
+  to?: "/courier/messages" | "/courier/support";
   onClick?: () => void;
   showArrow?: boolean;
   toggle?: boolean;
@@ -167,7 +167,7 @@ function AccountSettingsPage() {
           iconColor: "text-green-600",
           iconBg: "bg-green-50",
           showArrow: true,
-          to: "/courier/messages",
+          to: "/courier/support",
         },
       ],
     },
