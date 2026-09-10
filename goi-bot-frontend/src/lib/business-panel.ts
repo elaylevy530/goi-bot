@@ -160,35 +160,140 @@ export type LiveMapPin = {
   lat: number;
   lng: number;
   label: string;
+  color?: string;
+  type?: "store" | "courier" | "destination";
 };
+
+export function jobRecipientName(job: NestJob): string {
+  return (
+    (job as { recipient_name?: string | null }).recipient_name ||
+    job.guest_name ||
+    job.customer_name ||
+    "לקוח"
+  );
+}
+
+export function jobRecipientPhone(job: NestJob): string {
+  return (
+    (job as { recipient_phone?: string | null }).recipient_phone ||
+    job.guest_phone ||
+    job.customer_phone ||
+    ""
+  );
+}
+
+export function jobSourceLabel(job: NestJob): string {
+  const via = String((job as { created_via?: string | null }).created_via || "");
+  if (via === "integration" || via === "webhook" || via === "intake") return "אינטגרציה";
+  if ((job as { partner_id?: string | null }).partner_id) return "שותף";
+  if (job.pricing_type === "quote_request") return "מכרז";
+  if (job.guest_name) return "אורח";
+  return "ידני";
+}
+
+export function jobItemsLabel(job: NestJob): string {
+  return String(job.description || (job as { items?: string | null }).items || job.job_type || "משלוח");
+}
+
+export function jobHasCourier(job: NestJob): boolean {
+  return Boolean(job.selected_courier_id);
+}
+
+export function isIncomingJob(job: NestJob): boolean {
+  if (CANCELLED_STATUSES.has(job.status) || DONE_STATUSES.has(job.status)) return false;
+  if (job.status === "טיוטה") return true;
+  if (job.pricing_type === "quote_request" && !job.selected_courier_id) return true;
+  return false;
+}
+
+export function isTrackingJob(job: NestJob): boolean {
+  if (DONE_STATUSES.has(job.status) || CANCELLED_STATUSES.has(job.status) || job.status === "טיוטה") return false;
+  if (job.pricing_type === "quote_request" && !job.selected_courier_id) return false;
+  return WAITING_STATUSES.has(job.status) || ACTIVE_STATUSES.has(job.status);
+}
+
+export function isHistoryJob(job: NestJob): boolean {
+  return DONE_STATUSES.has(job.status) || CANCELLED_STATUSES.has(job.status);
+}
+
+export function trackingGroup(job: NestJob): "waiting" | "pickup" | "delivery" {
+  const step = String((job as { courier_step?: string | null }).courier_step ?? "");
+  if (step === "אספתי" || step === "נמסר") return "delivery";
+  if (step === "בדרך לאיסוף") return "pickup";
+  if (ACTIVE_STATUSES.has(job.status) && job.selected_courier_id) {
+    if (step === "שליח אישר") return "pickup";
+    return "delivery";
+  }
+  return "waiting";
+}
+
+export function trackingStageIndex(job: NestJob): number {
+  const group = trackingGroup(job);
+  if (group === "delivery") return String((job as { courier_step?: string | null }).courier_step) === "אספתי" || job.status === "פעילה" ? 2 : 3;
+  if (group === "pickup") return 1;
+  return 0;
+}
+
+export function jobBadgeTone(status: string): string {
+  if (DONE_STATUSES.has(status)) return "green";
+  if (ACTIVE_STATUSES.has(status)) return "green";
+  if (CANCELLED_STATUSES.has(status)) return "red";
+  if (status === "יש שליחים שאישרו") return "purple";
+  if (WAITING_STATUSES.has(status)) return "amber";
+  return "gray";
+}
+
+export function moneyIls(n: number): string {
+  return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 2 }).format(n);
+}
 
 export function pinsFromJobs(jobs: NestJob[]): LiveMapPin[] {
   const pins: LiveMapPin[] = [];
   for (const job of jobs) {
-    const courier = job as {
+    const row = job as {
       couriers?: { last_lat?: number | null; last_lng?: number | null; full_name?: string | null } | null;
       pickup_lat?: number | null;
       pickup_lng?: number | null;
+      dropoff_lat?: number | null;
+      dropoff_lng?: number | null;
     };
-    const lat = Number(courier.couriers?.last_lat);
-    const lng = Number(courier.couriers?.last_lng);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const assigned = Boolean(job.selected_courier_id) && trackingGroup(job) !== "waiting";
+    const cLat = Number(row.couriers?.last_lat);
+    const cLng = Number(row.couriers?.last_lng);
+    if (assigned && Number.isFinite(cLat) && Number.isFinite(cLng)) {
       pins.push({
         id: job.id,
-        lat,
-        lng,
-        label: courier.couriers?.full_name || job.job_number,
+        lat: cLat,
+        lng: cLng,
+        label: row.couriers?.full_name || job.job_number,
+        type: "courier",
+        color: trackingGroup(job) === "pickup" ? "#527eaf" : "#27875a",
       });
       continue;
     }
-    const pLat = Number(courier.pickup_lat);
-    const pLng = Number(courier.pickup_lng);
+    const dLat = Number(row.dropoff_lat);
+    const dLng = Number(row.dropoff_lng);
+    if (Number.isFinite(dLat) && Number.isFinite(dLng)) {
+      pins.push({
+        id: job.id,
+        lat: dLat,
+        lng: dLng,
+        label: `${job.job_number} · יעד מסירה`,
+        type: "destination",
+        color: "#b38235",
+      });
+      continue;
+    }
+    const pLat = Number(row.pickup_lat);
+    const pLng = Number(row.pickup_lng);
     if (Number.isFinite(pLat) && Number.isFinite(pLng)) {
       pins.push({
-        id: `${job.id}-pickup`,
+        id: job.id,
         lat: pLat,
         lng: pLng,
         label: job.job_number,
+        type: "destination",
+        color: "#b38235",
       });
     }
   }

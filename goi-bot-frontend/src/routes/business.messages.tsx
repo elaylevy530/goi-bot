@@ -54,7 +54,7 @@ function BusinessMessagesPage() {
   }, [me?.id, courierId, jobId, qc]);
 
   return (
-    <BusinessShell title="הודעות" subtitle="צ׳אט עם השליחים שביצעו עבורך משלוחים ועם תמיכת המערכת">
+    <BusinessShell title="צ׳אט עם שליחים" subtitle="שיחות לפי משלוח עם השליח המשויך">
       {me?.id && pushSupported() && (
         <div className="mb-3">
           <PushEnableRowGeneric
@@ -69,7 +69,9 @@ function BusinessMessagesPage() {
           />
         </div>
       )}
-      <ChatCenter viewerRole="business" initialConversationId={initialConvId} />
+      <div className="courier-chat-layout">
+        <ChatCenter viewerRole="business" initialConversationId={initialConvId} />
+      </div>
     </BusinessShell>
   );
 }

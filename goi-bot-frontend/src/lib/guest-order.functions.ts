@@ -33,18 +33,6 @@ export const confirmGuestOrderFn = createServerFn({ method: "POST" })
     nestServerFetch(`/api/public/jobs/${data.job_id}/confirm`, { method: "POST", body: data }),
   );
 
-export const createGuestPaypalOrderFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => refSchema.extend({ amount: z.number().positive() }).parse(data))
-  .handler(({ data }) =>
-    nestServerFetch(`/api/public/jobs/${data.job_id}/paypal-order`, { method: "POST", body: data }),
-  );
-
-export const captureGuestPaypalOrderFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => refSchema.extend({ order_id: z.string().min(4) }).parse(data))
-  .handler(({ data }) =>
-    nestServerFetch(`/api/public/jobs/${data.job_id}/paypal-capture`, { method: "POST", body: data }),
-  );
-
 export const getGuestJobQuotesFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => refSchema.parse(data))
   .handler(({ data }) =>

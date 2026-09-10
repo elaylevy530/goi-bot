@@ -27,8 +27,6 @@ import { CourierJobDecline } from "../jobs/entities/courier-job-decline.entity";
 import { OfferEvent } from "../jobs/entities/offer-event.entity";
 import { StatusLog } from "../jobs/entities/status-log.entity";
 import { BillingRecord } from "../payments/entities/billing-record.entity";
-import { PaypalPayout } from "../payments/entities/paypal-payout.entity";
-import { PaypalWebhookEvent } from "../payments/entities/paypal-webhook-event.entity";
 import { Kiosk } from "../munch/entities/kiosk.entity";
 import { KioskCategory } from "../munch/entities/kiosk-category.entity";
 import { KioskProduct } from "../munch/entities/kiosk-product.entity";
@@ -94,8 +92,6 @@ export const TYPEORM_ENTITIES = [
   WhatsappMessage,
   GreenApiWebhookEvent,
   BillingRecord,
-  PaypalWebhookEvent,
-  PaypalPayout,
   BusinessIntegration,
   BusinessBranch,
   IntegrationRequestLog,

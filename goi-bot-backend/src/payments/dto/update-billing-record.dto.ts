@@ -7,14 +7,6 @@ export class UpdateBillingRecordDto {
 
   @IsOptional()
   @IsString()
-  paypal_order_id?: string | null;
-
-  @IsOptional()
-  @IsString()
-  paypal_capture_id?: string | null;
-
-  @IsOptional()
-  @IsString()
   status?: string;
 
   @IsOptional()

@@ -169,19 +169,4 @@ export class UpdateCustomerSelfDto {
   @IsString()
   @MaxLength(32)
   signed_agreement_version?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(128)
-  paypal_vault_id?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(128)
-  paypal_payer_id?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  paypal_email?: string | null;
 }

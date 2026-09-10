@@ -1,39 +1,41 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
-import { KpiCard } from "@/components/business/KpiCard";
+import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
-import { AddressAutocomplete } from "@/components/customer/AddressAutocomplete";
-import { SegmentedControl } from "@/components/SegmentedControl";
-import { ListEmptyState } from "@/components/ListEmptyState";
-import { nestListJobs, type NestJob } from "@/lib/nest-jobs";
+import { Avatar, Badge, Panel, money } from "@/components/business/goi/GoiUi";
+import { nestListMyNotifications } from "@/lib/nest-accounts";
 import { playBeep } from "@/lib/offer-alert";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import {
-  ACTIVE_STATUSES,
-  DONE_STATUSES,
-  WAITING_STATUSES,
-  formatDelta,
-  formatJobWhen,
+  formatHebrewDate,
+  isIncomingJob,
   isSameDay,
-  isSameMonth,
-  jobCourierLabel,
+  isTrackingJob,
   jobPrice,
-  percentDelta,
+  jobRecipientName,
+  jobSourceLabel,
+  jobCourierName,
+  courierStepLabel,
   pinsFromJobs,
-  statusPillClass,
+  trackingGroup,
+  jobBadgeTone,
 } from "@/lib/business-panel";
 import {
+  ArrowLeft,
+  BarChart3,
+  Bell,
   Bike,
-  Clock,
-  CreditCard,
+  Check,
+  CheckCheck,
+  ClipboardList,
+  Clock3,
+  FileText,
+  Headphones,
   MapPin,
   Package,
-  Plus,
-  Truck,
-  type LucideIcon,
+  Search,
+  X,
 } from "lucide-react";
 
 export const Route = createFileRoute("/business/dashboard")({
@@ -43,7 +45,7 @@ export const Route = createFileRoute("/business/dashboard")({
 });
 
 export function EmptyState({ icon: Icon, title, desc, action, ctaLabel, ctaTo }: {
-  icon: LucideIcon;
+  icon: typeof Package;
   title: string;
   desc?: string;
   action?: React.ReactNode;
@@ -51,42 +53,25 @@ export function EmptyState({ icon: Icon, title, desc, action, ctaLabel, ctaTo }:
   ctaTo?: string;
 }) {
   return (
-    <ListEmptyState
-      title={title}
-      description={desc}
-      icon={<Icon className="size-6" />}
-      action={
-        action ??
-        (ctaLabel && ctaTo ? (
-          <Link
-            to={ctaTo as never}
-            className="inline-flex h-11 items-center gap-2 rounded-pill bg-primary-deep px-5 font-black text-primary-foreground shadow-fab"
-          >
-            {ctaLabel}
-          </Link>
-        ) : undefined)
-      }
-    />
+    <div className="empty-state">
+      <Icon className="size-6" />
+      <h2>{title}</h2>
+      {desc && <p>{desc}</p>}
+      {action}
+      {ctaLabel && ctaTo && (
+        <Link to={ctaTo as never} className="btn primary">
+          {ctaLabel}
+        </Link>
+      )}
+    </div>
   );
 }
 
-type OpsTab = "waiting" | "active" | "done";
-
 const CLAIM_STATUSES = new Set(["נבחר שליח", "פעילה"]);
-const POLL_MS = 12_000;
-
-function tabForStatus(status: string): OpsTab | null {
-  if (WAITING_STATUSES.has(status)) return "waiting";
-  if (ACTIVE_STATUSES.has(status)) return "active";
-  if (DONE_STATUSES.has(status)) return "done";
-  return null;
-}
 
 function statusToastMessage(prev: string, next: string, jobNumber?: string): string | null {
   const label = jobNumber ? `#${jobNumber}` : "משלוח";
-  if (prev !== next && CLAIM_STATUSES.has(next) && !CLAIM_STATUSES.has(prev)) {
-    return `${label} — שליח שובץ ✓`;
-  }
+  if (prev !== next && CLAIM_STATUSES.has(next) && !CLAIM_STATUSES.has(prev)) return `${label} — שליח שובץ ✓`;
   if (next === "הושלמה" && prev !== "הושלמה") return `${label} — המשלוח הושלם`;
   if (next === "יש שליחים שאישרו" && prev !== next) return `${label} — יש שליחים שאישרו`;
   if (next === "ממתינה לתגובות" && prev === "נשלחה לשליחים") return `${label} — ממתין לתגובות שליחים`;
@@ -96,18 +81,13 @@ function statusToastMessage(prev: string, next: string, jobNumber?: string): str
 function BusinessDashboard() {
   const { data: me } = useMyBusiness();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<OpsTab>("waiting");
-  const [dropoffText, setDropoffText] = useState("");
-  const [quickVehicle, setQuickVehicle] = useState("קטנוע");
   const prevStatusesRef = useRef<Map<string, string> | null>(null);
   const primedRef = useRef(false);
-
-  const { data: orders, isLoading } = useQuery({
-    queryKey: ["biz-dashboard-orders", me?.id],
+  const { data: orders, isLoading } = useBusinessJobs(me?.id);
+  const { data: notifs = [] } = useQuery({
+    queryKey: ["notif-recent", me?.id],
     enabled: !!me?.id,
-    refetchInterval: POLL_MS,
-    refetchIntervalInBackground: true,
-    queryFn: () => nestListJobs({ limit: 50 }),
+    queryFn: () => nestListMyNotifications(8),
   });
 
   const all = orders ?? [];
@@ -141,322 +121,184 @@ function BusinessDashboard() {
     prevStatusesRef.current = nextMap;
   }, [orders]);
 
-  const waiting = useMemo(() => all.filter((o) => WAITING_STATUSES.has(o.status)), [all]);
-  const active = useMemo(() => all.filter((o) => ACTIVE_STATUSES.has(o.status)), [all]);
-  const done = useMemo(() => all.filter((o) => DONE_STATUSES.has(o.status)).slice(0, 20), [all]);
-  const list = tab === "waiting" ? waiting : tab === "active" ? active : done;
+  const incoming = useMemo(() => all.filter(isIncomingJob), [all]);
+  const tracking = useMemo(() => all.filter(isTrackingJob), [all]);
+  const moving = useMemo(() => tracking.filter((j) => trackingGroup(j) !== "waiting"), [tracking]);
+  const waiting = useMemo(() => tracking.filter((j) => trackingGroup(j) === "waiting"), [tracking]);
+  const today = useMemo(() => all.filter((j) => isSameDay(j.created_at)), [all]);
+  const pins = useMemo(() => pinsFromJobs(moving), [moving]);
 
-  const pickupAddress = ((me as { pickup_address?: string | null } | null)?.pickup_address ?? "").trim();
-  const kpis = useMemo(() => computeKpis(all), [all]);
-  const pins = useMemo(() => pinsFromJobs(active), [active]);
-  const recent = all.slice(0, 5);
-
-  const goQuickOrder = () => {
-    navigate({
-      to: "/business/new-delivery",
-      search: {
-        to: dropoffText.trim() || undefined,
-        timing: undefined,
-        vehicle: quickVehicle,
-      },
-    });
-  };
+  const pickupLat = Number((me as { pickup_lat?: number | null } | null)?.pickup_lat);
+  const pickupLng = Number((me as { pickup_lng?: number | null } | null)?.pickup_lng);
+  const storePin =
+    Number.isFinite(pickupLat) && Number.isFinite(pickupLng)
+      ? { id: "store", lat: pickupLat, lng: pickupLng, label: "העסק", type: "store" as const, color: "#00a334" }
+      : null;
 
   return (
     <BusinessShell>
-      <div className="space-y-4 px-4 pb-8 pt-4 lg:hidden">
-        <div className="flex items-start justify-between gap-3 text-right">
-          <div className="min-w-0">
-            <h1 className="text-xl font-black text-text-strong">לוח משלוחים</h1>
-            <p className="mt-0.5 truncate text-xs text-text-muted">
-              {(me as { business_name?: string; name?: string } | null)?.business_name ||
-                (me as { name?: string } | null)?.name ||
-                "העסק שלי"}
-            </p>
+      <div className="page-content">
+        <div className="dashboard-heading">
+          <div>
+            <span className="eyebrow">סקירה יומית</span>
+            <h1>היום בעסק שלך</h1>
+            <p>כל ההזמנות והמשלוחים, במקום אחד.</p>
           </div>
-          <Link
-            to="/business/new-delivery"
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-pill bg-primary-deep px-4 text-sm font-black text-primary-foreground shadow-fab transition active:scale-[0.98]"
-          >
-            <Plus className="size-4" strokeWidth={2.6} />
-            הזמן
-          </Link>
+          <span className="dashboard-date">{formatHebrewDate()}</span>
         </div>
-
-        <SegmentedControl
-          aria-label="סינון משלוחים"
-          value={tab}
-          onValueChange={(v) => setTab(v as OpsTab)}
-          options={[
-            { value: "waiting", label: `ממתינים (${waiting.length})` },
-            { value: "active", label: `בביצוע (${active.length})` },
-            { value: "done", label: `הושלמו (${done.length})` },
-          ]}
-        />
-
-        <section className="space-y-2.5" aria-live="polite">
-          {isLoading && !orders ? (
-            <div className="rounded-card bg-surface px-4 py-10 text-center text-sm text-text-muted shadow-card">
-              טוען משלוחים…
-            </div>
-          ) : list.length === 0 ? (
-            <ListEmptyState
-              title={tab === "waiting" ? "אין משלוחים ממתינים" : tab === "active" ? "אין משלוחים בביצוע" : "אין משלוחים שהושלמו לאחרונה"}
-              description={tab === "done" ? "משלוחים שהושלמו יופיעו כאן" : "שדרו משלוח חדש — השליחים יקבלו אותו מיד"}
-              icon={<Package className="size-6" />}
-              action={
-                tab !== "done" ? (
-                  <Link
-                    to="/business/new-delivery"
-                    className="inline-flex h-11 items-center gap-2 rounded-pill bg-primary-deep px-5 font-black text-primary-foreground shadow-fab"
-                  >
-                    <Plus className="size-4" /> הזמן משלוח
-                  </Link>
-                ) : (
-                  <Link to="/business/orders" className="inline-flex h-11 items-center gap-2 rounded-pill bg-navy px-5 font-black text-white">
-                    לכל ההזמנות
-                  </Link>
-                )
-              }
-            />
-          ) : (
-            list.map((o) => <DeliveryCard key={o.id} job={o} />)
-          )}
-        </section>
-      </div>
-
-      <div className="hidden space-y-6 p-8 lg:block">
-        <div className="flex gap-6">
-          <KpiCard
-            title="משלוחים היום"
-            value={String(kpis.todayCount)}
-            delta={formatDelta(kpis.todayDelta)}
-            icon={Package}
-            iconClass="bg-kpi-volume-bg text-info-text"
-          />
-          <KpiCard
-            title="שליחים פעילים"
-            value={kpis.activeCouriers === 0 ? "0" : `${kpis.activeCouriers} שליחים`}
-            icon={Truck}
-            iconClass="bg-kpi-fleet-bg text-success-text"
-          />
-          <KpiCard
-            title="זמן ממוצע"
-            value={kpis.avgMin == null ? "—" : `${kpis.avgMin} דק׳`}
-            icon={Clock}
-            iconClass="bg-kpi-time-bg text-warning-text"
-          />
-          <KpiCard
-            title="עלות חודשית"
-            value={`₪${kpis.monthSpend.toLocaleString("he-IL")}`}
-            delta={formatDelta(kpis.monthDelta)}
-            icon={CreditCard}
-            iconClass="bg-kpi-cost-bg text-danger-text"
-          />
-        </div>
-
-        <div className="flex h-[22.5rem] gap-6">
-          <section className="flex w-[22.5rem] shrink-0 flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-panel">
-            <div className="flex items-center justify-between">
-              <span className="rounded-md bg-kpi-volume-bg px-2 py-1 text-xs font-bold text-primary">מהיר</span>
-              <h2 className="text-lg font-bold text-text-strong">הזמנה מהירה</h2>
-            </div>
-            <div className="flex flex-1 flex-col gap-3">
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-4 py-2.5 text-sm text-text-subtle">
-                <MapPin className="size-4 shrink-0 text-primary" />
-                <span className="truncate">{pickupAddress || "כתובת האיסוף מהפרופיל"}</span>
-              </div>
-              <AddressAutocomplete
-                label="כתובת מסירה"
-                placeholder="לאן לשלוח?"
-                value={dropoffText}
-                onChange={setDropoffText}
-                onSelect={(p) => setDropoffText(p.address)}
-                accent="red"
-              />
-              <div className="relative">
-                <Bike className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
-                <select
-                  value={quickVehicle}
-                  onChange={(e) => setQuickVehicle(e.target.value)}
-                  className="biz-input appearance-none pe-9"
-                  aria-label="סוג רכב"
-                >
-                  <option value="קטנוע">קטנוע</option>
-                  <option value="רכב">רכב</option>
-                  <option value="רכב מסחרי">רכב מסחרי</option>
-                  <option value="אופניים חשמליים">אופניים חשמליים</option>
-                  <option value="אופניים רגילים">אופניים רגילים</option>
-                  <option value="קורקינט חשמלי">קורקינט חשמלי</option>
-                </select>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={goQuickOrder}
-              className="h-12 w-full rounded-lg bg-primary-deep text-sm font-bold text-primary-foreground transition hover:bg-primary-deep/90"
-            >
-              הזמן שליח עכשיו
+        <div className="home-stats">
+          {[
+            { label: "הזמנות לאישור", value: incoming.length, icon: ClipboardList, to: "/business/incoming", hint: "ממתינות לטיפול שלך", tone: "amber" },
+            { label: "משלוחים בדרך", value: moving.length, icon: Bike, to: "/business/active", hint: "בדרך לאיסוף וללקוחות", tone: "green" },
+            { label: "ממתינים לשליח", value: waiting.length, icon: Clock3, to: "/business/active", hint: "לפני תחילת המשלוח", tone: "blue" },
+            { label: "סך הזמנות היום", value: today.length, icon: Package, to: "/business/history", hint: "כל הזמנות העסק להיום", tone: "neutral" },
+          ].map((s) => (
+            <button key={s.label} type="button" className={`panel stat-card stat-${s.tone}`} onClick={() => navigate({ to: s.to as never })}>
+              <span className="round-icon">
+                <s.icon size={22} />
+              </span>
+              <h2>{s.label}</h2>
+              <strong>{isLoading && !orders ? "—" : s.value}</strong>
+              <small>
+                {s.hint}
+                <ArrowLeft size={14} />
+              </small>
             </button>
-          </section>
-
-          <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
-            <div className="flex items-center justify-between px-5 py-3">
-              <Link to="/business/active" className="text-xs font-semibold text-primary hover:underline">
-                למסך המלא
-              </Link>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-success-text">
-                  <span>בזמן אמת</span>
-                  <span className="size-1.5 rounded-full bg-success" />
-                </div>
-                <h2 className="text-sm font-bold text-text-strong">מעקב חי - שליחים בתנועה</h2>
-              </div>
-            </div>
-            <Link to="/business/active" className="relative min-h-0 flex-1" aria-label="מעקב חי">
-              <LiveJobsMap pins={pins} />
-              {active.length === 0 && (
-                <div className="pointer-events-none absolute inset-0 grid place-items-center bg-muted/40 text-sm text-text-muted">
-                  אין שליחים פעילים כרגע
-                </div>
-              )}
-            </Link>
-          </section>
+          ))}
         </div>
-
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
-          <div className="flex items-center justify-between px-6 py-4">
-            <Link to="/business/orders" className="text-sm font-semibold text-primary hover:underline">
-              הצג את כל ההזמנות ←
-            </Link>
-            <h2 className="text-base font-bold text-text-strong">הזמנות אחרונות</h2>
-          </div>
-          {recent.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-text-muted">עדיין אין הזמנות</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-y border-border bg-muted text-xs text-text-muted">
-                  <th className="px-4 py-3 text-right font-semibold">מס׳ הזמנה</th>
-                  <th className="px-4 py-3 text-right font-semibold">תאריך ושעה</th>
-                  <th className="px-4 py-3 text-right font-semibold">יעד מסירה</th>
-                  <th className="px-4 py-3 text-right font-semibold">שליח</th>
-                  <th className="px-4 py-3 text-right font-semibold">סטטוס</th>
-                  <th className="px-4 py-3 text-right font-semibold">עלות</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((job) => (
-                  <tr key={job.id} className="border-b border-border last:border-0 hover:bg-muted/50">
-                    <td className="px-4 py-3.5">
-                      <Link to="/business/order/$id" params={{ id: job.id }} className="font-mono font-bold text-primary hover:underline">
-                        {job.job_number}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-text-subtle">{formatJobWhen(job.created_at)}</td>
-                    <td className="max-w-[14rem] truncate px-4 py-3.5">{job.dropoff_address || job.dropoff_area || "—"}</td>
-                    <td className="px-4 py-3.5">{jobCourierLabel(job)}</td>
-                    <td className="px-4 py-3.5">
-                      <span className={cn("inline-flex rounded-pill px-2.5 py-1 text-xs font-bold", statusPillClass(job.status))}>
-                        {job.status}
+        <div className="home-workspace">
+          <Panel
+            className="home-map-panel"
+            title="המשלוחים שלך על המפה"
+            icon={<MapPin size={19} />}
+            action={
+              <Link to="/business/active" className="link">
+                למעקב המלא
+                <ArrowLeft size={15} />
+              </Link>
+            }
+          >
+            <LiveJobsMap
+              pins={[...(storePin ? [storePin] : []), ...pins]}
+              onMarker={(id) => {
+                if (id === "store") navigate({ to: "/business/account" });
+                else navigate({ to: "/business/active", search: { job: id } });
+              }}
+              showControls
+            />
+            <div className="map-summary">
+              <span>
+                <Bike size={17} />
+                <strong>{moving.length}</strong> משלוחים בדרך
+              </span>
+              <span>מיקומים לפי נתוני השליחים בפועל</span>
+            </div>
+          </Panel>
+          <div className="home-bottom-grid">
+            <Panel title="ממתינות לאישור שלך" icon={<ClipboardList size={19} />} action={<Badge text={String(incoming.length)} tone="amber" />}>
+              <div className="approval-list">
+                {incoming.slice(0, 5).map((o) => (
+                  <div className="approval-row" key={o.id}>
+                    <Link to="/business/order/$id" params={{ id: o.id }} className="approval-person">
+                      <Avatar name={jobRecipientName(o)} />
+                      <span>
+                        <strong>{jobRecipientName(o)}</strong>
+                        <small>#{o.job_number} · {o.dropoff_area || o.dropoff_address || ""}</small>
                       </span>
-                    </td>
-                    <td className="px-4 py-3.5 font-bold">₪{jobPrice(job).toLocaleString("he-IL")}</td>
-                  </tr>
+                    </Link>
+                    <div className="approval-value">
+                      <strong>{money(jobPrice(o))}</strong>
+                      <span>{jobSourceLabel(o)}</span>
+                    </div>
+                    <Link to="/business/incoming" className="approve-action">
+                      <Check size={17} />
+                      טיפול
+                    </Link>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </section>
+                {incoming.length === 0 && (
+                  <div className="approval-empty">
+                    <CheckCheck size={25} />
+                    כל ההזמנות טופלו
+                  </div>
+                )}
+              </div>
+              <Link to="/business/incoming" className="panel-link">
+                לכל ההזמנות לאישור
+                <ArrowLeft size={15} />
+              </Link>
+            </Panel>
+            <Panel title="משלוחים בדרך" icon={<Bike size={19} />} action={<Badge text={String(moving.length)} tone="green" />}>
+              <div className="home-deliveries">
+                {moving.slice(0, 3).map((o) => (
+                  <button key={o.id} type="button" onClick={() => navigate({ to: "/business/active", search: { job: o.id } })}>
+                    <div className="home-courier">
+                      <Avatar name={jobCourierName(o) || "שליח"} />
+                      <span>
+                        <strong>{jobCourierName(o) || "ממתין לשליח"}</strong>
+                        <p>{o.dropoff_area || o.dropoff_address || ""}</p>
+                      </span>
+                    </div>
+                    <div>
+                      <Badge text={courierStepLabel(o)} tone={jobBadgeTone(o.status)} />
+                      <small>#{o.job_number}</small>
+                    </div>
+                    <div>
+                      <small>סטטוס</small>
+                      <b>{courierStepLabel(o)}</b>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <Link to="/business/active" className="panel-link">
+                לכל המשלוחים
+                <ArrowLeft size={15} />
+              </Link>
+            </Panel>
+          </div>
+        </div>
+        <Panel className="home-updates" title="עדכונים אחרונים" icon={<Bell size={19} />}>
+          <div className="three-cols">
+            {(notifs.length ? notifs.slice(0, 3) : [
+              { id: "empty", title: "אין עדכונים חדשים", body: "עדכוני משלוחים יופיעו כאן", icon: Bell },
+            ]).map((e: any) => (
+              <Link key={e.id} to="/business/notifications" className="update-tile">
+                <span className="event-icon green">
+                  <Bell size={22} />
+                </span>
+                <div>
+                  <strong>{e.title}</strong>
+                  <p>{e.body || "עדכון מהמערכת"}</p>
+                </div>
+                <ArrowLeft size={16} />
+              </Link>
+            ))}
+          </div>
+          <Link to="/business/notifications" className="panel-link">
+            לכל העדכונים
+            <ArrowLeft size={15} />
+          </Link>
+        </Panel>
+        <Panel className="quick-links" title="גישה מהירה">
+          <div className="four-cols">
+            {[
+              { t: "חיפוש משלוח", d: "לפי מספר הזמנה", i: Search, p: "/business/active" },
+              { t: "תמיכה ושירות", d: "אנחנו כאן בשבילך", i: Headphones, p: "/business/help" },
+              { t: "חשבוניות וחיובים", d: "כל החיובים שלך", i: FileText, p: "/business/billing" },
+              { t: "דוחות וסטטיסטיקות", d: "ביצועי העסק", i: BarChart3, p: "/business/analytics" },
+            ].map((l) => (
+              <Link key={l.p} to={l.p as never}>
+                <l.i size={25} />
+                <div>
+                  <strong>{l.t}</strong>
+                  <p>{l.d}</p>
+                </div>
+                <ArrowLeft size={16} />
+              </Link>
+            ))}
+          </div>
+        </Panel>
       </div>
     </BusinessShell>
-  );
-}
-
-function computeKpis(jobs: NestJob[]) {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-
-  const todayCount = jobs.filter((j) => isSameDay(j.created_at)).length;
-  const yesterdayCount = jobs.filter((j) => isSameDay(j.created_at, yesterday)).length;
-  const monthJobs = jobs.filter((j) => isSameMonth(j.created_at));
-  const lastMonthJobs = jobs.filter((j) => isSameMonth(j.created_at, lastMonth));
-  const monthSpend = Math.round(monthJobs.reduce((s, j) => s + jobPrice(j), 0));
-  const lastMonthSpend = Math.round(lastMonthJobs.reduce((s, j) => s + jobPrice(j), 0));
-  const active = jobs.filter((j) => ACTIVE_STATUSES.has(j.status));
-  const courierIds = new Set(active.map((j) => j.selected_courier_id).filter(Boolean));
-  const done = jobs.filter((j) => DONE_STATUSES.has(j.status) && j.created_at);
-  const minutes = done
-    .map((j) => {
-      const start = new Date(j.created_at!).getTime();
-      const end = new Date(String((j as { updated_at?: string }).updated_at || j.created_at)).getTime();
-      return (end - start) / 60_000;
-    })
-    .filter((m) => m > 0 && m < 24 * 60);
-
-  return {
-    todayCount,
-    todayDelta: percentDelta(todayCount, yesterdayCount),
-    activeCouriers: courierIds.size,
-    avgMin: minutes.length >= 2 ? Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length) : null,
-    monthSpend,
-    monthDelta: percentDelta(monthSpend, lastMonthSpend),
-  };
-}
-
-function DeliveryCard({ job }: { job: NestJob }) {
-  const courierName = jobCourierLabel(job);
-  const price = jobPrice(job);
-  const time = job.created_at
-    ? new Date(job.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
-    : "";
-  const tab = tabForStatus(job.status);
-
-  return (
-    <Link
-      to="/business/order/$id"
-      params={{ id: job.id }}
-      className="block rounded-card border border-border bg-surface p-4 shadow-card transition hover:shadow-card-strong active:scale-[0.995]"
-    >
-      <div className="mb-2.5 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className={cn("shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-black", statusPillClass(job.status))}>
-            {job.status}
-          </span>
-          {job.job_number && (
-            <span className="truncate font-mono text-[11px] font-bold text-text-muted">{job.job_number}</span>
-          )}
-        </div>
-        <span className="flex shrink-0 items-center gap-1 text-[11px] text-text-muted">
-          <Clock className="size-3" /> {time}
-        </span>
-      </div>
-      <div className="space-y-1.5">
-        <div className="flex items-start gap-1.5 text-[13px] text-text-strong">
-          <MapPin className="mt-0.5 size-3.5 shrink-0 text-text-muted" />
-          <span className="truncate">{job.pickup_address || "—"}</span>
-        </div>
-        <div className="flex items-start gap-1.5 text-[13px] text-text-strong">
-          <MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" />
-          <span className="truncate">{job.dropoff_address || "—"}</span>
-        </div>
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2.5">
-        <div className="truncate text-[12px] text-text-muted">
-          {courierName !== "—"
-            ? `שליח: ${courierName}`
-            : tab === "waiting"
-              ? "ממתין לשיבוץ שליח"
-              : tab === "active"
-                ? "בדרך"
-                : "הושלם"}
-        </div>
-        {price > 0 && (
-          <div className="shrink-0 text-sm font-black text-text-strong">₪{price.toLocaleString("he-IL")}</div>
-        )}
-      </div>
-    </Link>
   );
 }

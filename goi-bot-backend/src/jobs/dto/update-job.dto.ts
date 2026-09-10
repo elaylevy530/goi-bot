@@ -48,11 +48,6 @@ export class UpdateJobDto {
   per_job_amount?: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(128)
-  paypal_order_id?: string | null;
-
-  @IsOptional()
   @IsNumber()
   pickup_lat?: number | null;
 

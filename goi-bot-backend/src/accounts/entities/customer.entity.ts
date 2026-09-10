@@ -139,6 +139,7 @@ export class Customer {
   @Column({ type: "varchar", length: 64, nullable: true })
   payment_provider!: string | null;
 
+  /** Legacy PayPal vault fields — kept so synchronize does not drop historical columns. */
   @Column({ type: "varchar", length: 255, nullable: true })
   paypal_email!: string | null;
 

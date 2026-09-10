@@ -89,7 +89,7 @@ function BusinessIntegrationsPage() {
 
   if (isLoading || !integration) {
     return (
-      <BusinessShell title="חיבור אתר / הזמנות אוטומטיות">
+      <BusinessShell title="אינטגרציות וחיבורים">
         <div className="p-8 text-center text-slate-500">טוען…</div>
       </BusinessShell>
     );
@@ -118,8 +118,8 @@ function BusinessIntegrationsPage() {
 
   return (
     <BusinessShell
-      title="חיבור אתר / הזמנות אוטומטיות"
-      subtitle="חבר את האתר שלך וקבל הזמנות ישירות לפאנל — חיפוש שליח אוטומטי"
+      title="אינטגרציות וחיבורים"
+      subtitle="ניהול מקורות ההזמנות והחיבורים של העסק"
     >
       <div className="grid gap-6">
         {/* Status + Auto mode */}

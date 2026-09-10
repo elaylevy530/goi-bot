@@ -1,79 +1,88 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { BusinessShell } from "@/components/BusinessShell";
-import { Card, CardContent } from "@/components/ui/card";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { HelpCircle, MessageSquare, Package, Wallet, Star, MapPin } from "lucide-react";
+import { Bike, CheckCheck, ChevronLeft, CreditCard, Headphones, MessageCircle, Package } from "lucide-react";
+import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
+import { Panel } from "@/components/business/goi/GoiUi";
 
 export const Route = createFileRoute("/business/help")({
-  head: () => ({ meta: [{ title: "עזרה — Goi" }] }),
+  head: () => ({ meta: [{ title: "עזרה ותמיכה — Goi" }] }),
   ssr: false,
   component: HelpPage,
 });
 
 const FAQ = [
-  { q: "איך מזמינים שליח ראשון?", a: "לחצו על 'משלוח חדש' בתפריט, מלאו כתובת איסוף, מסירה ופרטי הנמען. תוך שניות שליחים פנויים יקבלו את ההזמנה." },
-  { q: "מה ההבדל בין מצב פרטי לעסקי?", a: "במצב פרטי תפריט מקוצר — רק משלוחים והיסטוריה. עסקי כולל חשבונית חודשית, סניפים, קווי חלוקה והזמנות קבועות. ניתן לשנות בכל רגע ב'הגדרות'." },
-  { q: "איך עוקבים אחרי שליח בזמן אמת?", a: "במסך 'המשלוחים שלי' לחצו על המשלוח, ואז 'מעקב חי'. תופיע מפה עם מיקום השליח. ניתן גם לשתף קישור עם הנמען." },
-  { q: "איך מבטלים משלוח?", a: "בכניסה לפרטי המשלוח יש כפתור 'בטל'. ניתן לבטל רק אם השליח עדיין לא אסף את החבילה." },
-  { q: "איך טוענים את הארנק?", a: "בתפריט יש 'ארנק'. בחרו סכום (החל מ-10 ש״ח) ולחצו טען. בטעינה של 100₪+ מקבלים 10% מתנה." },
-  { q: "איך שומרים נמענים חוזרים?", a: "מתוך משלוח קיים — 'שמור נמען'. כל הנמענים מופיעים ב'אנשי קשר' ויופיעו כהשלמה אוטומטית בטופס משלוח." },
-  { q: "מה זה תבנית משלוח?", a: "אם אתם שולחים שוב ושוב אותם פרטים, שמרו אותם פעם אחת כתבנית. בפעם הבאה — לחיצה אחת ויש משלוח מוכן." },
-  { q: "איך מקבלים חשבונית?", a: "כל משלוח שהושלם נכנס ל'חיובים ותשלומים'. שם ניתן להוריד חשבונית מס לטווח תאריכים." },
+  { q: "איך פותחים משלוח חדש?", a: "בוחרים «הזמנה חדשה» בתפריט, ממלאים כתובת איסוף ומסירה, פרטי נמען, תכולה ותזמון, ואז מאשרים. המשלוח יופיע במעקב משלוחים פעילים או בהזמנות נכנסות לפי סוג התמחור." },
+  { q: "איפה רואים את השליח?", a: "במסך «מעקב משלוחים פעילים» בוחרים משלוח. אם שובץ שליח אפשר לפתוח «עקוב במפה» או «צ׳אט עם השליח». בלי שליח הכפתור מושבת." },
+  { q: "איפה נמצאות החשבוניות?", a: "בתפריט «חשבוניות וחיובים» מופיעות יתרת הארנק, פירוט העסקאות וחשבוניות חודשיות להורדה." },
+  { q: "איך מבטלים משלוח?", a: "בפרטי המשלוח או בהזמנות נכנסות אפשר לבטל כל עוד השליח עדיין לא אסף. לאחר איסוף יש לפנות לתמיכה." },
+  { q: "איפה מנהלים צוות?", a: "«צוות והרשאות» נמצא בתוך «העסק שלי», ולא בתפריט הראשי." },
 ];
 
-const GUIDES = [
-  { icon: Package, title: "המדריך המלא להזמנה ראשונה", desc: "צעד אחר צעד — מהרגע שנכנסתם ועד שהחבילה נמסרת." },
-  { icon: MapPin, title: "מעקב חי וקישור לנמען", desc: "איך לשתף את הנמען בקישור מעקב מבלי שיצטרך להתחבר." },
-  { icon: Wallet, title: "ארנק, קופונים וחיובים", desc: "כל מה שצריך לדעת על תשלומים, זיכויים והנחות." },
-  { icon: Star, title: "שליחים מועדפים ודירוגים", desc: "איך בונים רשימת שליחים שאתם אוהבים לעבוד איתם." },
+const TOPICS = [
+  { t: "עזרה בהזמנה חדשה", i: Package, to: "/business/new-delivery" },
+  { t: "בעיה במשלוח פעיל", i: Bike, to: "/business/active" },
+  { t: "המשלוח הגיע ונשמח לעזרה", i: CheckCheck, to: "/business/history" },
+  { t: "חיובים ותשלומים", i: CreditCard, to: "/business/billing" },
 ];
 
 function HelpPage() {
+  const navigate = useNavigate();
+  const { data: me } = useMyBusiness();
+  const first = ((me as { name?: string } | null)?.name || "שלום").split(" ")[0];
+
   return (
-    <BusinessShell title="מרכז עזרה" subtitle="שאלות נפוצות, מדריכים ויצירת קשר">
-      <div className="space-y-4 max-w-4xl mx-auto">
-        <div className="grid sm:grid-cols-2 gap-3">
-          {GUIDES.map((g) => {
-            const Icon = g.icon;
-            return (
-              <Card key={g.title} className="rounded-2xl border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="p-4 flex items-start gap-3">
-                  <span className="size-10 grid place-items-center rounded-xl bg-emerald-50 text-[#35AD29] shrink-0"><Icon className="size-5" /></span>
-                  <div>
-                    <div className="font-extrabold text-slate-900 text-sm">{g.title}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{g.desc}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+    <BusinessShell>
+      <div className="support-home extra-page extra-support">
+        <div className="support-welcome">
+          <div>
+            <h1>
+              היי {first},
+              <br />
+              <span>איך אפשר לעזור?</span>
+            </h1>
+            <p>
+              אנחנו כאן בשבילך. בחר נושא או פתח פנייה
+              <br />
+              לצוות התמיכה.
+            </p>
+          </div>
+          <span className="support-symbol">
+            <MessageCircle size={65} />
+          </span>
         </div>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardContent className="p-5">
-            <div className="font-extrabold text-slate-900 mb-3 flex items-center gap-2"><HelpCircle className="size-4 text-[#35AD29]" /> שאלות נפוצות</div>
-            <Accordion type="single" collapsible className="w-full">
-              {FAQ.map((f, i) => (
-                <AccordionItem key={i} value={`item-${i}`}>
-                  <AccordionTrigger className="text-right text-sm font-bold">{f.q}</AccordionTrigger>
-                  <AccordionContent className="text-sm text-slate-600">{f.a}</AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm bg-emerald-50/50">
-          <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <div className="font-extrabold text-slate-900">לא מצאת תשובה?</div>
-              <div className="text-sm text-slate-600 mt-0.5">צוות התמיכה זמין בצ׳אט וביצירת פניות.</div>
-            </div>
-            <Link to="/business/support" className="px-4 py-2 rounded-xl bg-primary-deep text-white font-bold text-sm flex items-center gap-2 hover:bg-primary-deep/90">
-              <MessageSquare className="size-4" /> פתח פנייה לתמיכה
+        <button type="button" className="panel support-agent" onClick={() => navigate({ to: "/business/support" })}>
+          <span className="round-icon">
+            <Headphones />
+          </span>
+          <div>
+            <h3>פנייה לתמיכה</h3>
+            <p>
+              פתח קריאה במערכת או דבר איתנו בוואטסאפ.
+              <br />
+              אין כאן בוט הדגמה — הפנייה מגיעה לצוות האמיתי.
+            </p>
+          </div>
+          <ChevronLeft />
+        </button>
+        <div className="support-topics">
+          {TOPICS.map((s) => (
+            <Link key={s.t} to={s.to as never}>
+              <s.i size={20} />
+              {s.t}
+              <ChevronLeft size={16} />
             </Link>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
+        <Panel title="שאלות נפוצות">
+          <Accordion type="single" collapsible>
+            {FAQ.map((s) => (
+              <AccordionItem key={s.q} value={s.q}>
+                <AccordionTrigger>{s.q}</AccordionTrigger>
+                <AccordionContent>{s.a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </Panel>
       </div>
     </BusinessShell>
   );

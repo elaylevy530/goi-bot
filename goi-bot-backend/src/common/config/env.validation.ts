@@ -39,12 +39,6 @@ const envSchema = z
     WHATSAPP_CLOUD_APP_SECRET: z.string().optional(),
     WHATSAPP_CLOUD_API_VERSION: z.string().optional(),
 
-    // PayPal — optional; webhook accepts + persists events without verification when unset.
-    PAYPAL_CLIENT_ID: z.string().optional(),
-    PAYPAL_CLIENT_SECRET: z.string().optional(),
-    PAYPAL_MODE: z.enum(["sandbox", "live"]).optional(),
-    PAYPAL_WEBHOOK_ID: z.string().optional(),
-
     // Chat push webhook (DB trigger -> Nest) — optional; guard returns 503 when unset.
     CHAT_PUSH_TOKEN: z.string().optional(),
 

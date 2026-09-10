@@ -43,7 +43,7 @@ export function replyToSupport(body: string | null | undefined): SupportBotResul
   ) {
     return { reply: REPLIES.human, handoff: true };
   }
-  if (includesAny(text, ["תשלום", "ארנק", "משיכ", "עמלה", "כסף", "paypal", "משכור"])) {
+  if (includesAny(text, ["תשלום", "ארנק", "משיכ", "עמלה", "כסף", "משכור"])) {
     return { reply: REPLIES.pay, handoff: false };
   }
   if (includesAny(text, ["משלוח", "עבוד", "איסוף", "מסיר", "דילג", "דלג", "הזמנ"])) {

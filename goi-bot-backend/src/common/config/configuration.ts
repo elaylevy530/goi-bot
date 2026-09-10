@@ -51,12 +51,6 @@ export default () => {
       appSecret: process.env.WHATSAPP_CLOUD_APP_SECRET || undefined,
       apiVersion: process.env.WHATSAPP_CLOUD_API_VERSION || "v21.0",
     },
-    paypal: {
-      clientId: process.env.PAYPAL_CLIENT_ID || undefined,
-      clientSecret: process.env.PAYPAL_CLIENT_SECRET || undefined,
-      mode: process.env.PAYPAL_MODE || "sandbox",
-      webhookId: process.env.PAYPAL_WEBHOOK_ID || undefined,
-    },
     chatPush: {
       token: process.env.CHAT_PUSH_TOKEN || undefined,
     },

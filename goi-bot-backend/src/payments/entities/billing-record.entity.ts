@@ -20,7 +20,7 @@ export class BillingRecord {
   @Column({ type: "uuid" })
   business_id!: string;
 
-  @Column({ type: "varchar", length: 64, default: "paypal" })
+  @Column({ type: "varchar", length: 64, default: "pending" })
   provider!: string;
 
   @Column({ type: "varchar", length: 64, default: "pending" })
@@ -38,6 +38,7 @@ export class BillingRecord {
   @Column({ type: "numeric", default: 0 })
   platform_fee!: string;
 
+  /** Legacy PayPal ids — kept so synchronize does not drop historical columns. */
   @Column({ type: "varchar", length: 128, nullable: true })
   paypal_order_id!: string | null;
 

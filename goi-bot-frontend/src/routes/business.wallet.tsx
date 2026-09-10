@@ -65,7 +65,7 @@ function WalletPage() {
                 <div className="text-4xl font-extrabold text-slate-900 mt-1 flex items-center gap-2">
                   <Wallet className="size-7 text-[#35AD29]" /> ₪{balance.toLocaleString("he-IL")}
                 </div>
-                <div className="text-xs text-slate-500 mt-2">כל משלוח יורד מהיתרה אוטומטית. אם אין יתרה — סליקה דרך אמצעי תשלום שמור או בהזמנה.</div>
+                <div className="text-xs text-slate-500 mt-2">כל משלוח יורד מהיתרה אוטומטית. סליקת כרטיס תחובר בהמשך.</div>
               </div>
               <div className="text-xs text-slate-600 max-w-[280px] text-right space-y-1 bg-white/70 rounded-xl p-3 border border-emerald-100">
                 <div className="font-extrabold text-emerald-700">מדרגות בונוס:</div>
@@ -100,9 +100,9 @@ function WalletPage() {
                 </div>
               )}
               <Button onClick={() => recharge.mutate()} disabled={recharge.isPending} className="w-full bg-primary-deep hover:bg-primary-deep/90">
-                {recharge.isPending ? "טוען..." : "שלם דרך PayPal וטען"}
+                {recharge.isPending ? "טוען..." : "טען יתרה"}
               </Button>
-              <div className="text-[11px] text-slate-400 text-center">הסליקה דרך PayPal Business — תחובר ברגע שתעדכן/י את ה-Credentials.</div>
+              <div className="text-[11px] text-slate-400 text-center">הטעינה נרשמת בארנק. סליקת כרטיס תחובר בהמשך.</div>
             </CardContent>
           </Card>
 
@@ -113,10 +113,10 @@ function WalletPage() {
                 במקום לטעון ארנק — שמרו אמצעי תשלום קבוע. בכל הזמנה שאין בה יתרה בארנק, נחייב אוטומטית את האמצעי השמור.
               </div>
               <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500 border border-slate-200">
-                לא נשמר אמצעי תשלום. ברגע שתחבר/י PayPal, יופיע כאן כפתור "הוסף PayPal" + רשימת אמצעים שמורים.
+                אין אמצעי תשלום שמור. סליקת כרטיס תחובר בהמשך — בינתיים אפשר לטעון את הארנק.
               </div>
               <Button variant="outline" className="w-full" disabled>
-                הוסף אמצעי תשלום (PayPal Vault) — בקרוב
+                הוסף אמצעי תשלום — בקרוב
               </Button>
             </CardContent>
           </Card>

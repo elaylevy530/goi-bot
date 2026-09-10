@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { loadGoogleMaps } from "@/components/customer/AddressAutocomplete";
 import type { LiveMapPin } from "@/lib/business-panel";
@@ -10,18 +10,24 @@ type Props = {
   pins: LiveMapPin[];
   className?: string;
   showControls?: boolean;
+  selectedId?: string;
+  onMarker?: (id: string) => void;
 };
 
-function pinColor(el: HTMLElement | null) {
-  if (!el) return "#2979ff";
-  const value = getComputedStyle(el).getPropertyValue("--primary").trim();
-  return value || "#2979ff";
+function pinFill(pin: LiveMapPin, fallback: string) {
+  if (pin.color) return pin.color;
+  if (pin.type === "store") return "#00a334";
+  if (pin.type === "destination") return "#b38235";
+  return fallback;
 }
 
-export function LiveJobsMap({ pins, className, showControls }: Props) {
+export function LiveJobsMap({ pins, className, showControls, selectedId, onMarker }: Props) {
   const divRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const onMarkerRef = useRef(onMarker);
+  const [mapReady, setMapReady] = useState(false);
+  onMarkerRef.current = onMarker;
 
   useEffect(() => {
     let cancelled = false;
@@ -38,11 +44,12 @@ export function LiveJobsMap({ pins, className, showControls }: Props) {
           styles: [
             { featureType: "poi", stylers: [{ visibility: "off" }] },
             { featureType: "transit", stylers: [{ visibility: "off" }] },
-            { featureType: "water", stylers: [{ color: "#e2e8f0" }] },
-            { featureType: "landscape", stylers: [{ color: "#f1f5f9" }] },
+            { featureType: "water", stylers: [{ color: "#dce8e1" }] },
+            { featureType: "landscape", stylers: [{ color: "#eef4f0" }] },
             { featureType: "road", stylers: [{ color: "#ffffff" }] },
           ],
         });
+        setMapReady(true);
       })
       .catch(() => {});
     return () => {
@@ -52,8 +59,8 @@ export function LiveJobsMap({ pins, className, showControls }: Props) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !window.google?.maps) return;
-    const fill = pinColor(divRef.current);
+    if (!map || !window.google?.maps || !mapReady) return;
+    const fallback = "#087d52";
 
     for (const marker of markersRef.current) marker.setMap(null);
     markersRef.current = [];
@@ -66,21 +73,30 @@ export function LiveJobsMap({ pins, className, showControls }: Props) {
 
     const bounds = new window.google.maps.LatLngBounds();
     for (const pin of pins) {
+      const selected = selectedId === pin.id;
       const marker = new window.google.maps.Marker({
         position: { lat: pin.lat, lng: pin.lng },
         map,
         title: pin.label,
+        zIndex: selected ? 20 : pin.type === "store" ? 15 : 5,
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: fill,
+          scale: pin.type === "store" ? 14 : selected ? 12 : 10,
+          fillColor: pinFill(pin, fallback),
           fillOpacity: 1,
           strokeColor: "#ffffff",
-          strokeWeight: 3,
+          strokeWeight: selected ? 4 : 3,
         },
       });
+      marker.addListener("click", () => onMarkerRef.current?.(pin.id));
       markersRef.current.push(marker);
       bounds.extend({ lat: pin.lat, lng: pin.lng });
+    }
+    const focused = pins.find((p) => p.id === selectedId);
+    if (focused) {
+      map.panTo({ lat: focused.lat, lng: focused.lng });
+      map.setZoom(Math.max(map.getZoom() ?? 14, 14));
+      return;
     }
     if (pins.length === 1) {
       map.setCenter({ lat: pins[0].lat, lng: pins[0].lng });
@@ -88,7 +104,7 @@ export function LiveJobsMap({ pins, className, showControls }: Props) {
     } else {
       map.fitBounds(bounds, 48);
     }
-  }, [pins]);
+  }, [pins, selectedId, mapReady]);
 
   const bumpZoom = (delta: number) => {
     const map = mapRef.current;
@@ -97,32 +113,23 @@ export function LiveJobsMap({ pins, className, showControls }: Props) {
   };
 
   return (
-    <div className={cn("relative h-full min-h-[16rem] w-full bg-map-canvas", className)}>
+    <div className={cn("goi-map relative h-full min-h-[16rem] w-full", className)}>
       <div
         ref={divRef}
-        className="h-full min-h-[16rem] w-full bg-map-canvas"
+        className="h-full min-h-[16rem] w-full"
         role="img"
-        aria-label="מפת שליחים"
+        aria-label="מפת משלוחים"
       />
       {showControls && (
-        <div className="absolute start-4 top-4 z-10 flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-kpi">
-          <button
-            type="button"
-            onClick={() => bumpZoom(1)}
-            className="grid size-8 place-items-center text-text-strong hover:bg-muted"
-            aria-label="הגדל"
-          >
-            <Plus className="size-4" />
-          </button>
-          <div className="h-px bg-border" />
-          <button
-            type="button"
-            onClick={() => bumpZoom(-1)}
-            className="grid size-8 place-items-center text-text-strong hover:bg-muted"
-            aria-label="הקטן"
-          >
-            <Minus className="size-4" />
-          </button>
+        <div className="map-controls">
+          <div>
+            <button type="button" onClick={() => bumpZoom(1)} aria-label="הגדל">
+              <Plus className="size-4" />
+            </button>
+            <button type="button" onClick={() => bumpZoom(-1)} aria-label="הקטן">
+              <Minus className="size-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

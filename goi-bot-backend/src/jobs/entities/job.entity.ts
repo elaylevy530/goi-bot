@@ -223,6 +223,7 @@ export class Job {
   @Column({ type: "numeric", nullable: true })
   per_job_amount!: string | null;
 
+  /** Legacy PayPal order id — kept so synchronize does not drop the historical column. */
   @Column({ type: "varchar", length: 128, nullable: true })
   paypal_order_id!: string | null;
 

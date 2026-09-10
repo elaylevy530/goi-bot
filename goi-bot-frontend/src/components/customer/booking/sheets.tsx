@@ -1,16 +1,11 @@
 import { useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { PayPalScriptProvider, PayPalButtons, FUNDING } from "@paypal/react-paypal-js";
-import { toast } from "sonner";
 import { ArrowRight, Radar, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import {
-  createGuestPaypalOrderFn,
-  captureGuestPaypalOrderFn,
   getGuestJobStatusFn,
   type createGuestOrderFn,
 } from "@/lib/guest-order.functions";
-import { getPaypalConfigFn } from "@/lib/paypal-billing.functions";
 
 export type CreatedOrder = Awaited<ReturnType<typeof createGuestOrderFn>>;
 
@@ -23,13 +18,8 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** PayPal payment step — fullscreen bottom sheet over navy backdrop. */
-export function PaymentSheet({ created, onDone, onBack }: { created: CreatedOrder; onDone: () => void; onBack: () => void }) {
-  const getCfg = useServerFn(getPaypalConfigFn);
-  const createPP = useServerFn(createGuestPaypalOrderFn);
-  const capturePP = useServerFn(captureGuestPaypalOrderFn);
-  const { data: cfg } = useQuery({ queryKey: ["paypal-config"], queryFn: () => getCfg() });
-
+/** Payment step — card checkout is not connected yet. */
+export function PaymentSheet({ created, onBack }: { created: CreatedOrder; onDone: () => void; onBack: () => void }) {
   return (
     <div className="fixed inset-0 bottom-16 md:bottom-0 flex flex-col bg-slate-100">
       <div className="px-4 pt-3">
@@ -56,38 +46,10 @@ export function PaymentSheet({ created, onDone, onBack }: { created: CreatedOrde
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <ShieldCheck className="size-4 text-emerald-600" /> תשלום מאובטח. החיוב יתבצע לפי תנאי ההזמנה.
+          <div className="flex items-start gap-2 text-xs text-slate-500">
+            <ShieldCheck className="size-4 text-emerald-600 shrink-0 mt-0.5" />
+            סליקת כרטיס תחובר בהמשך. ההזמנה נשמרה, אבל התשלום לא בוצע.
           </div>
-
-          {cfg?.clientId ? (
-            <PayPalScriptProvider
-              options={{ clientId: cfg.clientId, currency: cfg.currency, intent: "capture", components: "buttons", locale: "he_IL", disableFunding: "card,credit" }}
-            >
-              <PayPalButtons
-                fundingSource={FUNDING.PAYPAL}
-                style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
-                createOrder={async () => {
-                  const r = await createPP({ data: { job_id: created.job_id, tracking_token: created.tracking_token, amount: created.amount_to_charge_now } });
-                  if (!r?.order_id) throw new Error("לא ניתן ליצור הזמנה");
-                  return r.order_id;
-                }}
-                onApprove={async (data) => {
-                  try {
-                    await capturePP({ data: { job_id: created.job_id, tracking_token: created.tracking_token, order_id: data.orderID } });
-                    toast.success("התשלום אושר");
-                    onDone();
-                  } catch (e: any) {
-                    toast.error("שגיאה: " + (e?.message ?? "לא ידוע"));
-                  }
-                }}
-                onError={(err) => toast.error("PayPal: " + (((err as any)?.message as string) ?? "שגיאה"))}
-                onCancel={() => toast.message("התשלום בוטל")}
-              />
-            </PayPalScriptProvider>
-          ) : (
-            <div className="py-6 text-center"><Loader2 className="size-5 animate-spin mx-auto" /></div>
-          )}
         </div>
       </div>
     </div>

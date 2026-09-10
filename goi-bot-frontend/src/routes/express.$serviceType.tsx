@@ -2,17 +2,13 @@ import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-ro
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { PayPalScriptProvider, PayPalButtons, FUNDING } from "@paypal/react-paypal-js";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, ShieldCheck, Bike, Calendar, Truck, PackageCheck, Sofa, Refrigerator, Bed, Tv, WashingMachine, Armchair, Package, Boxes, Piano, Bike as BikeIcon, Utensils, Home as HomeIcon } from "lucide-react";
 import {
   getPricingRulesFn,
   createGuestOrderFn,
   confirmGuestOrderFn,
-  createGuestPaypalOrderFn,
-  captureGuestPaypalOrderFn,
 } from "@/lib/guest-order.functions";
-import { getPaypalConfigFn } from "@/lib/paypal-billing.functions";
 
 const VALID = new Set(["same_day", "scheduled", "small_move", "big_move"]);
 
@@ -361,14 +357,9 @@ function MoveCategoryPicker({ selected, onChange }: { selected: string; onChange
   );
 }
 
-function PaymentStep({ created, onDone, onBack }: {
+function PaymentStep({ created, onBack }: {
   created: CreatedOrder; onDone: () => void; onBack: () => void;
 }) {
-  const getCfg = useServerFn(getPaypalConfigFn);
-  const createPP = useServerFn(createGuestPaypalOrderFn);
-  const capturePP = useServerFn(captureGuestPaypalOrderFn);
-  const { data: cfg } = useQuery({ queryKey: ["paypal-config"], queryFn: () => getCfg() });
-
   return (
     <div dir="rtl" className="min-h-screen bg-[#f5f3ee] text-[#0d0d0d]">
       <header className="border-b border-[#0d0d0d]/10 bg-[#f5f3ee]/85 backdrop-blur-xl sticky top-0 z-10">
@@ -404,54 +395,10 @@ function PaymentStep({ created, onDone, onBack }: {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-[#0d0d0d]/50">
-            <ShieldCheck className="size-4 text-[#35AD29]" />
-            תשלום מאובטח דרך PayPal · לא נשמרים אצלנו פרטי כרטיס.
+          <div className="flex items-start gap-2 text-xs text-[#0d0d0d]/50">
+            <ShieldCheck className="size-4 text-[#35AD29] shrink-0 mt-0.5" />
+            סליקת כרטיס תחובר בהמשך. ההזמנה נשמרה, אבל התשלום לא בוצע.
           </div>
-
-          {cfg?.clientId ? (
-            <PayPalScriptProvider
-              options={{
-                clientId: cfg.clientId,
-                currency: cfg.currency,
-                intent: "capture",
-                components: "buttons",
-                locale: "he_IL",
-                disableFunding: "card,credit",
-              }}
-            >
-              <PayPalButtons
-                fundingSource={FUNDING.PAYPAL}
-                style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
-                createOrder={async () => {
-                  const r = await createPP({ data: {
-                    job_id: created.job_id,
-                    tracking_token: created.tracking_token,
-                    amount: created.amount_to_charge_now,
-                  } });
-                  if (!r?.order_id) throw new Error("לא ניתן ליצור הזמנה");
-                  return r.order_id;
-                }}
-                onApprove={async (data) => {
-                  try {
-                    await capturePP({ data: {
-                      job_id: created.job_id,
-                      tracking_token: created.tracking_token,
-                      order_id: data.orderID,
-                    } });
-                    toast.success("התשלום אושר ✅");
-                    onDone();
-                  } catch (e: any) {
-                    toast.error("שגיאה: " + (e?.message ?? "לא ידוע"));
-                  }
-                }}
-                onError={(err) => toast.error("PayPal: " + (((err as any)?.message as string) ?? "שגיאה"))}
-                onCancel={() => toast.message("התשלום בוטל")}
-              />
-            </PayPalScriptProvider>
-          ) : (
-            <div className="py-8 text-center"><Loader2 className="size-5 animate-spin mx-auto" /></div>
-          )}
         </div>
       </div>
     </div>

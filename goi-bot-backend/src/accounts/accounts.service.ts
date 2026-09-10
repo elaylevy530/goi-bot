@@ -606,13 +606,11 @@ export class AccountsService implements OnModuleInit {
     }
     if (dto.payment_method_on_file === false) {
       customer.payment_method_added_at = null;
+      // Clear leftover PayPal vault columns until a new processor replaces them.
       customer.paypal_vault_id = null;
       customer.paypal_payer_id = null;
       customer.paypal_email = null;
       customer.paypal_setup_at = null;
-    }
-    if (dto.paypal_vault_id) {
-      customer.paypal_setup_at = new Date();
     }
     if (dto.niche_details) {
       customer.niche_details = { ...(customer.niche_details ?? {}), ...dto.niche_details };

@@ -1,122 +1,128 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
-import { Card, CardContent } from "@/components/ui/card";
-import { nestListJobs } from "@/lib/nest-jobs";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { TrendingUp, Package, Clock, MapPin } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Bike, CheckCheck, Download, Package, Wallet } from "lucide-react";
+import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
+import { DataTable, Panel, SelectBox, exportCsv, money } from "@/components/business/goi/GoiUi";
+import {
+  isHistoryJob,
+  isIncomingJob,
+  isSameDay,
+  isSameMonth,
+  isTrackingJob,
+  jobPrice,
+  jobSourceLabel,
+} from "@/lib/business-panel";
+import type { NestJob } from "@/lib/nest-jobs";
 
 export const Route = createFileRoute("/business/analytics")({
-  head: () => ({ meta: [{ title: "אנליטיקות — Goi" }] }),
+  head: () => ({ meta: [{ title: "דוחות וסטטיסטיקות — Goi" }] }),
   ssr: false,
   component: AnalyticsPage,
 });
 
-const COLORS = ["#35AD29", "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+function inPeriod(job: NestJob, period: string) {
+  if (period === "היום") return isSameDay(job.created_at);
+  if (period === "השבוע") {
+    const d = job.created_at ? new Date(job.created_at) : null;
+    if (!d) return false;
+    const start = new Date();
+    start.setDate(start.getDate() - 7);
+    return d >= start;
+  }
+  if (period === "החודש") return isSameMonth(job.created_at);
+  return true;
+}
 
 function AnalyticsPage() {
   const { data: me } = useMyBusiness();
-
-  const { data: jobs = [] } = useQuery({
-    queryKey: ["analytics-jobs", me?.id],
-    enabled: !!me?.id,
-    queryFn: async () => {
-      const since = new Date();
-      since.setMonth(since.getMonth() - 6);
-      const all = await nestListJobs({ limit: 500 });
-      return all.filter((j) => {
-        const created = j.created_at ? new Date(String(j.created_at)) : null;
-        return created && created >= since;
-      });
-    },
-  });
-
-  const stats = useMemo(() => {
-    const total = jobs.length;
-    const completed = jobs.filter((j: any) => j.status === "הושלמה").length;
-    const spend = jobs.reduce((s: number, j: any) => s + Number(j.customer_price || j.final_price || j.payment || 0), 0);
-    const avg = completed ? Math.round(spend / completed) : 0;
-    return { total, completed, spend, avg };
-  }, [jobs]);
-
-  const byMonth = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const j of jobs as any[]) {
-      const d = new Date(j.created_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      m[key] = (m[key] || 0) + Number(j.customer_price || j.final_price || j.payment || 0);
-    }
-    return Object.entries(m).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ month: k, spend: v }));
-  }, [jobs]);
-
-  const byArea = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const j of jobs as any[]) {
-      const k = j.dropoff_area || "לא ידוע";
-      m[k] = (m[k] || 0) + 1;
-    }
-    return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, value]) => ({ name, value }));
-  }, [jobs]);
+  const { data: jobs = [] } = useBusinessJobs(me?.id);
+  const [period, setPeriod] = useState("החודש");
+  const shown = useMemo(() => jobs.filter((j) => inPeriod(j, period)), [jobs, period]);
+  const completed = shown.filter((j) => j.status === "הושלמה");
+  const cancelled = shown.filter((j) => j.status === "בוטלה");
+  const spend = shown.reduce((s, j) => s + jobPrice(j), 0);
+  const sources = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const j of shown) map.set(jobSourceLabel(j), (map.get(jobSourceLabel(j)) || 0) + 1);
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [shown]);
+  const maxSource = Math.max(1, ...sources.map(([, n]) => n));
 
   return (
-    <BusinessShell title="אנליטיקות" subtitle="ניתוח הוצאות ומשלוחים — 6 חודשים אחרונים">
-      <div className="space-y-4 max-w-5xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi icon={Package} label="משלוחים" value={stats.total} />
-          <Kpi icon={Clock} label="הושלמו" value={stats.completed} />
-          <Kpi icon={TrendingUp} label='סה"כ הוצאה' value={`₪${stats.spend.toLocaleString("he-IL")}`} />
-          <Kpi icon={MapPin} label="ממוצע למשלוח" value={`₪${stats.avg.toLocaleString("he-IL")}`} />
+    <BusinessShell title="דוחות וסטטיסטיקות" subtitle="תמונת מצב של פעילות המשלוחים בעסק">
+      <div className="extra-page extra-reports">
+        <div className="section-toolbar">
+          <SelectBox label="תקופת דוח" value={period} onChange={setPeriod} options={["היום", "השבוע", "החודש"]} />
+          <button
+            type="button"
+            className="btn outline"
+            onClick={() =>
+              exportCsv(
+                "GOI-report",
+                ["מספר משלוח", "תאריך", "סטטוס", "מקור", "עלות"],
+                shown.map((j) => [j.job_number, j.created_at || "", j.status, jobSourceLabel(j), jobPrice(j)]),
+              )
+            }
+          >
+            <Download size={16} />
+            ייצוא דוח
+          </button>
         </div>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardContent className="p-5">
-            <div className="font-extrabold text-slate-900 mb-3">הוצאות לפי חודש</div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byMonth}>
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="spend" fill="#35AD29" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardContent className="p-5">
-            <div className="font-extrabold text-slate-900 mb-3">אזורי מסירה מובילים</div>
-            {byArea.length === 0 ? (
-              <div className="text-sm text-slate-400 text-center py-8">אין נתונים עדיין</div>
+        <div className="four-cols">
+          <Panel className="report-number">
+            <Package />
+            <strong>{shown.length}</strong>
+            <p>סה״כ הזמנות</p>
+          </Panel>
+          <Panel className="report-number">
+            <CheckCheck />
+            <strong>{completed.length}</strong>
+            <p>נמסרו בהצלחה</p>
+          </Panel>
+          <Panel className="report-number">
+            <Wallet />
+            <strong>{money(spend)}</strong>
+            <p>עלות משלוחים</p>
+          </Panel>
+          <Panel className="report-number">
+            <Bike />
+            <strong>{shown.filter(isTrackingJob).length}</strong>
+            <p>משלוחים פעילים</p>
+          </Panel>
+        </div>
+        <div className="two-cols">
+          <Panel title="משלוחים לפי מקור הזמנה">
+            {sources.length === 0 ? (
+              <p className="hint">אין משלוחים בתקופה שנבחרה.</p>
             ) : (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={byArea} dataKey="value" nameKey="name" outerRadius={90} label>
-                      {byArea.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="bar-chart">
+                {sources.map(([name, count], i) => (
+                  <div key={name}>
+                    <span>{name}</span>
+                    <div>
+                      <i style={{ width: `${(count / maxSource) * 100}%`, background: ["#08913e", "#2092df", "#9c64c9", "#779a85"][i % 4] }} />
+                    </div>
+                    <strong>{count}</strong>
+                  </div>
+                ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
+          <Panel title="סיכום פעילות">
+            <DataTable
+              headers={["סטטוס", "משלוחים"]}
+              rows={[
+                ["ממתינות לאישור", shown.filter(isIncomingJob).length],
+                ["בתהליך", shown.filter(isTrackingJob).length],
+                ["נמסרו", completed.length],
+                ["בוטלו", cancelled.length],
+                ["היסטוריה", shown.filter(isHistoryJob).length],
+              ]}
+            />
+          </Panel>
+        </div>
+        <p className="hint">הנתונים מגיעים ממשלוחי העסק האמיתיים. הייצוא כולל רק את התקופה שנבחרה.</p>
       </div>
     </BusinessShell>
-  );
-}
-
-function Kpi({ icon: Icon, label, value }: { icon: any; label: string; value: any }) {
-  return (
-    <Card className="rounded-2xl border-slate-200 shadow-sm">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-slate-500 text-xs"><Icon className="size-4" /> {label}</div>
-        <div className="text-2xl font-extrabold text-slate-900 mt-1">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

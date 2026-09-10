@@ -14,6 +14,7 @@ import { ChevronLeft, Code2, Heart, Loader2, LogOut, Shield, Trash2, Upload, Use
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import { SaveBar } from "@/components/business/goi/GoiUi";
 
 export const Route = createFileRoute("/business/settings")({
   head: () => ({ meta: [{ title: "הגדרות — Goi עסקים" }] }),
@@ -141,13 +142,13 @@ function SettingsPage() {
   };
 
   return (
-    <BusinessShell title="הגדרות" subtitle="חשבון, התראות וצוות">
-      <div className="flex flex-col gap-6 p-4 pb-24 lg:flex-row lg:p-8">
+    <BusinessShell title="הגדרות חשבון" subtitle="פרופיל אישי, אבטחה והתראות">
+      <div className="flex flex-col gap-6 lg:flex-row">
         <aside className="w-full shrink-0 space-y-4 lg:order-2 lg:w-[17.5rem]">
           <nav className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
             {[
               { href: "#biz-details", label: "פרטי עסק", active: true },
-              { href: "/business/team", label: "משתמשים והרשאות", to: "/business/team" },
+              { href: "/business/company/$section", label: "משתמשים והרשאות", to: "/business/company/$section", params: { section: "team" } },
               { href: "#biz-notify", label: "התראות וסמס" },
               { href: "/business/integrations", label: "מפתחות ו-API", to: "/business/integrations" },
               { href: "#biz-security", label: "אבטחת חשבון" },
@@ -156,6 +157,7 @@ function SettingsPage() {
                 <Link
                   key={item.label}
                   to={item.to as never}
+                  params={"params" in item ? item.params : undefined}
                   className="flex items-center justify-between border-b border-border px-4 py-3 text-sm font-medium text-text-subtle last:border-0 hover:bg-muted"
                 >
                   {item.label}
@@ -446,7 +448,7 @@ function SettingsPage() {
           <CardContent>
             <p className="text-sm text-slate-500 mb-3">ניהול הרשאות ומשתמשים נוספים לעסק.</p>
             <Button asChild variant="outline" size="sm">
-              <Link to="/business/team">למסך הצוות</Link>
+              <Link to="/business/company/$section" params={{ section: "team" }}>למסך הצוות</Link>
             </Button>
           </CardContent>
         </Card>
@@ -461,11 +463,9 @@ function SettingsPage() {
         </Card>
         </div>
       </div>
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-20 flex justify-center pb-3 lg:bottom-0 lg:pb-6">
-        <div className="pointer-events-auto rounded-xl bg-sidebar px-4 py-3 shadow-panel">
-          <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending} className="min-w-48 rounded-lg bg-primary-deep text-primary-foreground">
-            {saveProfile.isPending && <Loader2 className="size-4 animate-spin" />} שמור שינויים
-          </Button>
+      <div className="pointer-events-none sticky bottom-4 z-20 flex justify-center pb-2">
+        <div className="pointer-events-auto">
+          <SaveBar saving={saveProfile.isPending} onSave={() => saveProfile.mutate()} />
         </div>
       </div>
     </BusinessShell>

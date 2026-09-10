@@ -7,7 +7,6 @@ import { Courier } from "../accounts/entities/courier.entity";
 import { Customer } from "../accounts/entities/customer.entity";
 import { Message } from "../chat/entities/message.entity";
 import { PartnersModule } from "../partners/partners.module";
-import { PaymentsModule } from "../payments/payments.module";
 import { PlatformModule } from "../platform/platform.module";
 import { Conversation } from "../push/entities/conversation.entity";
 import { PushModule } from "../push/push.module";
@@ -48,7 +47,6 @@ import { PublicMoverJobsController } from "./public-mover-jobs.controller";
     ]),
     AccountsModule,
     PartnersModule,
-    PaymentsModule,
     WhatsappModule,
     PushModule,
     PlatformModule,

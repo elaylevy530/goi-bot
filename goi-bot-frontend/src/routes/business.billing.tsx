@@ -1,147 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { BusinessShell, useMyBusiness, useWalletBalance } from "@/components/BusinessShell";
-import { Button } from "@/components/ui/button";
 import { nestListMyBillingRecords, nestListWalletTransactions } from "@/lib/nest-domain";
-import { CreditCard, Download, Loader2, Lock, Wallet } from "lucide-react";
-import { toast } from "sonner";
-import { EmptyState } from "./business.dashboard";
-import { createSetupTokenFn, confirmVaultFn, removeVaultFn } from "@/lib/paypal-billing.functions";
-import { SaveCardDialog } from "@/components/SaveCardDialog";
-import { cn } from "@/lib/utils";
+import { CalendarDays, Download, Package, ReceiptText, Wallet } from "lucide-react";
+import { Badge, DataTable, Panel, money } from "@/components/business/goi/GoiUi";
 
 export const Route = createFileRoute("/business/billing")({
-  head: () => ({ meta: [{ title: "חיובים ותשלומים — Goi" }] }),
+  head: () => ({ meta: [{ title: "חשבוניות וחיובים — Goi" }] }),
   ssr: false,
   component: BillingPage,
 });
 
 function PaymentMethodCard() {
-  const qc = useQueryClient();
-  const { data: me } = useMyBusiness();
-  const m = me as {
-    payment_method_on_file?: boolean;
-    payment_method_brand?: string;
-    payment_method_last4?: string;
-    paypal_email?: string;
-    billing_cycle?: string;
-  } | null;
-  const setupFn = useServerFn(createSetupTokenFn);
-  const confirmFn = useServerFn(confirmVaultFn);
-  const removeFn = useServerFn(removeVaultFn);
-  const [cardOpen, setCardOpen] = useState(false);
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const setupId = url.searchParams.get("setup_token_id") || url.searchParams.get("approval_token_id");
-    if (!setupId) return;
-    url.searchParams.delete("setup_token_id");
-    url.searchParams.delete("approval_token_id");
-    window.history.replaceState({}, "", url.toString());
-    confirmFn({ data: { setup_token_id: setupId } })
-      .then(() => {
-        toast.success("אמצעי תשלום PayPal נשמר — שידור משלוחים פעיל");
-        qc.invalidateQueries({ queryKey: ["business-me"] });
-      })
-      .catch((e: Error) => toast.error("שגיאה באישור PayPal: " + e.message));
-  }, [confirmFn, qc]);
-
-  const startPaypal = useMutation({
-    mutationFn: async () => {
-      const origin = window.location.origin;
-      const r = await setupFn({
-        data: {
-          source: "paypal",
-          return_url: `${origin}/business/billing`,
-          cancel_url: `${origin}/business/billing?paypal=cancel`,
-        },
-      });
-      if (!r.approve_url) throw new Error("PayPal לא החזיר קישור אישור");
-      window.location.href = r.approve_url;
-      return r;
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const remove = useMutation({
-    mutationFn: () => removeFn({}),
-    onSuccess: () => {
-      toast.success("אמצעי התשלום הוסר");
-      qc.invalidateQueries({ queryKey: ["business-me"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const cardDialog = (
-    <SaveCardDialog
-      open={cardOpen}
-      onClose={() => setCardOpen(false)}
-      onSaved={() => {
-        setCardOpen(false);
-        qc.invalidateQueries({ queryKey: ["business-me"] });
-      }}
-    />
-  );
-
-  if (m?.payment_method_on_file) {
-    return (
-      <>
-        <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
-          <div className="flex items-center justify-between gap-3">
-            <div className="grid size-9 place-items-center rounded-md bg-kpi-volume-bg text-primary">
-              <CreditCard className="size-5" />
-            </div>
-            <p className="text-sm font-medium text-text-subtle">אמצעי תשלום</p>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setCardOpen(true)} className="text-sm font-semibold text-primary hover:underline">
-                שנה כרטיס
-              </button>
-              <button type="button" onClick={() => remove.mutate()} disabled={remove.isPending} className="text-sm font-semibold text-text-muted hover:underline">
-                {remove.isPending ? "מסיר…" : "הסר"}
-              </button>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-text-strong">
-                {m.payment_method_brand}
-                {m.payment_method_last4 ? ` ••${m.payment_method_last4}` : ""}
-              </p>
-              <p className="text-xs text-text-muted">{m.paypal_email || "PayPal"}</p>
-            </div>
-          </div>
-          <p className="text-xs text-text-muted">
-            חיוב {m.billing_cycle === "monthly" ? "חודשי" : m.billing_cycle === "weekly" ? "שבועי" : m.billing_cycle === "daily" ? "יומי" : "פר־משלוח"}
-          </p>
-        </article>
-        {cardDialog}
-      </>
-    );
-  }
-
-  const busy = startPaypal.isPending;
   return (
-    <>
-      <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-warning/40 bg-warning-bg p-6 shadow-card">
-        <div className="flex items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-md bg-warning/20 text-warning-text">
-            <Lock className="size-5" />
-          </div>
-          <p className="text-sm font-bold text-text-strong">אין אמצעי תשלום</p>
-        </div>
-        <p className="text-sm text-text-subtle">הוסיפו כרטיס אשראי כאן. חשבון PayPal הוא אפשרות נפרדת — בלי טופס כתובת של PayPal.</p>
-        <div className="mt-auto flex flex-wrap gap-2">
-          <Button onClick={() => setCardOpen(true)} disabled={busy}>
-            <CreditCard className="size-4" /> הוסף כרטיס
-          </Button>
-          <Button onClick={() => startPaypal.mutate()} disabled={busy} variant="outline">
-            {busy && <Loader2 className="size-4 animate-spin" />} חשבון PayPal
-          </Button>
-        </div>
-      </article>
-      {cardDialog}
-    </>
+    <Panel className="payment-card">
+      <h3>
+        <Wallet size={18} /> אמצעי תשלום
+      </h3>
+      <p>סליקת כרטיס תחובר בהמשך. הארנק והחשבוניות ממשיכים לעבוד כרגיל.</p>
+      <Link to="/business/wallet" className="btn outline">לארנק העסק</Link>
+    </Panel>
   );
 }
 
@@ -172,126 +51,69 @@ function BillingPage() {
   );
 
   return (
-    <BusinessShell title="חיובים ותשלומים" subtitle="סיכום הוצאה והיסטוריית חיובים">
-      <div className="space-y-6 p-4 lg:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
-            <p className="text-sm font-medium text-text-subtle">יתרה נוכחית</p>
-            <div className="flex items-end justify-between gap-3">
-              <Button asChild className="rounded-lg">
-                <Link to="/business/wallet">טען יתרה</Link>
-              </Button>
-              <p className="text-[1.75rem] font-bold text-text-strong">₪{Math.round(balance).toLocaleString("he-IL")}</p>
-            </div>
-            <p className="text-xs text-text-muted">טעינה אוטומטית כשהיתרה יורדת מתחת לכיסוי משלוח.</p>
-          </article>
-
-          <article className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-6 shadow-panel">
-            <div className="flex items-center justify-between gap-3">
-              <span className="rounded-md bg-success-bg px-2 py-1 text-[10px] font-bold text-success-text">החודש</span>
-              <p className="text-sm font-medium text-text-subtle">הוצאה חודשית</p>
-            </div>
-            <p className="text-[1.75rem] font-bold text-text-strong">₪{Math.round(monthSpend).toLocaleString("he-IL")}</p>
-            <p className="text-xs text-text-muted">{monthRecords.length} משלוחים החודש</p>
-          </article>
-
+    <BusinessShell title="חשבוניות וחיובים" subtitle="כל התשלומים, התנועות והחשבוניות שלך מול GOI">
+      <div className="extra-page extra-billing">
+        <div className="billing-cards">
+          <Panel className="billing-stat">
+            <CalendarDays className="purple-text" />
+            <small>משלוחים החודש</small>
+            <strong>{monthRecords.length}</strong>
+            <span>לפי רשומות החיוב</span>
+          </Panel>
+          <Panel className="billing-stat">
+            <ReceiptText className="blue-text" />
+            <small>סה״כ חיובים החודש</small>
+            <strong>{money(monthSpend)}</strong>
+            <span>{monthRecords.length} משלוחים לחיוב</span>
+          </Panel>
+          <Panel className="billing-stat">
+            <Package className="green-text" />
+            <small>מגמה חצי שנתית</small>
+            <strong>{money(monthly.reduce((s, m) => s + m.value, 0))}</strong>
+            <span>סכום 6 החודשים האחרונים</span>
+          </Panel>
+          <Panel className="balance-card">
+            <Wallet size={22} />
+            <small>יתרת העסק</small>
+            <strong>{money(balance)}</strong>
+            <Link to="/business/wallet" className="btn primary">טען יתרה</Link>
+            <p>טעינה דרך מסך הארנק הקיים. לא מבוצעת כאן סליקה אוטומטית.</p>
+          </Panel>
           <PaymentMethodCard />
         </div>
-
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <section className="w-full rounded-xl border border-border bg-surface p-5 shadow-panel lg:w-[25rem]">
-            <h2 className="mb-4 text-base font-bold text-text-strong">חשבוניות אחרונות להורדה</h2>
-            <div className="space-y-2">
-              {invoiceMonths.length === 0 && (
-                <p className="py-6 text-center text-sm text-text-muted">אין חשבוניות עדיין</p>
-              )}
-              {invoiceMonths.map((inv) => (
-                <div key={inv.key} className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-3">
-                  <button
-                    type="button"
-                    onClick={() => downloadInvoiceMonth(inv)}
-                    className="grid size-9 place-items-center rounded-full bg-surface text-primary shadow-kpi"
-                    aria-label={`הורד ${inv.label}`}
-                  >
-                    <Download className="size-4" />
-                  </button>
-                  <div className="min-w-0 text-right">
-                    <div className="truncate text-sm font-semibold">{inv.label}</div>
-                    <div className="text-xs text-text-muted">
-                      {inv.count} חיובים · ₪{Math.round(inv.total).toLocaleString("he-IL")}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="min-w-0 flex-1 rounded-xl border border-border bg-surface p-5 shadow-panel">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-xs text-text-muted">מגמת הוצאות בחצי שנה האחרונה</p>
-              <h2 className="text-base font-bold text-text-strong">הוצאה חודשית ממוצעת</h2>
-            </div>
-            <div className="flex h-48 items-end justify-between gap-2 px-2">
-              {monthly.map((m) => {
-                const max = Math.max(...monthly.map((x) => x.value), 1);
-                const h = Math.max(8, Math.round((m.value / max) * 140));
-                return (
-                  <div key={m.label} className="flex flex-1 flex-col items-center gap-2">
-                    <span className="text-[10px] text-text-muted">₪{Math.round(m.value).toLocaleString("he-IL")}</span>
-                    <div className="w-6 rounded-t-md bg-primary" style={{ height: h }} />
-                    <span className="text-xs text-text-subtle">{m.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel">
-          <div className="flex items-center justify-between px-6 py-4">
-            <button type="button" onClick={() => downloadWalletCsv(walletRows)} className="text-sm font-semibold text-primary hover:underline">
-              הורד דו״ח אקסל מלא ←
+        <Panel
+          title="פעילות בחשבון"
+          action={
+            <button type="button" className="btn outline small" onClick={() => downloadWalletCsv(walletRows)}>
+              <Download size={14} /> ייצוא פירוט
             </button>
-            <h2 className="text-base font-bold text-text-strong">פעילות אחרונה בחשבון</h2>
-          </div>
-          {walletRows.length === 0 ? (
-            <div className="p-6">
-              <EmptyState icon={Wallet} title="אין רשומות חיוב עדיין" desc="כשיושלם משלוח, רשומת חיוב תיווצר אוטומטית." />
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-y border-border bg-muted text-xs text-text-muted">
-                  <th className="px-4 py-3 text-right font-semibold">תאריך ושעה</th>
-                  <th className="px-4 py-3 text-right font-semibold">תיאור הפעולה</th>
-                  <th className="px-4 py-3 text-right font-semibold">סוג פעולה</th>
-                  <th className="px-4 py-3 text-right font-semibold">סכום</th>
-                  <th className="px-4 py-3 text-right font-semibold">יתרה אחרי הפעולה</th>
-                </tr>
-              </thead>
-              <tbody>
-                {walletRows.map((t) => {
-                  const pos = Number(t.amount) >= 0;
-                  return (
-                    <tr key={t.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-3.5 text-xs text-text-muted">{new Date(t.created_at).toLocaleString("he-IL")}</td>
-                      <td className="px-4 py-3.5">{t.description || t.kind || "תנועת ארנק"}</td>
-                      <td className="px-4 py-3.5">
-                        <span className={cn("rounded-pill px-2.5 py-1 text-xs font-bold", pos ? "bg-success-bg text-success-text" : "bg-danger-bg text-danger-text")}>
-                          {pos ? "זיכוי" : "חיוב"}
-                        </span>
-                      </td>
-                      <td className={cn("px-4 py-3.5 font-bold", pos ? "text-success-text" : "text-text-strong")}>
-                        {pos ? "+" : ""}₪{Number(t.amount).toLocaleString("he-IL")}
-                      </td>
-                      <td className="px-4 py-3.5 font-semibold">₪{Math.round(t.balanceAfter).toLocaleString("he-IL")}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </section>
+          }
+        >
+          <DataTable
+            headers={["תאריך", "סוג פעולה", "תיאור", "סכום", "יתרה"]}
+            rows={walletRows.slice(0, 12).map((t) => [
+              new Date(t.created_at).toLocaleString("he-IL"),
+              Number(t.amount) >= 0 ? "זיכוי" : "חיוב",
+              t.description || t.kind || "תנועת ארנק",
+              money(Number(t.amount)),
+              money(Math.round(t.balanceAfter)),
+            ])}
+          />
+        </Panel>
+        <Panel title="חשבוניות חודשיות">
+          <DataTable
+            headers={["חודש", "חיובים", "סכום", "סטטוס", "פעולות"]}
+            rows={invoiceMonths.map((inv) => [
+              inv.label,
+              String(inv.count),
+              money(inv.total),
+              <Badge key={inv.key} text="זמין להורדה" tone="green" />,
+              <button key={`${inv.key}-dl`} type="button" className="link" onClick={() => downloadInvoiceMonth(inv)}>
+                <Download size={14} /> הורדה
+              </button>,
+            ])}
+          />
+        </Panel>
       </div>
     </BusinessShell>
   );

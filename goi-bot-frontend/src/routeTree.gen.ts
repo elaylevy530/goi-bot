@@ -69,6 +69,7 @@ import { Route as BusinessContactsRouteImport } from './routes/business.contacts
 import { Route as BusinessDashboardRouteImport } from './routes/business.dashboard'
 import { Route as BusinessHelpRouteImport } from './routes/business.help'
 import { Route as BusinessHistoryRouteImport } from './routes/business.history'
+import { Route as BusinessIncomingRouteImport } from './routes/business.incoming'
 import { Route as BusinessIntegrationsRouteImport } from './routes/business.integrations'
 import { Route as BusinessMessagesRouteImport } from './routes/business.messages'
 import { Route as BusinessNewDeliveryRouteImport } from './routes/business.new-delivery'
@@ -123,6 +124,7 @@ import { Route as AuthenticatedBusinessesIdRouteImport } from './routes/_authent
 import { Route as AuthenticatedCouriersIdRouteImport } from './routes/_authenticated.couriers.$id'
 import { Route as AuthenticatedCouriersBankDetailsRouteImport } from './routes/_authenticated.couriers.bank-details'
 import { Route as ApiPublicNotificationQueueWorkerRouteImport } from './routes/api/public/notification-queue-worker'
+import { Route as BusinessCompanySectionRouteImport } from './routes/business.company.$section'
 import { Route as BusinessOrderIdRouteImport } from './routes/business.order.$id'
 import { Route as BusinessTrackIdRouteImport } from './routes/business.track.$id'
 import { Route as CourierMissionJobIdRouteImport } from './routes/courier.mission.$jobId'
@@ -446,6 +448,11 @@ const BusinessHistoryRoute = BusinessHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => BusinessRoute,
 } as any)
+const BusinessIncomingRoute = BusinessIncomingRouteImport.update({
+  id: '/incoming',
+  path: '/incoming',
+  getParentRoute: () => BusinessRoute,
+} as any)
 const BusinessIntegrationsRoute = BusinessIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
@@ -723,6 +730,11 @@ const ApiPublicNotificationQueueWorkerRoute =
     path: '/api/public/notification-queue-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const BusinessCompanySectionRoute = BusinessCompanySectionRouteImport.update({
+  id: '/company/$section',
+  path: '/company/$section',
+  getParentRoute: () => BusinessRoute,
+} as any)
 const BusinessOrderIdRoute = BusinessOrderIdRouteImport.update({
   id: '/order/$id',
   path: '/order/$id',
@@ -847,6 +859,7 @@ export interface FileRoutesByFullPath {
   '/business/dashboard': typeof BusinessDashboardRoute
   '/business/help': typeof BusinessHelpRoute
   '/business/history': typeof BusinessHistoryRoute
+  '/business/incoming': typeof BusinessIncomingRoute
   '/business/integrations': typeof BusinessIntegrationsRoute
   '/business/messages': typeof BusinessMessagesRoute
   '/business/new-delivery': typeof BusinessNewDeliveryRoute
@@ -902,6 +915,7 @@ export interface FileRoutesByFullPath {
   '/couriers/$id': typeof AuthenticatedCouriersIdRoute
   '/couriers/bank-details': typeof AuthenticatedCouriersBankDetailsRoute
   '/api/public/notification-queue-worker': typeof ApiPublicNotificationQueueWorkerRoute
+  '/business/company/$section': typeof BusinessCompanySectionRoute
   '/business/order/$id': typeof BusinessOrderIdRoute
   '/business/track/$id': typeof BusinessTrackIdRoute
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
@@ -974,6 +988,7 @@ export interface FileRoutesByTo {
   '/business/dashboard': typeof BusinessDashboardRoute
   '/business/help': typeof BusinessHelpRoute
   '/business/history': typeof BusinessHistoryRoute
+  '/business/incoming': typeof BusinessIncomingRoute
   '/business/integrations': typeof BusinessIntegrationsRoute
   '/business/messages': typeof BusinessMessagesRoute
   '/business/new-delivery': typeof BusinessNewDeliveryRoute
@@ -1028,6 +1043,7 @@ export interface FileRoutesByTo {
   '/couriers/$id': typeof AuthenticatedCouriersIdRoute
   '/couriers/bank-details': typeof AuthenticatedCouriersBankDetailsRoute
   '/api/public/notification-queue-worker': typeof ApiPublicNotificationQueueWorkerRoute
+  '/business/company/$section': typeof BusinessCompanySectionRoute
   '/business/order/$id': typeof BusinessOrderIdRoute
   '/business/track/$id': typeof BusinessTrackIdRoute
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
@@ -1103,6 +1119,7 @@ export interface FileRoutesById {
   '/business/dashboard': typeof BusinessDashboardRoute
   '/business/help': typeof BusinessHelpRoute
   '/business/history': typeof BusinessHistoryRoute
+  '/business/incoming': typeof BusinessIncomingRoute
   '/business/integrations': typeof BusinessIntegrationsRoute
   '/business/messages': typeof BusinessMessagesRoute
   '/business/new-delivery': typeof BusinessNewDeliveryRoute
@@ -1158,6 +1175,7 @@ export interface FileRoutesById {
   '/_authenticated/couriers/$id': typeof AuthenticatedCouriersIdRoute
   '/_authenticated/couriers/bank-details': typeof AuthenticatedCouriersBankDetailsRoute
   '/api/public/notification-queue-worker': typeof ApiPublicNotificationQueueWorkerRoute
+  '/business/company/$section': typeof BusinessCompanySectionRoute
   '/business/order/$id': typeof BusinessOrderIdRoute
   '/business/track/$id': typeof BusinessTrackIdRoute
   '/courier/mission/$jobId': typeof CourierMissionJobIdRoute
@@ -1233,6 +1251,7 @@ export interface FileRouteTypes {
     | '/business/dashboard'
     | '/business/help'
     | '/business/history'
+    | '/business/incoming'
     | '/business/integrations'
     | '/business/messages'
     | '/business/new-delivery'
@@ -1288,6 +1307,7 @@ export interface FileRouteTypes {
     | '/couriers/$id'
     | '/couriers/bank-details'
     | '/api/public/notification-queue-worker'
+    | '/business/company/$section'
     | '/business/order/$id'
     | '/business/track/$id'
     | '/courier/mission/$jobId'
@@ -1360,6 +1380,7 @@ export interface FileRouteTypes {
     | '/business/dashboard'
     | '/business/help'
     | '/business/history'
+    | '/business/incoming'
     | '/business/integrations'
     | '/business/messages'
     | '/business/new-delivery'
@@ -1414,6 +1435,7 @@ export interface FileRouteTypes {
     | '/couriers/$id'
     | '/couriers/bank-details'
     | '/api/public/notification-queue-worker'
+    | '/business/company/$section'
     | '/business/order/$id'
     | '/business/track/$id'
     | '/courier/mission/$jobId'
@@ -1488,6 +1510,7 @@ export interface FileRouteTypes {
     | '/business/dashboard'
     | '/business/help'
     | '/business/history'
+    | '/business/incoming'
     | '/business/integrations'
     | '/business/messages'
     | '/business/new-delivery'
@@ -1543,6 +1566,7 @@ export interface FileRouteTypes {
     | '/_authenticated/couriers/$id'
     | '/_authenticated/couriers/bank-details'
     | '/api/public/notification-queue-worker'
+    | '/business/company/$section'
     | '/business/order/$id'
     | '/business/track/$id'
     | '/courier/mission/$jobId'
@@ -2021,6 +2045,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BusinessHistoryRouteImport
       parentRoute: typeof BusinessRoute
     }
+    '/business/incoming': {
+      id: '/business/incoming'
+      path: '/incoming'
+      fullPath: '/business/incoming'
+      preLoaderRoute: typeof BusinessIncomingRouteImport
+      parentRoute: typeof BusinessRoute
+    }
     '/business/integrations': {
       id: '/business/integrations'
       path: '/integrations'
@@ -2399,6 +2430,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicNotificationQueueWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/business/company/$section': {
+      id: '/business/company/$section'
+      path: '/company/$section'
+      fullPath: '/business/company/$section'
+      preLoaderRoute: typeof BusinessCompanySectionRouteImport
+      parentRoute: typeof BusinessRoute
+    }
     '/business/order/$id': {
       id: '/business/order/$id'
       path: '/order/$id'
@@ -2585,6 +2623,7 @@ interface BusinessRouteChildren {
   BusinessDashboardRoute: typeof BusinessDashboardRoute
   BusinessHelpRoute: typeof BusinessHelpRoute
   BusinessHistoryRoute: typeof BusinessHistoryRoute
+  BusinessIncomingRoute: typeof BusinessIncomingRoute
   BusinessIntegrationsRoute: typeof BusinessIntegrationsRoute
   BusinessMessagesRoute: typeof BusinessMessagesRoute
   BusinessNewDeliveryRoute: typeof BusinessNewDeliveryRoute
@@ -2601,6 +2640,7 @@ interface BusinessRouteChildren {
   BusinessTeamRoute: typeof BusinessTeamRoute
   BusinessWalletRoute: typeof BusinessWalletRoute
   BusinessIndexRoute: typeof BusinessIndexRoute
+  BusinessCompanySectionRoute: typeof BusinessCompanySectionRoute
   BusinessOrderIdRoute: typeof BusinessOrderIdRoute
   BusinessTrackIdRoute: typeof BusinessTrackIdRoute
 }
@@ -2615,6 +2655,7 @@ const BusinessRouteChildren: BusinessRouteChildren = {
   BusinessDashboardRoute: BusinessDashboardRoute,
   BusinessHelpRoute: BusinessHelpRoute,
   BusinessHistoryRoute: BusinessHistoryRoute,
+  BusinessIncomingRoute: BusinessIncomingRoute,
   BusinessIntegrationsRoute: BusinessIntegrationsRoute,
   BusinessMessagesRoute: BusinessMessagesRoute,
   BusinessNewDeliveryRoute: BusinessNewDeliveryRoute,
@@ -2631,6 +2672,7 @@ const BusinessRouteChildren: BusinessRouteChildren = {
   BusinessTeamRoute: BusinessTeamRoute,
   BusinessWalletRoute: BusinessWalletRoute,
   BusinessIndexRoute: BusinessIndexRoute,
+  BusinessCompanySectionRoute: BusinessCompanySectionRoute,
   BusinessOrderIdRoute: BusinessOrderIdRoute,
   BusinessTrackIdRoute: BusinessTrackIdRoute,
 }

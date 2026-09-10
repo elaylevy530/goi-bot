@@ -417,7 +417,8 @@ function NewDeliveryPage() {
   });
 
   return (
-    <BusinessShell title="משלוח חדש">
+    <BusinessShell title="הזמנה חדשה" subtitle="סניף איסוף, כתובת מסירה, תכולה ותזמון">
+      <div className="order-page order-form" style={{ margin: 0 }}>
       <BusinessNewOrder
         pickupText={pickupText}
         pickup={pickup}
@@ -504,6 +505,7 @@ function NewDeliveryPage() {
         onValidateRoute={() => applyErrors(collectFieldErrors("route"))}
         onValidateDetails={() => applyErrors(collectFieldErrors("details"))}
       />
+      </div>
     </BusinessShell>
   );
 }

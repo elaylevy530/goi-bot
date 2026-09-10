@@ -7,7 +7,6 @@ import { Courier } from "../accounts/entities/courier.entity";
 import { Message } from "../chat/entities/message.entity";
 import { AppError } from "../common/errors/app.error";
 import { PartnersService } from "../partners/partners.service";
-import { PaypalClientService } from "../payments/paypal-client.service";
 import { PlatformService } from "../platform/platform.service";
 import { Conversation } from "../push/entities/conversation.entity";
 import { GreenApiClient } from "../whatsapp/green-api.client";
@@ -20,7 +19,6 @@ import type {
   GuestChatPostMessageDto,
 } from "./dto/guest-chat.dto";
 import type { GuestJobRefDto, GuestSelectQuoteDto } from "./dto/guest-job-ref.dto";
-import type { GuestPaypalCaptureDto, GuestPaypalOrderDto } from "./dto/guest-paypal.dto";
 import type { GuestRepriceJobDto } from "./dto/reprice-job.dto";
 import type { SubmitJobLeadDto } from "./dto/submit-job-lead.dto";
 import { ExpressPricingRule } from "./entities/express-pricing-rule.entity";
@@ -84,7 +82,6 @@ export class PublicJobsService {
     private readonly conversations: Repository<Conversation>,
     @InjectRepository(Message) private readonly messages: Repository<Message>,
     private readonly jobsService: JobsService,
-    private readonly paypal: PaypalClientService,
     private readonly partners: PartnersService,
     private readonly platform: PlatformService,
     private readonly greenApi: GreenApiClient,
@@ -538,126 +535,6 @@ export class PublicJobsService {
     await this.jobsService.cancelPendingOffersForJob(jobId);
 
     return { ok: true as const, job_id: jobId, quote_id: quoteId };
-  }
-
-  private requirePaypalConfigured() {
-    if (!this.paypal.isConfigured()) {
-      throw new AppError("config_missing", {
-        userMessage: "תשלום PayPal אינו מוגדר בשרת (חסר PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET)",
-      });
-    }
-  }
-
-  private guestChargeAmount(job: Job): number {
-    const snap = (job.pricing_snapshot ?? {}) as Record<string, unknown>;
-    const fromSnap = Number(snap.amount_to_charge_now ?? 0);
-    if (fromSnap > 0) return fromSnap;
-    const fromJob = Number(job.per_job_amount ?? 0);
-    if (fromJob > 0) return fromJob;
-    return 0;
-  }
-
-  /**
-   * Create a real PayPal checkout order for a guest job.
-   * Returns `{ order_id }` for the PayPal JS SDK — never invents an id.
-   */
-  async paypalOrder(dto: GuestPaypalOrderDto) {
-    this.requirePaypalConfigured();
-    const job = await this.requireGuestJob(dto.job_id, dto.tracking_token);
-
-    if (job.per_job_paid) {
-      throw new AppError("conflict", { userMessage: "ההזמנה כבר שולמה" });
-    }
-    if (TERMINAL.has(job.status)) {
-      throw new AppError("conflict", { userMessage: "לא ניתן לשלם על הזמנה זו" });
-    }
-
-    const expected = this.guestChargeAmount(job);
-    if (!(expected > 0)) {
-      throw new AppError("bad_request", {
-        userMessage: "אין סכום לתשלום עבור הזמנה זו",
-      });
-    }
-    if (Math.abs(Number(dto.amount) - expected) > 0.01) {
-      throw new AppError("bad_request", {
-        userMessage: "סכום התשלום אינו תואם להזמנה",
-      });
-    }
-
-    try {
-      const order = await this.paypal.createCheckoutOrder({
-        amount: expected.toFixed(2),
-        currency: "ILS",
-        // Unique per attempt so abandoned CREATED orders don't block retries.
-        invoice_id: `goi-guest-${job.id}-${Date.now()}`,
-        description: `Goi הזמנה ${job.job_number ?? job.id.slice(0, 8)}`,
-      });
-      if (!order?.id) {
-        throw new Error("PayPal create order returned no id");
-      }
-
-      job.paypal_order_id = order.id;
-      job.per_job_amount = String(expected);
-      await this.jobs.save(job);
-
-      return { order_id: order.id };
-    } catch (e) {
-      if (e instanceof AppError) throw e;
-      this.logger.error(
-        `guest paypal-order failed for ${job.id}`,
-        e instanceof Error ? e.stack : e,
-      );
-      throw new AppError("upstream_failed", {
-        userMessage: "יצירת תשלום PayPal נכשלה, נסה שוב",
-        cause: e,
-      });
-    }
-  }
-
-  /**
-   * Capture a guest PayPal order. Marks `per_job_paid` only after PayPal
-   * reports COMPLETED — never fakes capture success.
-   */
-  async paypalCapture(dto: GuestPaypalCaptureDto) {
-    this.requirePaypalConfigured();
-    const job = await this.requireGuestJob(dto.job_id, dto.tracking_token);
-
-    if (job.per_job_paid) {
-      return { ok: true as const, already: true };
-    }
-    if (job.paypal_order_id && job.paypal_order_id !== dto.order_id) {
-      throw new AppError("bad_request", { userMessage: "מזהה הזמנת PayPal אינו תואם" });
-    }
-
-    try {
-      const captured = await this.paypal.captureOrder(dto.order_id);
-      const cap = captured.purchase_units?.[0]?.payments?.captures?.[0];
-      if (cap?.status !== "COMPLETED") {
-        throw new AppError("upstream_failed", {
-          userMessage: `תפיסת התשלום לא הושלמה (${cap?.status ?? "unknown"})`,
-        });
-      }
-
-      job.per_job_paid = true;
-      job.paypal_order_id = dto.order_id;
-      if (!job.per_job_amount) {
-        const expected = this.guestChargeAmount(job);
-        if (expected > 0) job.per_job_amount = String(expected);
-      }
-      await this.jobs.save(job);
-
-      return { ok: true as const, capture_id: cap.id };
-    } catch (e) {
-      if (e instanceof AppError) throw e;
-      this.logger.error(
-        `guest paypal-capture failed for ${job.id}`,
-        e instanceof Error ? e.stack : e,
-      );
-      throw new AppError("upstream_failed", {
-        userMessage: "תפיסת תשלום PayPal נכשלה, נסה שוב",
-        cause: e,
-      });
-    }
   }
 
   /** Public mover board — limited fields by uuid or short_code. */

@@ -46,7 +46,7 @@ export class PaymentsService {
   }
 
   /**
-   * Ledger credit for prepaid wallet. Real card/PayPal capture can be layered later;
+   * Ledger credit for prepaid wallet. Card capture from a future processor can be layered later;
    * this records the recharge + bonus so the business UI balance works.
    */
   async rechargeWallet(
@@ -89,7 +89,7 @@ export class PaymentsService {
       business_id: rec.business_id,
       customer_price: Number(rec.customer_price),
       status: rec.status,
-      paypal_capture_id: rec.paypal_capture_id,
+      capture_id: rec.paypal_capture_id, // leftover column until a new processor writes its own id
       job_number: job?.job_number ?? null,
     };
   }
@@ -111,9 +111,6 @@ export class PaymentsService {
     const job = await this.jobs.findOne({ where: { id: dto.job_id } });
     if (!job) throw new NotFoundException("Job not found");
     if (job.per_job_paid) return { ok: true as const, already: true };
-    if (job.paypal_order_id && job.paypal_order_id !== dto.order_id) {
-      throw new NotFoundException("Order mismatch");
-    }
 
     const customerPrice = Number(job.customer_price ?? 0);
     const courierPay = Number(job.suggested_courier_payment ?? 0);
@@ -127,16 +124,11 @@ export class PaymentsService {
         customer_price: String(customerPrice),
         courier_payment: String(courierPay),
         platform_fee: String(fee),
-        provider: "paypal",
-        paypal_order_id: dto.order_id,
-        paypal_capture_id: dto.capture_id,
+        provider: "pending",
         status: "captured",
         billing_status: "paid",
       });
     } else {
-      rec.provider = "paypal";
-      rec.paypal_order_id = dto.order_id;
-      rec.paypal_capture_id = dto.capture_id;
       rec.status = "captured";
       rec.billing_status = "paid";
       rec.customer_price = String(customerPrice);

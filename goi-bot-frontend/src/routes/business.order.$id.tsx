@@ -222,7 +222,7 @@ function OrderDetailPage() {
     <BusinessShell title={`משלוח ${j.job_number}`} subtitle={j.job_type}>
       <div className="space-y-4 max-w-5xl mx-auto">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Button asChild variant="ghost" size="sm"><Link to="/business/orders"><ArrowRight className="size-4" /> חזרה למשלוחים</Link></Button>
+          <Button asChild variant="ghost" size="sm"><Link to="/business/history"><ArrowRight className="size-4" /> חזרה להיסטוריה</Link></Button>
           <div className="flex gap-2 flex-wrap">
             <JobStatusBadge status={j.status as JobStatus} courierStep={j.courier_step} />
             <Button asChild variant="outline" size="sm"><Link to="/business/track/$id" params={{ id: j.id }}><Navigation className="size-4" /> מעקב חי</Link></Button>

@@ -20,10 +20,6 @@ import {
   GuestSelectQuoteDto,
 } from "./dto/guest-job-ref.dto";
 import { GuestJobsListDto } from "./dto/guest-jobs-list.dto";
-import {
-  GuestPaypalCaptureDto,
-  GuestPaypalOrderDto,
-} from "./dto/guest-paypal.dto";
 import { GuestRepriceJobDto } from "./dto/reprice-job.dto";
 import { PublicJobsService } from "./public-jobs.service";
 
@@ -86,24 +82,6 @@ export class PublicJobsController {
       job_id: jobId,
       quote_id: quoteId,
     });
-  }
-
-  @Post(":job_id/paypal-order")
-  @Header("Cache-Control", "no-store")
-  paypalOrder(
-    @Param("job_id", ParseUUIDPipe) jobId: string,
-    @Body() body: GuestPaypalOrderDto,
-  ) {
-    return this.publicJobs.paypalOrder({ ...body, job_id: jobId });
-  }
-
-  @Post(":job_id/paypal-capture")
-  @Header("Cache-Control", "no-store")
-  paypalCapture(
-    @Param("job_id", ParseUUIDPipe) jobId: string,
-    @Body() body: GuestPaypalCaptureDto,
-  ) {
-    return this.publicJobs.paypalCapture({ ...body, job_id: jobId });
   }
 
   @Post(":job_id")

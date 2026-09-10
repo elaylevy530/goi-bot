@@ -1,29 +1,40 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, Bike, Check, CheckCheck, Package, Wallet } from "lucide-react";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { FilterTabs, Panel, Toggle } from "@/components/business/goi/GoiUi";
 import {
   nestListMyNotifications,
   nestMarkAllNotificationsRead,
   nestMarkNotificationRead,
+  nestUpdateMyCustomer,
 } from "@/lib/nest-accounts";
-import { Bell, Check, CheckCheck } from "lucide-react";
-import { EmptyState } from "./business.dashboard";
 import { PushEnableRowGeneric } from "@/components/PushEnableRow";
-
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/notifications")({
-  head: () => ({ meta: [{ title: "התראות — Goi" }] }),
+  head: () => ({ meta: [{ title: "הודעות ועדכונים — Goi" }] }),
   ssr: false,
   component: NotificationsPage,
 });
 
+function bucketOf(n: { title?: string; body?: string }) {
+  const t = `${n.title || ""} ${n.body || ""}`;
+  if (/חיוב|תשלום|ארנק|חשבונ/.test(t)) return "billing";
+  if (/שליח|שיחה|צ׳אט|צ'אט/.test(t)) return "couriers";
+  return "orders";
+}
+
 function NotificationsPage() {
   const { data: me } = useMyBusiness();
   const qc = useQueryClient();
+  const [tab, setTab] = useState("all");
+  const m = me as { notify_wa?: boolean; notify_email?: boolean } | null;
+  const [pushOn, setPushOn] = useState(m?.notify_wa !== false);
+  const [emailOn, setEmailOn] = useState(m?.notify_email !== false);
 
-  const { data: items } = useQuery({
+  const { data: items = [] } = useQuery({
     queryKey: ["notifications", me?.id],
     enabled: !!me?.id,
     queryFn: () => nestListMyNotifications(200),
@@ -40,61 +51,122 @@ function NotificationsPage() {
       qc.invalidateQueries({ queryKey: ["notif-recent"] });
     },
   });
+  const savePrefs = useMutation({
+    mutationFn: (body: Record<string, unknown>) => nestUpdateMyCustomer(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["business-me"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  const unread = (items ?? []).filter((n: any) => !n.read_at).length;
+  const unread = items.filter((n: { read_at?: string | null }) => !n.read_at).length;
+  const shown = useMemo(
+    () => items.filter((n: { title?: string; body?: string }) => tab === "all" || bucketOf(n) === tab),
+    [items, tab],
+  );
 
   return (
-    <BusinessShell title="התראות" subtitle={`${unread} לא נקראו`} headerExtra={
-      unread > 0 ? (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => markRead.mutate(undefined)}><CheckCheck className="size-4" /> סמן הכל כנקרא</Button>
-        </div>
-      ) : null
-    }>
-      {me?.id && (
-        <div className="mb-4">
-          <PushEnableRowGeneric
-            role="business"
-            ownerId={me.id}
-            copy={{
-              title: "הפעל התראות Push",
-              subtitle: "קבל התראה מיידית כשהשליח מאשר, יוצא לאיסוף, אוסף או מוסר",
-              grantedTitle: "התראות Push פעילות",
-              grantedSubtitle: "תקבל עדכונים על כל שלב במשלוח גם כשהאפליקציה סגורה",
+    <BusinessShell
+      title="הודעות ועדכונים"
+      subtitle={`${unread} לא נקראו`}
+      headerExtra={
+        unread > 0 ? (
+          <button type="button" className="btn outline" onClick={() => markRead.mutate(undefined)}>
+            <CheckCheck size={16} /> סמן הכל כנקרא
+          </button>
+        ) : null
+      }
+    >
+      <div className="notifications-layout extra-page extra-notifications">
+        <Panel>
+          <FilterTabs
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "all", label: "הכל", count: items.length },
+              { value: "orders", label: "הזמנות" },
+              { value: "couriers", label: "שליחים" },
+              { value: "billing", label: "תשלומים" },
+            ]}
+          />
+          {me?.id && (
+            <div style={{ margin: "12px 0 18px" }}>
+              <PushEnableRowGeneric
+                role="business"
+                ownerId={me.id}
+                copy={{
+                  title: "הפעל התראות Push",
+                  subtitle: "קבל התראה מיידית כשהשליח מאשר, יוצא לאיסוף, אוסף או מוסר",
+                  grantedTitle: "התראות Push פעילות",
+                  grantedSubtitle: "תקבל עדכונים על כל שלב במשלוח גם כשהאפליקציה סגורה",
+                }}
+              />
+            </div>
+          )}
+          <div className="notification-events">
+            {shown.length === 0 && <div className="empty-state">אין עדכונים בקטגוריה זו</div>}
+            {shown.map((n: any, i: number) => {
+              const tone = ["green", "amber", "blue", "purple"][i % 4];
+              const Icon = bucketOf(n) === "billing" ? Wallet : bucketOf(n) === "couriers" ? Bike : Package;
+              const inner = (
+                <>
+                  <span className={"event-icon " + tone}>
+                    <Icon size={20} />
+                  </span>
+                  <div>
+                    <strong>{n.title}</strong>
+                    {n.body && <p>{n.body}</p>}
+                  </div>
+                  <small>{n.created_at ? new Date(n.created_at).toLocaleString("he-IL") : ""}</small>
+                  {!n.read_at && <i />}
+                </>
+              );
+              return n.link ? (
+                <Link
+                  key={n.id}
+                  to={n.link as never}
+                  className={n.read_at ? "read" : ""}
+                  onClick={() => {
+                    if (!n.read_at) markRead.mutate(n.id);
+                  }}
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <button
+                  key={n.id}
+                  type="button"
+                  className={n.read_at ? "read" : ""}
+                  onClick={() => {
+                    if (!n.read_at) markRead.mutate(n.id);
+                  }}
+                >
+                  {inner}
+                  {!n.read_at && <Check size={16} />}
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+        <Panel title="העדפות התראות">
+          <Toggle
+            label="עדכונים בוואטסאפ"
+            description="ההעדפה נשמרת בחשבון העסק"
+            checked={pushOn}
+            onChange={(v) => {
+              setPushOn(v);
+              savePrefs.mutate({ notify_wa: v });
             }}
           />
-        </div>
-      )}
-      <Card className="rounded-2xl border-slate-200 shadow-sm">
-
-        <CardContent className="p-0">
-          {!items || items.length === 0 ? (
-            <div className="p-6"><EmptyState icon={Bell} title="אין התראות" desc="פה יופיעו עדכוני סטטוס, הצעות מחיר, תזכורות ועוד." /></div>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {items.map((n: any) => (
-                <li key={n.id} className={`p-4 flex items-start gap-3 ${!n.read_at ? "bg-emerald-50/30" : ""}`}>
-                  <div className={`mt-1 size-2.5 rounded-full ${!n.read_at ? "bg-[#35AD29]" : "bg-slate-200"}`} />
-                  <div className="flex-1 min-w-0">
-                    {n.link ? (
-                      <Link to={n.link} className="block hover:underline">
-                        <div className="font-bold text-slate-900 text-sm">{n.title}</div>
-                      </Link>
-                    ) : <div className="font-bold text-slate-900 text-sm">{n.title}</div>}
-                    {n.body && <div className="text-sm text-slate-600 mt-0.5">{n.body}</div>}
-                    <div className="text-xs text-slate-400 mt-1">{new Date(n.created_at).toLocaleString("he-IL")}</div>
-                  </div>
-                  {!n.read_at && (
-                    <Button variant="ghost" size="sm" onClick={() => markRead.mutate(n.id)} className="shrink-0">
-                      <Check className="size-4" />
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+          <Toggle
+            label="עדכונים באימייל"
+            checked={emailOn}
+            onChange={(v) => {
+              setEmailOn(v);
+              savePrefs.mutate({ notify_email: v });
+            }}
+          />
+          <p className="hint">שליחת ההודעות בפועל תלויה בהגדרות המערכת הקיימות. אין כאן ערוץ SMS נפרד.</p>
+        </Panel>
+      </div>
     </BusinessShell>
   );
 }

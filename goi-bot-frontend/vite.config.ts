@@ -85,7 +85,6 @@ const nestProxyPaths = [
   "/api/public/track",
   "/api/public/track-stop",
   "/api/public/intake",
-  "/api/public/paypal-webhook",
   "/api/public/hooks/chat-push",
 ];
 
