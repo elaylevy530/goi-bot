@@ -62,15 +62,6 @@
       font-weight: 800;
       letter-spacing: .02em;
     }
-    .goi-landing .eyebrow::before{
-      content: "";
-      width: 22px;
-      height: 2px;
-      border-radius: 99px;
-      background: var(--green);
-      box-shadow: 0 0 14px var(--green);
-    }
-
     .goi-landing header{
       position: fixed;
       inset: 0 0 auto;
@@ -583,11 +574,10 @@
       .goi-landing .hero-actions{ width:100%; }
       .goi-landing .hero-actions .btn{ flex:1; min-width:150px; padding-inline:14px; }
       .goi-landing .hero-proof{ gap:12px; flex-wrap:wrap; margin-top:24px; }
-      .goi-landing .hero-visual{ height:420px; margin-top:16px; }
-      .goi-landing .delivery-card{ width:84%; right:0; top:4px; padding:17px; }
-      .goi-landing .mascot{ width:67%; left:-4%; bottom:-6px; }
-      .goi-landing .chip-1{ left:1%; top:28px; }
-      .goi-landing .chip-2{ bottom:10px; right:2%; }
+      .goi-landing .hero-visual{ height:630px; margin-top:16px; }
+      .goi-landing .delivery-card{ width:100%; right:0; top:4px; padding:17px; transform:none; }
+      .goi-landing .mascot{ width:67%; left:-4%; bottom:18px; }
+      .goi-landing .float-chip{ display:none; }
       .goi-landing .trust-content{ padding:20px 0; flex-direction:column; align-items:start; }
       .goi-landing .audiences{ justify-content:flex-start; }
       .goi-landing section{ padding:82px 0; }
@@ -616,7 +606,9 @@
       .goi-landing .network-section{ padding:64px 0 82px; }
       .goi-landing .network-panel{ padding:37px 23px; gap:18px; border-radius:28px; }
       .goi-landing .network-points{ grid-template-columns:1fr; }
-      .goi-landing .network-visual{ min-height:320px; transform:scale(.9); margin-inline:-22px; }
+      .goi-landing .network-visual{ min-height:400px; transform:none; margin-inline:0; }
+      .goi-landing .network-card.independent{ bottom:86px; }
+      .goi-landing .network-card.available{ right:0; bottom:0; }
       .goi-landing .fit-grid{ grid-template-columns:1fr 1fr; gap:9px; }
       .goi-landing .fit-card{ min-height:220px; padding:16px; }
       .goi-landing .fit-icon{ width:72px; height:72px; margin-bottom:14px; border-radius:18px; }
