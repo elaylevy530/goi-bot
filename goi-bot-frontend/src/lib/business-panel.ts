@@ -234,6 +234,18 @@ export function trackingStageIndex(job: NestJob): number {
   return 0;
 }
 
+/** 0 אישור … 5 נמסר — for the side details sheet timeline. */
+export function deliverySheetLevel(job: NestJob): number {
+  if (DONE_STATUSES.has(job.status) || String((job as { courier_step?: string | null }).courier_step) === "נמסר") return 5;
+  if (CANCELLED_STATUSES.has(job.status)) return -1;
+  const stage = trackingStageIndex(job);
+  if (stage >= 3) return 4;
+  if (stage >= 2) return 3;
+  if (stage >= 1) return 2;
+  if (jobHasCourier(job)) return 1;
+  return 0;
+}
+
 export function jobBadgeTone(status: string): string {
   if (DONE_STATUSES.has(status)) return "green";
   if (ACTIVE_STATUSES.has(status)) return "green";

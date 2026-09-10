@@ -7,14 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { nestListCouriers } from "@/lib/nest-accounts";
+import { googleMapsBrowserKey, googleMapsTrackingId } from "@/lib/google-maps-key";
 import { RefreshCw, MapPin, Bike } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/couriers-map")({
   component: CouriersMapPage,
 });
 
-const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
-const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
+const TRACKING_ID = googleMapsTrackingId();
+const BROWSER_KEY = googleMapsBrowserKey();
 
 // Default center: Israel (Tel Aviv)
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };

@@ -19,6 +19,11 @@ const appBuildId =
 
 process.env.VITE_APP_BUILD_ID = appBuildId;
 
+if (!process.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY) {
+  process.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY =
+    process.env.GOOGLE_MAPS_BROWSER_KEY || process.env.VITE_GOOGLE_MAPS_BROWSER_KEY || "";
+}
+
 function appVersionPlugin(buildId: string): Plugin {
   const payload = JSON.stringify({
     buildId,

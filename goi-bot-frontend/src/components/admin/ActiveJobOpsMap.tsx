@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import type { NearbyCourier } from "@/lib/active-jobs";
 import type { LatLng } from "@/lib/google-driving-route";
 
-const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
-const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
+import { googleMapsBrowserKey, googleMapsTrackingId } from "@/lib/google-maps-key";
+
+const BROWSER_KEY = googleMapsBrowserKey();
+const TRACKING_ID = googleMapsTrackingId();
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
 
 declare global {

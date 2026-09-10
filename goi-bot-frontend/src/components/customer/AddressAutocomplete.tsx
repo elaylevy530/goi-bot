@@ -10,16 +10,20 @@ declare global {
   }
 }
 
-const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
-const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
+import { googleMapsBrowserKey, googleMapsTrackingId } from "@/lib/google-maps-key";
 
 /** Loads Google Maps JS once, shared across all consumers. */
 export function loadGoogleMaps(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.google?.maps) return Promise.resolve();
   if (window.__gmapsLoader) return window.__gmapsLoader;
+  const key = googleMapsBrowserKey();
+  const tracking = googleMapsTrackingId();
   window.__gmapsLoader = new Promise<void>((resolve, reject) => {
-    if (!BROWSER_KEY) { reject(new Error("Missing Google Maps key")); return; }
+    if (!key) {
+      reject(new Error("חסר מפתח Google Maps בדפדפן"));
+      return;
+    }
     if (document.querySelector("script[src*='maps.googleapis.com/maps/api/js']")) {
       const check = () => window.google?.maps ? resolve() : setTimeout(check, 60);
       check();
@@ -27,9 +31,9 @@ export function loadGoogleMaps(): Promise<void> {
     }
     window.__initGmaps = () => resolve();
     const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${BROWSER_KEY}&libraries=places&language=iw&region=IL&loading=async&callback=__initGmaps${TRACKING_ID ? `&channel=${TRACKING_ID}` : ""}`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=iw&region=IL&loading=async&callback=__initGmaps${tracking ? `&channel=${tracking}` : ""}`;
     s.async = true;
-    s.onerror = () => reject(new Error("Failed to load Google Maps"));
+    s.onerror = () => reject(new Error("מפת Google לא נטענה"));
     document.head.appendChild(s);
   });
   return window.__gmapsLoader;
@@ -52,7 +56,7 @@ type Suggestion = {
 };
 
 type Props = {
-  label: string;
+  label?: string;
   placeholder?: string;
   value: string;
   onChange: (v: string) => void;
@@ -61,6 +65,8 @@ type Props = {
   autoFocus?: boolean;
   /** Inline validation message shown under the field. */
   error?: string | null;
+  /** Native GOI field look (no card chrome). */
+  variant?: "card" | "plain";
 };
 
 /** OpenStreetMap Nominatim — used when Google Places is blocked (common on localhost referrer restrictions). */
@@ -104,7 +110,7 @@ async function fetchNominatimSuggestions(query: string): Promise<Suggestion[]> {
   }).filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng));
 }
 
-export function AddressAutocomplete({ label, placeholder, value, onChange, onSelect, accent, autoFocus, error }: Props) {
+export function AddressAutocomplete({ label, placeholder, value, onChange, onSelect, accent, autoFocus, error, variant = "card" }: Props) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -156,7 +162,7 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
     setLoading(true);
     try {
       // Skip Google after we already know this origin is referrer-blocked (e.g. localhost).
-      if (!googleBlockedRef.current && BROWSER_KEY) {
+      if (!googleBlockedRef.current && googleMapsBrowserKey()) {
         try {
           await loadGoogleMaps();
           const { AutocompleteSuggestion, AutocompleteSessionToken } =
@@ -231,9 +237,22 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
 
   const dotClass = accent === "green" ? "bg-[#0E7A4A] ring-[#E6F7EF]" : "bg-[#DC2626] ring-red-50";
   const hasError = Boolean(error);
+  const plain = variant === "plain";
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative goi-addr">
+      {plain ? (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => handleInput(e.target.value)}
+          onFocus={() => value.length >= 2 && suggestions.length > 0 && setOpen(true)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          aria-label={label || placeholder || "כתובת"}
+          aria-invalid={hasError}
+        />
+      ) : (
       <div
         className={`flex items-center gap-3 bg-white rounded-2xl px-4 py-2.5 ring-1 transition ${
           hasError
@@ -243,13 +262,15 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
       >
         <div className={`size-3 rounded-full ${dotClass} ring-4 shrink-0`} />
         <div className="flex-1 min-w-0">
-          <div
-            className={`text-[10px] font-bold uppercase tracking-wider ${
-              hasError ? "text-destructive" : "text-[#101418]/50"
-            }`}
-          >
-            {label}
-          </div>
+          {label ? (
+            <div
+              className={`text-[10px] font-bold uppercase tracking-wider ${
+                hasError ? "text-destructive" : "text-[#101418]/50"
+              }`}
+            >
+              {label}
+            </div>
+          ) : null}
           <input
             type="text"
             value={value}
@@ -276,6 +297,7 @@ export function AddressAutocomplete({ label, placeholder, value, onChange, onSel
           <MapPin className="size-4 text-[#101418]/30 shrink-0" />
         )}
       </div>
+      )}
       {hasError && (
         <p className="mt-1 px-1 text-[11px] font-medium text-destructive" role="alert">
           {error}

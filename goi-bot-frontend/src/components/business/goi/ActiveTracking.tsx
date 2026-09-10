@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
+import { DeliveryDetailsSheet } from "@/components/business/goi/DeliveryDetailsSheet";
 import { Avatar, Badge, FilterTabs, Panel, SearchBox, SelectBox, money } from "@/components/business/goi/GoiUi";
 import type { NestJob } from "@/lib/nest-jobs";
 import {
@@ -44,7 +45,6 @@ type Props = {
   storePin?: LiveMapPin | null;
   selectedId?: string;
   onSelect: (id: string | undefined) => void;
-  onDetails: (id: string) => void;
   initialFilter?: string;
 };
 
@@ -54,7 +54,6 @@ export function ActiveTracking({
   storePin,
   selectedId,
   onSelect,
-  onDetails,
   initialFilter = "all",
 }: Props) {
   const navigate = useNavigate();
@@ -62,6 +61,7 @@ export function ActiveTracking({
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("all");
   const [view, setView] = useState("map");
+  const [detailId, setDetailId] = useState<string | null>(null);
   const mapHost = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -187,7 +187,7 @@ export function ActiveTracking({
                 className={"tracking-card " + (chosen?.id === job.id ? "is-selected" : "")}
               >
                 <header>
-                  <button type="button" className="tracking-order-id" onClick={() => onDetails(job.id)}>
+                  <button type="button" className="tracking-order-id" onClick={() => setDetailId(job.id)}>
                     #{job.job_number}
                     <Eye size={15} />
                   </button>
@@ -269,7 +269,7 @@ export function ActiveTracking({
                     <MessageCircle size={17} />
                     <span>צ׳אט עם השליח</span>
                   </button>
-                  <button type="button" className="btn outline tracking-details" onClick={() => onDetails(job.id)}>
+                  <button type="button" className="btn outline tracking-details" onClick={() => setDetailId(job.id)}>
                     <Eye size={16} />
                     פרטי משלוח
                   </button>
@@ -316,7 +316,7 @@ export function ActiveTracking({
                       : "יעד המסירה · טרם שובץ שליח"}
                   </p>
                 </div>
-                <button type="button" className="btn outline small" onClick={() => onDetails(chosen.id)}>
+                <button type="button" className="btn outline small" onClick={() => setDetailId(chosen.id)}>
                   פרטים
                   <ArrowLeft size={15} />
                 </button>
@@ -343,6 +343,14 @@ export function ActiveTracking({
           </div>
         )}
       </div>
+      <DeliveryDetailsSheet
+        job={jobs.find((j) => j.id === detailId) ?? null}
+        onClose={() => setDetailId(null)}
+        onChat={(job) => {
+          setDetailId(null);
+          openChat(job);
+        }}
+      />
     </div>
   );
 }

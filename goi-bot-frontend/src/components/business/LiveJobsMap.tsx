@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { loadGoogleMaps } from "@/components/customer/AddressAutocomplete";
 import type { LiveMapPin } from "@/lib/business-panel";
+import { googleMapsBrowserKey } from "@/lib/google-maps-key";
 import { cn } from "@/lib/utils";
 
 const IL_CENTER = { lat: 32.0853, lng: 34.7818 };
@@ -27,6 +28,9 @@ export function LiveJobsMap({ pins, className, showControls, selectedId, onMarke
   const markersRef = useRef<google.maps.Marker[]>([]);
   const onMarkerRef = useRef(onMarker);
   const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(
+    googleMapsBrowserKey() ? null : "חסר מפתח Google Maps בדפדפן",
+  );
   onMarkerRef.current = onMarker;
 
   useEffect(() => {
@@ -50,12 +54,31 @@ export function LiveJobsMap({ pins, className, showControls, selectedId, onMarke
           ],
         });
         setMapReady(true);
+        setMapError(null);
+        window.setTimeout(() => {
+          if (!cancelled && mapRef.current) {
+            window.google.maps.event.trigger(mapRef.current, "resize");
+          }
+        }, 120);
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (!cancelled) setMapError(e instanceof Error ? e.message : "מפת Google לא נטענה");
+      });
     return () => {
       cancelled = true;
     };
   }, [showControls]);
+
+  useEffect(() => {
+    const el = divRef.current;
+    const map = mapRef.current;
+    if (!el || !map || !mapReady) return;
+    const ro = new ResizeObserver(() => {
+      window.google.maps.event.trigger(map, "resize");
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -120,6 +143,7 @@ export function LiveJobsMap({ pins, className, showControls, selectedId, onMarke
         role="img"
         aria-label="מפת משלוחים"
       />
+      {mapError && <div className="map-error">{mapError}. בדקו את מפתח Google Maps בהגדרות הפריסה.</div>}
       {showControls && (
         <div className="map-controls">
           <div>

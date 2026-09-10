@@ -16,6 +16,7 @@ import type { DrivingRoute } from "@/lib/google-driving-route";
 import { haversineKm } from "@/lib/google-driving-route";
 import { toast } from "sonner";
 import { canonicalizeVehicleValue } from "@/lib/courier-vehicles";
+import { Check, Save } from "lucide-react";
 
 type FieldKey =
   | "pickup"
@@ -71,8 +72,7 @@ function NewDeliveryPage() {
     [validExtraStops],
   );
 
-  const [deliveryType, setDeliveryType] = useState<string>(deliveryTypes[0]?.label ?? "מוצר");
-  useEffect(() => { setDeliveryType(deliveryTypes[0]?.label ?? "מוצר"); }, [deliveryTypes]);
+  const [deliveryType, setDeliveryType] = useState("חבילה עד 5 קילו");
 
   const [timing, setTiming] = useState<Timing>((search.timing as Timing) ?? timings[0] ?? "now");
   useEffect(() => { if (!timings.includes(timing)) setTiming(timings[0]); }, [timings, timing]);
@@ -145,6 +145,11 @@ function NewDeliveryPage() {
   const [dropoffFloor, setDropoffFloor] = useState("");
   const [dropoffApt, setDropoffApt] = useState("");
   const [dropoffEntry, setDropoffEntry] = useState("");
+  const [dropoffCity, setDropoffCity] = useState("");
+  const [dropoffCode, setDropoffCode] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [customerPayment, setCustomerPayment] = useState("כרטיס אשראי");
+  const [cashCollect, setCashCollect] = useState("");
   const [pricingModel, setPricingModel] = useState<"fixed_price" | "distance_based" | "quote_request">("fixed_price");
   const [offeredPrice, setOfferedPrice] = useState("");
   const [basePrice, setBasePrice] = useState("");
@@ -223,6 +228,10 @@ function NewDeliveryPage() {
     queryFn: () => nestComputePrice({ distanceKm: distanceKm!, extraStops: extraStopCount, isHeavy }),
   });
   const suggestedPrice = priceQuote?.business_total != null ? Math.round(Number(priceQuote.business_total)) : null;
+  useEffect(() => {
+    if (suggestedPrice == null || offeredPrice.trim()) return;
+    setOfferedPrice(String(suggestedPrice));
+  }, [suggestedPrice, offeredPrice]);
 
   const { data: activePricing } = useQuery({
     queryKey: ["pricing-active"],
@@ -322,9 +331,15 @@ function NewDeliveryPage() {
       const addressBits: string[] = [];
       if (dropoffFloor) addressBits.push(`קומה ${dropoffFloor}`);
       if (dropoffApt) addressBits.push(`דירה ${dropoffApt}`);
-      if (dropoffEntry) addressBits.push(`כניסה/קוד: ${dropoffEntry}`);
+      if (dropoffEntry) addressBits.push(`כניסה: ${dropoffEntry}`);
+      if (dropoffCode) addressBits.push(`קוד כניסה: ${dropoffCode}`);
       const addressNote = addressBits.length ? `יעד: ${addressBits.join(" · ")}` : "";
-      const fullNotes = [attrNote, stopsNote, addressNote, packageContents && `תכולה: ${packageContents}`, packageWeight && `משקל: ${packageWeight}`, notes].filter(Boolean).join(" · ");
+      const payNote =
+        customerPayment === "מזומן" && cashCollect.trim()
+          ? `תשלום לקוח: מזומן · לגבייה ₪${cashCollect.trim()}`
+          : `תשלום לקוח: ${customerPayment}`;
+      const qtyNote = quantity > 1 ? `כמות: ${quantity}` : "";
+      const fullNotes = [attrNote, stopsNote, addressNote, packageContents && `תכולה: ${packageContents}`, packageWeight && `משקל: ${packageWeight}`, qtyNote, payNote, notes].filter(Boolean).join(" · ");
 
       const price =
         pricingModel === "fixed_price"
@@ -354,7 +369,7 @@ function NewDeliveryPage() {
         pickup_ready: pickupReadyNow,
         pickup_ready_at: pickupReadyAtIso,
         dropoff_address: dropoff.address,
-        dropoff_area: extractCity(dropoff.address),
+        dropoff_area: dropoffCity.trim() || extractCity(dropoff.address),
         dropoff_lat: dropoff.lat ?? null,
         dropoff_lng: dropoff.lng ?? null,
         recipient_name: recipientName || null,
@@ -362,7 +377,7 @@ function NewDeliveryPage() {
         dropoff_notes: fullNotes || null,
         package_type: deliveryType,
         fragile: attributes.has("fragile"),
-        number_of_packages: 1 + validExtraStops.length,
+        number_of_packages: quantity + validExtraStops.length,
         vehicle_required: canonicalizeVehicleValue(vehicle) || vehicle || null,
         job_date: jobDate,
         job_time: jobTime,
@@ -375,7 +390,7 @@ function NewDeliveryPage() {
         customer_price: price || null,
         payment: price,
         estimated_distance_km: distanceKm ? Number(distanceKm.toFixed(1)) : null,
-        description: [`קטגוריה: ${category.label}`, deliveryType, validExtraStops.length ? `${validExtraStops.length + 1} יעדים` : null].filter(Boolean).join(" · "),
+        description: [`קטגוריה: ${category.label}`, `${quantity} × ${deliveryType}`, validExtraStops.length ? `${validExtraStops.length + 1} יעדים` : null, payNote].filter(Boolean).join(" · "),
         invoice_required: (me as { invoice_required?: boolean }).invoice_required ?? false,
         order_number: orderNumber.trim() || null,
         status: asDraftRef.current ? "טיוטה" : "נשלחה לשליחים",
@@ -417,8 +432,23 @@ function NewDeliveryPage() {
   });
 
   return (
-    <BusinessShell title="הזמנה חדשה" subtitle="סניף איסוף, כתובת מסירה, תכולה ותזמון">
-      <div className="order-page order-form" style={{ margin: 0 }}>
+    <BusinessShell
+      headerActions={
+        <div className="order-top-actions">
+          <span>
+            <Check size={15} />
+            נשמר אוטומטית
+          </span>
+          <button type="button" className="btn primary" onClick={attemptDraft} disabled={submit.isPending}>
+            <Save size={15} />
+            שמור טיוטה
+          </button>
+          <button type="button" className="btn outline" onClick={() => navigate({ to: "/business/dashboard" })}>
+            ביטול
+          </button>
+        </div>
+      }
+    >
       <BusinessNewOrder
         pickupText={pickupText}
         pickup={pickup}
@@ -432,7 +462,12 @@ function NewDeliveryPage() {
         dropoffText={dropoffText}
         dropoff={dropoff}
         onDropoffText={(v) => { setDropoffText(v); if (!v) setDropoff(null); clearFieldError("dropoff"); }}
-        onDropoffSelect={(p) => { setDropoff(p); setDropoffText(p.address); clearFieldError("dropoff"); }}
+        onDropoffSelect={(p) => {
+          setDropoff(p);
+          setDropoffText(p.address);
+          setDropoffCity((city) => city || extractCity(p.address) || "");
+          clearFieldError("dropoff");
+        }}
         dropoffError={fieldErrors.dropoff}
         extraStops={extraStops}
         setExtraStops={setExtraStops}
@@ -504,8 +539,17 @@ function NewDeliveryPage() {
         onDraft={attemptDraft}
         onValidateRoute={() => applyErrors(collectFieldErrors("route"))}
         onValidateDetails={() => applyErrors(collectFieldErrors("details"))}
+        quantity={quantity}
+        onQuantity={setQuantity}
+        customerPayment={customerPayment}
+        onCustomerPayment={setCustomerPayment}
+        cashCollect={cashCollect}
+        onCashCollect={setCashCollect}
+        dropoffCity={dropoffCity}
+        onDropoffCity={setDropoffCity}
+        dropoffCode={dropoffCode}
+        onDropoffCode={setDropoffCode}
       />
-      </div>
     </BusinessShell>
   );
 }

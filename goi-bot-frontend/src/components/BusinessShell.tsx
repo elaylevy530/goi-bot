@@ -179,11 +179,13 @@ export function BusinessShell({
   title,
   subtitle,
   headerExtra,
+  headerActions,
 }: {
   children: ReactNode;
   title?: string;
   subtitle?: string;
   headerExtra?: ReactNode;
+  headerActions?: ReactNode;
 }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
@@ -230,6 +232,7 @@ export function BusinessShell({
   };
 
   const isHome = pageClass(pathname) === "page-home";
+  const isOrder = pageClass(pathname) === "page-new";
 
   return (
     <div dir="rtl" className="goi-biz">
@@ -312,21 +315,25 @@ export function BusinessShell({
                 <strong className="mobile-brand goi-word">GOI</strong>
               </div>
               <div className="header-actions">
-                <form onSubmit={onSearch} className="search-box hidden lg:flex" style={{ minWidth: 220, maxWidth: 280 }}>
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש משלוח..." aria-label="חיפוש הזמנות" />
-                </form>
-                {!pathname.startsWith("/business/new-") && (
-                  <Link to="/business/new-delivery" className="btn primary header-new">
-                    <Plus size={18} />
-                    הזמנה חדשה
-                  </Link>
+                {headerActions ?? (
+                  <>
+                    <form onSubmit={onSearch} className="search-box hidden lg:flex" style={{ minWidth: 220, maxWidth: 280 }}>
+                      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש משלוח..." aria-label="חיפוש הזמנות" />
+                    </form>
+                    {!pathname.startsWith("/business/new-") && (
+                      <Link to="/business/new-delivery" className="btn primary header-new">
+                        <Plus size={18} />
+                        הזמנה חדשה
+                      </Link>
+                    )}
+                    <NotificationsBell businessId={me?.id} />
+                  </>
                 )}
-                <NotificationsBell businessId={me?.id} />
               </div>
             </header>
           )}
           <main className="page-scroll">
-            {isHome || hideChrome ? (
+            {isHome || isOrder || hideChrome ? (
               children
             ) : (
               <div className="page-content">

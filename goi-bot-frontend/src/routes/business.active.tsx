@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
 import { ActiveTracking } from "@/components/business/goi/ActiveTracking";
@@ -16,7 +16,6 @@ export const Route = createFileRoute("/business/active")({
 
 function LiveTrackingPage() {
   const { job, filter } = Route.useSearch();
-  const navigate = useNavigate();
   const { data: me } = useMyBusiness();
   const { data: jobs = [] } = useBusinessJobs(me?.id);
   const [selectedId, setSelectedId] = useState<string | undefined>(job);
@@ -38,7 +37,6 @@ function LiveTrackingPage() {
         selectedId={selectedId || job}
         initialFilter={filter || "all"}
         onSelect={setSelectedId}
-        onDetails={(id) => navigate({ to: "/business/order/$id", params: { id } })}
       />
     </BusinessShell>
   );
