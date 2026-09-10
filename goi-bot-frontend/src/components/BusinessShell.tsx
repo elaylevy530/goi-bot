@@ -194,10 +194,44 @@ export function BusinessShell({
   const { data: jobs = [] } = useBusinessJobs(me?.id);
   const [query, setQuery] = useState("");
   const [navOpen, setNavOpen] = useState(false);
+  const [phone, setPhone] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
 
   useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1180px)");
+    const closeOnDesktop = () => {
+      if (mq.matches) setNavOpen(false);
+    };
+    closeOnDesktop();
+    mq.addEventListener("change", closeOnDesktop);
+    return () => mq.removeEventListener("change", closeOnDesktop);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setPhone(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = navOpen ? "hidden" : "";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    if (navOpen) window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navOpen]);
 
   useEffect(() => {
     if (!me?.id) return;
@@ -235,22 +269,22 @@ export function BusinessShell({
   const isOrder = pageClass(pathname) === "page-new";
 
   return (
-    <div dir="rtl" className="goi-biz">
+    <div dir="rtl" className={cn("goi-biz", navOpen && "nav-open")}>
       {navOpen && (
         <button type="button" className="sidebar-overlay" aria-label="סגור תפריט" onClick={() => setNavOpen(false)} />
       )}
       <div className="app-shell">
-        <aside className={cn("app-sidebar", navOpen && "is-open")}>
+        <aside className={cn("app-sidebar", navOpen && "is-open")} id="business-nav">
           <div className="sidebar-brand">
             <Link to="/business/dashboard" className="goi-word" onClick={() => setNavOpen(false)}>
               GO<span>I</span>
               <small>BUSINESS</small>
             </Link>
-            <button type="button" className="sidebar-collapse icon-btn lg:hidden" aria-label="סגור תפריט" onClick={() => setNavOpen(false)}>
+            <button type="button" className="sidebar-collapse icon-btn" aria-label="סגור תפריט" onClick={() => setNavOpen(false)}>
               <X size={18} />
             </button>
           </div>
-          <nav className="main-nav" aria-label="ניווט עסקי" style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "auto" }}>
+          <nav className="main-nav" aria-label="ניווט עסקי">
             {NAV.map((group, gi) => (
               <div key={group.section} className={gi > 0 ? "nav-divider" : undefined}>
                 <span className="nav-section-label">{group.section}</span>
@@ -297,7 +331,7 @@ export function BusinessShell({
           {!hideChrome && (
             <header className="app-header">
               <div className="header-business">
-                <button type="button" className="mobile-menu icon-btn" aria-label="פתח תפריט" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>
+                <button type="button" className="mobile-menu icon-btn" aria-label="פתח תפריט" aria-expanded={navOpen} aria-controls="business-nav" onClick={() => setNavOpen(true)}>
                   <Menu size={24} />
                 </button>
                 <button type="button" className="business-avatar" onClick={() => navigate({ to: "/business/account" })} aria-label="העסק שלי">
@@ -315,20 +349,23 @@ export function BusinessShell({
                 <strong className="mobile-brand goi-word">GOI</strong>
               </div>
               <div className="header-actions">
-                {headerActions ?? (
-                  <>
-                    <form onSubmit={onSearch} className="search-box hidden lg:flex" style={{ minWidth: 220, maxWidth: 280 }}>
-                      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש משלוח..." aria-label="חיפוש הזמנות" />
-                    </form>
-                    {!pathname.startsWith("/business/new-") && (
-                      <Link to="/business/new-delivery" className="btn primary header-new">
-                        <Plus size={18} />
-                        הזמנה חדשה
-                      </Link>
-                    )}
-                    <NotificationsBell businessId={me?.id} />
-                  </>
-                )}
+                {!(phone && isOrder) &&
+                  (headerActions ?? (
+                    <>
+                      {!isHome && (
+                        <form onSubmit={onSearch} className="search-box header-search">
+                          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש משלוח..." aria-label="חיפוש הזמנות" />
+                        </form>
+                      )}
+                      {!pathname.startsWith("/business/new-") && (
+                        <Link to="/business/new-delivery" className="btn primary header-new">
+                          <Plus size={18} />
+                          הזמנה חדשה
+                        </Link>
+                      )}
+                    </>
+                  ))}
+                <NotificationsBell businessId={me?.id} />
               </div>
             </header>
           )}

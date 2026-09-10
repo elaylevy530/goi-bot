@@ -64,6 +64,31 @@ export function jobEtaMinutes(job: NestJob): number | null {
   return remaining > 0 ? remaining : null;
 }
 
+export function etaToneColor(minutes: number | null): string {
+  if (minutes == null) return "#27875a";
+  if (minutes <= 12) return "#087d52";
+  if (minutes <= 28) return "#c47a22";
+  return "#c45c4a";
+}
+
+export function formatEtaClock(job: NestJob): string {
+  const min = jobEtaMinutes(job);
+  if (min == null) return "—";
+  return new Date(Date.now() + min * 60_000).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+}
+
+export function formatRelativeHe(iso?: string | null): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60_000));
+  if (mins < 1) return "עכשיו";
+  if (mins < 60) return `לפני ${mins} דקות`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `לפני ${hours} שעות`;
+  return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function formatHebrewDate(d = new Date()): string {
   return d.toLocaleDateString("he-IL", {
     weekday: "long",
@@ -273,13 +298,14 @@ export function pinsFromJobs(jobs: NestJob[]): LiveMapPin[] {
     const cLat = Number(row.couriers?.last_lat);
     const cLng = Number(row.couriers?.last_lng);
     if (assigned && Number.isFinite(cLat) && Number.isFinite(cLng)) {
+      const eta = jobEtaMinutes(job);
       pins.push({
         id: job.id,
         lat: cLat,
         lng: cLng,
-        label: row.couriers?.full_name || job.job_number,
+        label: eta != null ? `${eta} דק׳` : row.couriers?.full_name || job.job_number,
         type: "courier",
-        color: trackingGroup(job) === "pickup" ? "#527eaf" : "#27875a",
+        color: etaToneColor(eta),
       });
       continue;
     }

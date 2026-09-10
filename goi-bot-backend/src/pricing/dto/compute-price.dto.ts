@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsBoolean, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 export class ComputePriceDto {
   @IsNumber()
@@ -13,4 +13,8 @@ export class ComputePriceDto {
   @IsOptional()
   @IsBoolean()
   isHeavy?: boolean;
+
+  @IsOptional()
+  @IsString()
+  dropoffCity?: string;
 }

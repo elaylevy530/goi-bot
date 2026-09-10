@@ -1,41 +1,45 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
-import { Avatar, Badge, Panel, money } from "@/components/business/goi/GoiUi";
+import { Avatar, DataTable, Panel, money } from "@/components/business/goi/GoiUi";
 import { nestListMyNotifications } from "@/lib/nest-accounts";
+import { nestCancelJob, type NestJob } from "@/lib/nest-jobs";
+import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import { playBeep } from "@/lib/offer-alert";
 import { toast } from "sonner";
 import {
-  formatHebrewDate,
+  formatEtaClock,
+  formatRelativeHe,
   isIncomingJob,
   isSameDay,
   isTrackingJob,
+  jobItemsLabel,
   jobPrice,
   jobRecipientName,
   jobSourceLabel,
   jobCourierName,
-  courierStepLabel,
   pinsFromJobs,
   trackingGroup,
-  jobBadgeTone,
 } from "@/lib/business-panel";
 import {
   ArrowLeft,
   BarChart3,
   Bell,
   Bike,
-  Check,
+  CalendarDays,
   CheckCheck,
   ClipboardList,
   Clock3,
   FileText,
-  Headphones,
+  LayoutGrid,
   MapPin,
+  MessageCircle,
   Package,
   Search,
-  X,
+  TriangleAlert,
 } from "lucide-react";
 
 export const Route = createFileRoute("/business/dashboard")({
@@ -78,9 +82,35 @@ function statusToastMessage(prev: string, next: string, jobNumber?: string): str
   return null;
 }
 
+function sourceTone(label: string) {
+  if (label === "אינטגרציה" || label === "שותף") return "orange";
+  if (label === "מכרז") return "purple";
+  return "green";
+}
+
+function notifVisual(kind: string) {
+  const k = kind.toLowerCase();
+  if (k.includes("warn") || k.includes("fail") || k.includes("stuck") || k.includes("cancel")) {
+    return { icon: TriangleAlert, color: "red" };
+  }
+  if (k.includes("incoming") || k.includes("approval") || k.includes("quote")) {
+    return { icon: ClipboardList, color: "amber" };
+  }
+  if (k.includes("job") || k.includes("courier") || k.includes("deliver")) {
+    return { icon: Bike, color: "green" };
+  }
+  return { icon: Bell, color: "green" };
+}
+
+function dropoffCity(job: NestJob) {
+  return job.dropoff_area || String(job.dropoff_address || "").split(",")[1]?.trim() || job.dropoff_address || "";
+}
+
 function BusinessDashboard() {
   const { data: me } = useMyBusiness();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const dispatchFn = useServerFn(dispatchJobToCouriers);
   const prevStatusesRef = useRef<Map<string, string> | null>(null);
   const primedRef = useRef(false);
   const { data: orders, isLoading } = useBusinessJobs(me?.id);
@@ -132,52 +162,61 @@ function BusinessDashboard() {
   const pickupLng = Number((me as { pickup_lng?: number | null } | null)?.pickup_lng);
   const storePin =
     Number.isFinite(pickupLat) && Number.isFinite(pickupLng)
-      ? { id: "store", lat: pickupLat, lng: pickupLng, label: "העסק", type: "store" as const, color: "#00a334" }
+      ? { id: "store", lat: pickupLat, lng: pickupLng, label: "העסק", type: "store" as const, color: "#087d52" }
       : null;
+
+  const dispatch = useMutation({
+    mutationFn: async (jobId: string) => dispatchFn({ data: { jobId } }),
+    onSuccess: (r) => {
+      toast.success(r.dispatched ? `המשלוח הופץ ל־${r.sent} שליחים` : "ההזמנה אושרה");
+      qc.invalidateQueries({ queryKey: ["business-jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const cancel = useMutation({
+    mutationFn: (jobId: string) => nestCancelJob(jobId),
+    onSuccess: () => {
+      toast.success("ההזמנה נדחתה");
+      qc.invalidateQueries({ queryKey: ["business-jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const approve = (o: NestJob) => {
+    if (o.pricing_type === "quote_request") {
+      navigate({ to: "/business/incoming" });
+      return;
+    }
+    dispatch.mutate(o.id);
+  };
+
+  const busy = isLoading && !orders;
 
   return (
     <BusinessShell>
       <div className="page-content">
-        <div className="dashboard-heading">
-          <div>
-            <span className="eyebrow">סקירה יומית</span>
-            <h1>היום בעסק שלך</h1>
-            <p>כל ההזמנות והמשלוחים, במקום אחד.</p>
-          </div>
-          <span className="dashboard-date">{formatHebrewDate()}</span>
-        </div>
         <div className="home-stats">
           {[
-            { label: "הזמנות לאישור", value: incoming.length, icon: ClipboardList, to: "/business/incoming", hint: "ממתינות לטיפול שלך", tone: "amber" },
-            { label: "משלוחים בדרך", value: moving.length, icon: Bike, to: "/business/active", hint: "בדרך לאיסוף וללקוחות", tone: "green" },
-            { label: "ממתינים לשליח", value: waiting.length, icon: Clock3, to: "/business/active", hint: "לפני תחילת המשלוח", tone: "blue" },
-            { label: "סך הזמנות היום", value: today.length, icon: Package, to: "/business/history", hint: "כל הזמנות העסק להיום", tone: "neutral" },
+            { label: "הזמנות נכנסות לאישור", value: incoming.length, icon: ClipboardList, to: "/business/incoming" },
+            { label: "משלוחים פעילים", value: moving.length, icon: Bike, to: "/business/active" },
+            { label: "ממתינים לשילוח", value: waiting.length, icon: Clock3, to: "/business/active" },
+            { label: "הזמנות היום", value: today.length, icon: CalendarDays, to: "/business/history" },
           ].map((s) => (
-            <button key={s.label} type="button" className={`panel stat-card stat-${s.tone}`} onClick={() => navigate({ to: s.to as never })}>
+            <button key={s.label} type="button" className="panel stat-card" onClick={() => navigate({ to: s.to as never })}>
               <span className="round-icon">
                 <s.icon size={22} />
               </span>
               <h2>{s.label}</h2>
-              <strong>{isLoading && !orders ? "—" : s.value}</strong>
+              <strong>{busy ? "—" : s.value}</strong>
               <small>
-                {s.hint}
-                <ArrowLeft size={14} />
+                <i className="live-dot" />
+                עודכן זה עתה
               </small>
             </button>
           ))}
         </div>
         <div className="home-workspace">
-          <Panel
-            className="home-map-panel"
-            title="המשלוחים שלך על המפה"
-            icon={<MapPin size={19} />}
-            action={
-              <Link to="/business/active" className="link">
-                למעקב המלא
-                <ArrowLeft size={15} />
-              </Link>
-            }
-          >
+          <Panel className="home-map-panel" title="מעקב משלוחים" icon={<MapPin size={19} />}>
             <LiveJobsMap
               pins={[...(storePin ? [storePin] : []), ...pins]}
               onMarker={(id) => {
@@ -186,69 +225,74 @@ function BusinessDashboard() {
               }}
               showControls
             />
-            <div className="map-summary">
-              <span>
-                <Bike size={17} />
-                <strong>{moving.length}</strong> משלוחים בדרך
-              </span>
-              <span>מיקומים לפי נתוני השליחים בפועל</span>
-            </div>
           </Panel>
           <div className="home-bottom-grid">
-            <Panel title="ממתינות לאישור שלך" icon={<ClipboardList size={19} />} action={<Badge text={String(incoming.length)} tone="amber" />}>
-              <div className="approval-list">
-                {incoming.slice(0, 5).map((o) => (
-                  <div className="approval-row" key={o.id}>
-                    <Link to="/business/order/$id" params={{ id: o.id }} className="approval-person">
-                      <Avatar name={jobRecipientName(o)} />
-                      <span>
-                        <strong>{jobRecipientName(o)}</strong>
-                        <small>#{o.job_number} · {o.dropoff_area || o.dropoff_address || ""}</small>
-                      </span>
-                    </Link>
-                    <div className="approval-value">
-                      <strong>{money(jobPrice(o))}</strong>
-                      <span>{jobSourceLabel(o)}</span>
-                    </div>
-                    <Link to="/business/incoming" className="approve-action">
-                      <Check size={17} />
-                      טיפול
-                    </Link>
-                  </div>
-                ))}
-                {incoming.length === 0 && (
-                  <div className="approval-empty">
-                    <CheckCheck size={25} />
-                    כל ההזמנות טופלו
-                  </div>
-                )}
-              </div>
+            <Panel title="הזמנות נכנסות לאישור" icon={<ClipboardList size={19} />}>
+              {incoming.length > 0 ? (
+                <DataTable
+                  headers={["#", "לקוח", "סכום", "פריטים", "מקור ההזמנה", "פעולה"]}
+                  rows={incoming.slice(0, 4).map((o, i) => [
+                    i + 1,
+                    <span key="c">
+                      {jobRecipientName(o)}
+                      <small>{dropoffCity(o)}</small>
+                    </span>,
+                    money(jobPrice(o)),
+                    jobItemsLabel(o),
+                    <span key="s" className={`source-tag ${sourceTone(jobSourceLabel(o))}`}>{jobSourceLabel(o)}</span>,
+                    <div key="a" className="mini-actions">
+                      <button type="button" className="btn primary small" disabled={dispatch.isPending} onClick={() => approve(o)}>
+                        אישור
+                      </button>
+                      <button type="button" className="btn outline small reject" disabled={cancel.isPending} onClick={() => cancel.mutate(o.id)}>
+                        דחייה
+                      </button>
+                      <button type="button" className="btn outline small" onClick={() => navigate({ to: "/business/order/$id", params: { id: o.id } })}>
+                        צפייה
+                      </button>
+                    </div>,
+                  ])}
+                />
+              ) : (
+                <div className="approval-empty">
+                  <CheckCheck size={25} />
+                  כל ההזמנות טופלו
+                </div>
+              )}
               <Link to="/business/incoming" className="panel-link">
                 לכל ההזמנות לאישור
                 <ArrowLeft size={15} />
               </Link>
             </Panel>
-            <Panel title="משלוחים בדרך" icon={<Bike size={19} />} action={<Badge text={String(moving.length)} tone="green" />}>
+            <Panel title="משלוחים פעילים" icon={<Bike size={19} />}>
               <div className="home-deliveries">
                 {moving.slice(0, 3).map((o) => (
                   <button key={o.id} type="button" onClick={() => navigate({ to: "/business/active", search: { job: o.id } })}>
                     <div className="home-courier">
                       <Avatar name={jobCourierName(o) || "שליח"} />
                       <span>
-                        <strong>{jobCourierName(o) || "ממתין לשליח"}</strong>
-                        <p>{o.dropoff_area || o.dropoff_address || ""}</p>
+                        <strong>
+                          {jobCourierName(o) || "ממתין לשליח"}
+                          <i className="live-dot" />
+                        </strong>
+                        <p>{dropoffCity(o)}</p>
                       </span>
                     </div>
                     <div>
-                      <Badge text={courierStepLabel(o)} tone={jobBadgeTone(o.status)} />
                       <small>#{o.job_number}</small>
                     </div>
                     <div>
-                      <small>סטטוס</small>
-                      <b>{courierStepLabel(o)}</b>
+                      <small>ETA</small>
+                      <b>{formatEtaClock(o)}</b>
                     </div>
                   </button>
                 ))}
+                {moving.length === 0 && (
+                  <div className="approval-empty">
+                    <Bike size={25} />
+                    אין משלוחים פעילים כרגע
+                  </div>
+                )}
               </div>
               <Link to="/business/active" className="panel-link">
                 לכל המשלוחים
@@ -257,43 +301,53 @@ function BusinessDashboard() {
             </Panel>
           </div>
         </div>
-        <Panel className="home-updates" title="עדכונים אחרונים" icon={<Bell size={19} />}>
+        <Panel className="home-updates" title="הודעות ועדכונים" icon={<Bell size={19} />}>
           <div className="three-cols">
-            {(notifs.length ? notifs.slice(0, 3) : [
-              { id: "empty", title: "אין עדכונים חדשים", body: "עדכוני משלוחים יופיעו כאן", icon: Bell },
-            ]).map((e: any) => (
-              <Link key={e.id} to="/business/notifications" className="update-tile">
-                <span className="event-icon green">
-                  <Bell size={22} />
-                </span>
-                <div>
-                  <strong>{e.title}</strong>
-                  <p>{e.body || "עדכון מהמערכת"}</p>
-                </div>
-                <ArrowLeft size={16} />
-              </Link>
-            ))}
+            {(notifs.length ? notifs.slice(0, 3) : []).map((e) => {
+              const visual = notifVisual(e.kind || "");
+              const Icon = visual.icon;
+              return (
+                <Link key={e.id} to={(e.link as never) || "/business/notifications"} className="update-tile">
+                  <span className={"event-icon " + visual.color}>
+                    <Icon size={22} />
+                  </span>
+                  <div>
+                    <strong>{e.title}</strong>
+                    <p className="update-when">{formatRelativeHe(e.created_at)}</p>
+                    {e.body ? <p className="update-body">{e.body}</p> : null}
+                  </div>
+                  <time>
+                    {new Date(e.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                  </time>
+                </Link>
+              );
+            })}
+            {notifs.length === 0 && (
+              <div className="approval-empty">
+                <Bell size={25} />
+                אין עדכונים חדשים
+              </div>
+            )}
           </div>
           <Link to="/business/notifications" className="panel-link">
-            לכל העדכונים
+            לכל ההודעות
             <ArrowLeft size={15} />
           </Link>
         </Panel>
-        <Panel className="quick-links" title="גישה מהירה">
+        <Panel className="quick-links" title="קיצורי דרך" icon={<LayoutGrid size={19} />}>
           <div className="four-cols">
             {[
-              { t: "חיפוש משלוח", d: "לפי מספר הזמנה", i: Search, p: "/business/active" },
-              { t: "תמיכה ושירות", d: "אנחנו כאן בשבילך", i: Headphones, p: "/business/help" },
-              { t: "חשבוניות וחיובים", d: "כל החיובים שלך", i: FileText, p: "/business/billing" },
-              { t: "דוחות וסטטיסטיקות", d: "ביצועי העסק", i: BarChart3, p: "/business/analytics" },
+              { t: "חיפוש משלוח", d: "חיפוש לפי מספר הזמנה", i: Search, p: "/business/history" },
+              { t: "צ׳אט עם התמיכה", d: "דבר איתנו", i: MessageCircle, p: "/business/help" },
+              { t: "חשבוניות וחיובים", d: "הפקת וניהול חשבוניות", i: FileText, p: "/business/billing" },
+              { t: "דוחות וסטטיסטיקות", d: "צפייה בדוחות", i: BarChart3, p: "/business/analytics" },
             ].map((l) => (
-              <Link key={l.p} to={l.p as never}>
+              <Link key={l.p} to={l.p as never} className="quick-link">
                 <l.i size={25} />
                 <div>
                   <strong>{l.t}</strong>
                   <p>{l.d}</p>
                 </div>
-                <ArrowLeft size={16} />
               </Link>
             ))}
           </div>

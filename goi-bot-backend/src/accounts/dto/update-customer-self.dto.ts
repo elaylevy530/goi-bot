@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -159,6 +160,15 @@ export class UpdateCustomerSelfDto {
   @IsOptional()
   @IsString()
   dispatch_blocked_reason?: string | null;
+
+  @IsOptional()
+  @IsIn(["distance_based", "fixed_price", "city_radius"])
+  default_pricing_type?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  default_delivery_price?: number | null;
 
   @IsOptional()
   @IsString()

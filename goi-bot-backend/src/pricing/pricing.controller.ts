@@ -10,6 +10,8 @@ import {
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { AuthUserContext } from "../auth/auth.types";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { PricingService } from "./pricing.service";
 
 class ComputePriceDto {
@@ -25,6 +27,10 @@ class ComputePriceDto {
   @IsOptional()
   @IsBoolean()
   isHeavy?: boolean;
+
+  @IsOptional()
+  @IsString()
+  dropoffCity?: string;
 }
 
 class UpdatePricingDto {
@@ -53,11 +59,14 @@ export class PricingController {
 
   @Post("compute")
   @UseGuards(JwtAuthGuard)
-  compute(@Body() dto: ComputePriceDto) {
-    return this.pricing.compute(
+  compute(@CurrentUser() auth: AuthUserContext, @Body() dto: ComputePriceDto) {
+    return this.pricing.computeForCustomer(
+      auth.userId,
+      auth.preview?.customerId,
       dto.distanceKm,
       dto.extraStops ?? 0,
       dto.isHeavy ?? false,
+      dto.dropoffCity,
     );
   }
 

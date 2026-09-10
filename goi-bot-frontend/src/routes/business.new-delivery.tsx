@@ -105,6 +105,8 @@ function NewDeliveryPage() {
     if (!me || pickupPrefilled) return;
     const m = me as {
       pickup_address?: string | null;
+      pickup_lat?: number | null;
+      pickup_lng?: number | null;
       pickup_contact_name?: string | null;
       pickup_contact_phone?: string | null;
       pickup_instructions?: string | null;
@@ -113,6 +115,11 @@ function NewDeliveryPage() {
       business_name?: string | null;
     };
     if (m.pickup_address && !pickupText) setPickupText(m.pickup_address);
+    const lat = Number(m.pickup_lat);
+    const lng = Number(m.pickup_lng);
+    if (m.pickup_address && Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+      setPickup({ address: m.pickup_address, lat, lng } as SelectedPlace);
+    }
     setPickupContactName(m.pickup_contact_name || m.name || m.business_name || "");
     setPickupContactPhone(m.pickup_contact_phone || m.phone || "");
     setPickupInstructions(m.pickup_instructions || "");
@@ -121,7 +128,7 @@ function NewDeliveryPage() {
 
   useEffect(() => {
     if (!useBusinessAddress || !businessPickupAddress) return;
-    if (pickup && pickup.address === businessPickupAddress) return;
+    if (pickup?.lat != null && pickup?.lng != null) return;
     let cancelled = false;
     (async () => {
       try {
@@ -150,13 +157,59 @@ function NewDeliveryPage() {
   const [quantity, setQuantity] = useState(1);
   const [customerPayment, setCustomerPayment] = useState("כרטיס אשראי");
   const [cashCollect, setCashCollect] = useState("");
-  const [pricingModel, setPricingModel] = useState<"fixed_price" | "distance_based" | "quote_request">("fixed_price");
+  const [pricingModel, setPricingModel] = useState<"fixed_price" | "distance_based" | "city_radius" | "quote_request">("distance_based");
   const [offeredPrice, setOfferedPrice] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [pricePerKm, setPricePerKm] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [driveRoute, setDriveRoute] = useState<DrivingRoute | null>(null);
   const asDraftRef = useRef(false);
+  const businessPricing = useMemo(() => {
+    const profile = me as {
+      default_pricing_type?: string | null;
+      default_delivery_price?: string | number | null;
+      niche_details?: {
+        pricing_config?: {
+          model?: string;
+          base_price?: number;
+          price_per_km?: number;
+          minimum_price?: number;
+          fixed_price?: number;
+          zones?: Array<{ city?: string; radius_km?: number; fixed_price?: number }>;
+        };
+      };
+    } | null;
+    return {
+      model: profile?.default_pricing_type || profile?.niche_details?.pricing_config?.model || "distance_based",
+      fixedPrice:
+        Number(profile?.default_delivery_price) ||
+        Number(profile?.niche_details?.pricing_config?.fixed_price) ||
+        0,
+      config: profile?.niche_details?.pricing_config,
+    };
+  }, [me]);
+  const profilePickupName =
+    pickupContactName.trim() ||
+    ((me as { pickup_contact_name?: string | null; name?: string | null; business_name?: string | null } | null)
+      ?.pickup_contact_name ??
+      (me as { name?: string | null } | null)?.name ??
+      (me as { business_name?: string | null } | null)?.business_name ??
+      "").trim();
+  const profilePickupPhone =
+    pickupContactPhone.trim() ||
+    ((me as { pickup_contact_phone?: string | null; phone?: string | null } | null)?.pickup_contact_phone ??
+      (me as { phone?: string | null } | null)?.phone ??
+      "").trim();
+
+  useEffect(() => {
+    const model = businessPricing.model;
+    if (model === "fixed_price" || model === "distance_based" || model === "city_radius") {
+      setPricingModel(model);
+    }
+    const config = businessPricing.config;
+    if (config?.base_price != null) setBasePrice(String(config.base_price));
+    if (config?.price_per_km != null) setPricePerKm(String(config.price_per_km));
+  }, [businessPricing]);
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
@@ -167,7 +220,10 @@ function NewDeliveryPage() {
     });
   };
 
-  const collectFieldErrors = (scope: "route" | "details" | "all" = "all"): FieldErrors => {
+  const collectFieldErrors = (
+    scope: "route" | "details" | "all" = "all",
+    automaticPrice?: number | null,
+  ): FieldErrors => {
     const errors: FieldErrors = {};
     if (scope === "route" || scope === "all") {
       if (!pickup) {
@@ -178,17 +234,20 @@ function NewDeliveryPage() {
       }
     }
     if (scope === "details" || scope === "all") {
-      if (!pickupContactName.trim()) errors.pickupContactName = "הזינו שם איש קשר באיסוף";
-      if (!pickupContactPhone.trim()) errors.pickupContactPhone = "הזינו טלפון איש קשר באיסוף";
-      else if (!isValidPhone(pickupContactPhone)) errors.pickupContactPhone = "מספר טלפון לא תקין";
-      if (!pickupReadyNow && !pickupReadyTime) errors.pickupReadyTime = "בחרו שעה שבה החבילה תהיה מוכנה";
+      if (!profilePickupName) errors.pickupContactName = "חסר שם איש קשר בכתובת העסק";
+      if (!profilePickupPhone) errors.pickupContactPhone = "חסר טלפון איש קשר בכתובת העסק";
+      else if (!isValidPhone(profilePickupPhone)) errors.pickupContactPhone = "מספר הטלפון של העסק אינו תקין";
+      if (timing !== "scheduled" && !pickupReadyNow && !pickupReadyTime) {
+        errors.pickupReadyTime = "בחרו שעה שבה החבילה תהיה מוכנה";
+      }
       if (timing === "scheduled" && !scheduledAt) errors.scheduledAt = "בחרו תאריך ושעה למשלוח מתוזמן";
     }
     if (scope === "all") {
-      if (pricingModel === "fixed_price") {
-        const price = Number(offeredPrice);
-        if (!offeredPrice.trim()) errors.offeredPrice = "הזינו מחיר לשליח";
-        else if (!Number.isFinite(price) || price <= 0) errors.offeredPrice = "המחיר חייב להיות גדול מ־0";
+      if (pricingModel === "fixed_price" || pricingModel === "city_radius") {
+        const price = Number(offeredPrice) || Number(automaticPrice);
+        if (!Number.isFinite(price) || price <= 0) {
+          errors.offeredPrice = "לא ניתן לחשב מחיר אוטומטי — בדקו את כתובות האיסוף והמסירה";
+        }
       }
       if (pricingModel === "distance_based") {
         if (!basePrice.trim() || !Number.isFinite(Number(basePrice)) || Number(basePrice) < 0) {
@@ -206,7 +265,8 @@ function NewDeliveryPage() {
     setFieldErrors(errors);
     const count = Object.keys(errors).length;
     if (count === 0) return true;
-    toast.error(count === 1 ? "יש להשלים שדה חובה אחד" : `יש ${count} שדות שדורשים תיקון`);
+    const firstMessage = Object.values(errors)[0];
+    toast.error(firstMessage || (count === 1 ? "יש להשלים שדה חובה אחד" : `יש ${count} שדות שדורשים תיקון`));
     window.setTimeout(() => {
       const first = Object.keys(errors)[0];
       document.querySelector(`[data-field="${first}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -223,15 +283,17 @@ function NewDeliveryPage() {
   const extraStopCount = validExtraStops.length;
   const isHeavy = attributes.has("heavy");
   const { data: priceQuote } = useQuery({
-    queryKey: ["compute-price", distanceKm, extraStopCount, isHeavy],
+    queryKey: ["compute-price", distanceKm, extraStopCount, isHeavy, dropoffCity, pricingModel],
     enabled: distanceKm != null,
-    queryFn: () => nestComputePrice({ distanceKm: distanceKm!, extraStops: extraStopCount, isHeavy }),
+    queryFn: () =>
+      nestComputePrice({
+        distanceKm: distanceKm!,
+        extraStops: extraStopCount,
+        isHeavy,
+        dropoffCity,
+      }),
   });
-  const suggestedPrice = priceQuote?.business_total != null ? Math.round(Number(priceQuote.business_total)) : null;
-  useEffect(() => {
-    if (suggestedPrice == null || offeredPrice.trim()) return;
-    setOfferedPrice(String(suggestedPrice));
-  }, [suggestedPrice, offeredPrice]);
+  const nestPrice = priceQuote?.business_total != null ? Math.round(Number(priceQuote.business_total)) : null;
 
   const { data: activePricing } = useQuery({
     queryKey: ["pricing-active"],
@@ -253,8 +315,32 @@ function NewDeliveryPage() {
     if (distanceKm == null) return null;
     const b = Number(basePrice) || 0;
     const perKm = Number(pricePerKm) || 0;
-    return Math.max(0, Math.round((b + perKm * distanceKm) * 100) / 100);
-  }, [distanceKm, basePrice, pricePerKm]);
+    const minimum =
+      Number(businessPricing.config?.minimum_price ?? activePricing?.minimum_price) || 0;
+    return Math.max(minimum, Math.round((b + perKm * distanceKm) * 100) / 100);
+  }, [activePricing, basePrice, businessPricing, distanceKm, pricePerKm]);
+
+  const cityRulePrice = useMemo(() => {
+    if (pricingModel !== "city_radius" || distanceKm == null) return null;
+    const city = dropoffCity.trim().toLocaleLowerCase("he").replace(/[^\p{L}\p{N}]/gu, "");
+    const zone = (businessPricing.config?.zones ?? []).find((item) => {
+      const zoneCity = String(item.city ?? "").trim().toLocaleLowerCase("he").replace(/[^\p{L}\p{N}]/gu, "");
+      return city && city === zoneCity && distanceKm <= Number(item.radius_km);
+    });
+    return zone?.fixed_price != null ? Number(zone.fixed_price) : businessPricing.fixedPrice || null;
+  }, [businessPricing, distanceKm, dropoffCity, pricingModel]);
+  const fallbackPrice =
+    pricingModel === "fixed_price"
+      ? businessPricing.fixedPrice || null
+      : pricingModel === "city_radius"
+        ? cityRulePrice
+        : distancePrice != null
+          ? Math.round(distancePrice)
+          : null;
+  const suggestedPrice = nestPrice ?? fallbackPrice;
+  useEffect(() => {
+    setOfferedPrice(suggestedPrice == null ? "" : String(suggestedPrice));
+  }, [suggestedPrice]);
 
   const attemptSubmit = () => {
     asDraftRef.current = false;
@@ -262,7 +348,7 @@ function NewDeliveryPage() {
       toast.error("חסר פרופיל עסק — השלימו את הפרופיל וחזרו לכאן");
       return;
     }
-    if (!applyErrors(collectFieldErrors("all"))) return;
+    if (!applyErrors(collectFieldErrors("all", suggestedPrice))) return;
     submit.mutate();
   };
 
@@ -341,12 +427,7 @@ function NewDeliveryPage() {
       const qtyNote = quantity > 1 ? `כמות: ${quantity}` : "";
       const fullNotes = [attrNote, stopsNote, addressNote, packageContents && `תכולה: ${packageContents}`, packageWeight && `משקל: ${packageWeight}`, qtyNote, payNote, notes].filter(Boolean).join(" · ");
 
-      const price =
-        pricingModel === "fixed_price"
-          ? Number(offeredPrice) || 0
-          : pricingModel === "distance_based"
-            ? distancePrice ?? 0
-            : 0;
+      const price = (suggestedPrice ?? Number(offeredPrice)) || 0;
 
       const pickupReadyAtIso = (() => {
         if (pickupReadyNow) return null;
@@ -362,8 +443,8 @@ function NewDeliveryPage() {
         pickup_area: extractCity(pickup.address),
         pickup_lat: pickup.lat ?? null,
         pickup_lng: pickup.lng ?? null,
-        pickup_contact_name: pickupContactName.trim() || null,
-        pickup_contact_phone: pickupContactPhone.trim() || null,
+        pickup_contact_name: profilePickupName || null,
+        pickup_contact_phone: profilePickupPhone || null,
         pickup_instructions: pickupInstructions.trim() || null,
         pickup_notes: pickupInstructions.trim() || null,
         pickup_ready: pickupReadyNow,
@@ -382,7 +463,7 @@ function NewDeliveryPage() {
         job_date: jobDate,
         job_time: jobTime,
         delivery_deadline: deliveryDeadline,
-        matching_model: pricingModel,
+        matching_model: "fastest",
         pricing_type: pricingModel,
         base_price: pricingModel === "distance_based" ? Number(basePrice) || 0 : null,
         price_per_km: pricingModel === "distance_based" ? Number(pricePerKm) || 0 : null,

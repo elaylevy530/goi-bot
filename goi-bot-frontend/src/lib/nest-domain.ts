@@ -82,7 +82,10 @@ export function nestGetPricing() { return apiFetch<Record<string, unknown>>("/ap
 export type NestPriceBreakdown = {
   pricing_version: number;
   pricing_rule_id: string;
+  pricing_type?: "distance_based" | "fixed_price" | "city_radius";
+  matched_zone?: string | null;
   base_price: number;
+  price_per_km?: number;
   distance_km: number;
   distance_price: number;
   surcharges: number;
@@ -97,6 +100,7 @@ export async function nestComputePrice(input: {
   distanceKm: number;
   extraStops?: number;
   isHeavy?: boolean;
+  dropoffCity?: string;
 }): Promise<NestPriceBreakdown | null> {
   try {
     return await apiFetch<NestPriceBreakdown>("/api/pricing/compute", {
@@ -106,6 +110,7 @@ export async function nestComputePrice(input: {
         distanceKm: input.distanceKm,
         extraStops: input.extraStops ?? 0,
         isHeavy: input.isHeavy ?? false,
+        dropoffCity: input.dropoffCity?.trim() || undefined,
       }),
     });
   } catch (e) {

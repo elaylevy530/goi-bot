@@ -1,19 +1,26 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Bike,
+  CalendarDays,
   Car,
   Check,
   Clock3,
   Loader2,
+  Lock,
   MapPin,
+  MessageSquare,
   Minus,
   Package,
+  Phone,
   Plus,
   Search,
   Send,
   Tag,
+  User,
+  Utensils,
 } from "lucide-react";
 import { AddressAutocomplete, type SelectedPlace } from "@/components/customer/AddressAutocomplete";
 import { OrderMap } from "@/components/customer/OrderMap";
@@ -22,16 +29,21 @@ import { useMyBusiness } from "@/components/BusinessShell";
 import type { Timing } from "@/config/businessCategories";
 import { nestListMyBranches } from "@/lib/nest-domain";
 import { canonicalizeVehicleValue } from "@/lib/courier-vehicles";
-import type { DrivingRoute, LatLng } from "@/lib/google-driving-route";
+import { haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import packBagImg from "@/assets/order/pack-bag.png";
+import packBagsImg from "@/assets/order/pack-bags.png";
+import packBoxImg from "@/assets/order/pack-box.png";
 
 export type ExtraStop = { place: SelectedPlace | null; text: string; name: string; phone: string };
 
 type DeliveryType = { key: string; label: string };
-type PricingModel = "fixed_price" | "distance_based" | "quote_request";
+type PricingModel = "fixed_price" | "distance_based" | "city_radius" | "quote_request";
 
 const GENERIC_KINDS = ["מעטפה", "שקית", "חבילה עד 5 קילו", "חבילה עד 10 קילו", "עד 20 קילו"];
 const PAY_OPTIONS = ["כרטיס אשראי", "יתרה", "מזומן"];
+const READY_MINS = [15, 30, 45, 60] as const;
 
 type SavedItem = { id: string; name: string; weight?: string; vehicle?: string; quantity?: number };
 type Branch = { id: string; branch_name: string; full_address?: string | null; city?: string | null; is_default?: boolean; phone?: string | null };
@@ -150,6 +162,158 @@ function shortAddress(address: string) {
     .join(", ");
 }
 
+type PackVisual = "bag" | "bags" | "box";
+type PackCard = { key: string; label: string; visual: PackVisual; item?: SavedItem };
+
+function looksLikeFood(text: string) {
+  return /פיצה|מסעד|אוכל|מאפה|קפה|בייקרי|מזון|קונדיטור|bakery|pizza|food/.test(text);
+}
+
+function packVisual(name: string, qty?: number): PackVisual {
+  const n = name.toLowerCase();
+  if (/מארז|פיצה|קופס|גדול|box|pizza|עוג/.test(n) || (qty != null && qty >= 4)) return "box";
+  if (/2-3|שקיות|bags/.test(n) || qty === 2 || qty === 3) return "bags";
+  if (/שקית|מעטפה|bag/.test(n) || qty === 1) return "bag";
+  return qty && qty >= 2 ? "bags" : "bag";
+}
+
+function buildPackCards(saved: SavedItem[], deliveryTypes: DeliveryType[]): PackCard[] {
+  const cards: PackCard[] = saved.slice(0, 3).map((item) => ({
+    key: item.id || item.name,
+    label: item.name,
+    visual: packVisual(item.name, item.quantity),
+    item,
+  }));
+  const used = new Set(cards.map((c) => c.label));
+  for (const t of deliveryTypes) {
+    if (cards.length >= 3) break;
+    if (used.has(t.label)) continue;
+    used.add(t.label);
+    cards.push({ key: t.key, label: t.label, visual: packVisual(t.label) });
+  }
+  for (const g of GENERIC_KINDS) {
+    if (cards.length >= 3) break;
+    if (used.has(g)) continue;
+    used.add(g);
+    cards.push({ key: g, label: g, visual: packVisual(g) });
+  }
+  const rank = { box: 0, bags: 1, bag: 2 };
+  return cards.sort((a, b) => rank[a.visual] - rank[b.visual]);
+}
+
+function PackArt({ visual }: { visual: PackVisual }) {
+  return <img className="pack-photo" src={visual === "box" ? packBoxImg : visual === "bags" ? packBagsImg : packBagImg} alt="" />;
+}
+
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function HebrewClockFace({ hour, minute }: { hour: number; minute: number }) {
+  const hDeg = ((hour % 12) + minute / 60) * 30;
+  const mDeg = minute * 6;
+  return (
+    <svg className="he-clock-face" viewBox="0 0 160 160" aria-hidden>
+      <circle className="he-clock-ring" cx="80" cy="80" r="74" />
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = ((i + 1) / 12) * Math.PI * 2 - Math.PI / 2;
+        return (
+          <text key={i} className="he-clock-num" x={80 + Math.cos(a) * 56} y={80 + Math.sin(a) * 56} textAnchor="middle" dominantBaseline="middle">
+            {i + 1}
+          </text>
+        );
+      })}
+      <line className="he-clock-hour" x1="80" y1="80" x2="80" y2="42" transform={`rotate(${hDeg} 80 80)`} />
+      <line className="he-clock-min" x1="80" y1="80" x2="80" y2="28" transform={`rotate(${mDeg} 80 80)`} />
+      <circle className="he-clock-hub" cx="80" cy="80" r="5" />
+    </svg>
+  );
+}
+
+function HebrewTimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const hourRef = useRef<HTMLDivElement>(null);
+  const minRef = useRef<HTMLDivElement>(null);
+  const raw = value && /^\d{2}:\d{2}$/.test(value) ? value : "12:00";
+  const hour = Number(raw.slice(0, 2));
+  const minute = Number(raw.slice(3, 5));
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+  useEffect(() => {
+    if (!open) return;
+    hourRef.current?.querySelector("button.on")?.scrollIntoView({ block: "center" });
+    minRef.current?.querySelector("button.on")?.scrollIntoView({ block: "center" });
+  }, [open, hour, minute]);
+
+  return (
+    <>
+      <button type="button" className="he-clock-trigger" onClick={() => setOpen(true)}>
+        <Clock3 size={18} />
+        <span>שעת איסוף</span>
+        <b dir="ltr">{raw}</b>
+      </button>
+      {open &&
+        createPortal(
+          <div
+            className="he-clock-overlay"
+            role="dialog"
+            aria-label="בחירת שעה"
+            onClick={() => setOpen(false)}
+          >
+            <div className="he-clock-sheet" dir="rtl" onClick={(e) => e.stopPropagation()}>
+              <h3>בחרו שעת איסוף</h3>
+              <HebrewClockFace hour={hour} minute={minute} />
+              <p className="he-clock-digital" dir="ltr">
+                {raw}
+              </p>
+              <div className="he-clock-cols">
+                <div>
+                  <small>שעה</small>
+                  <div className="he-clock-list" ref={hourRef}>
+                    {hours.map((hr) => (
+                      <button
+                        key={hr}
+                        type="button"
+                        className={hr === hour ? "on" : undefined}
+                        onClick={() => onChange(`${pad2(hr)}:${pad2(minute)}`)}
+                      >
+                        {pad2(hr)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <small>דקה</small>
+                  <div className="he-clock-list" ref={minRef}>
+                    {minutes.map((min) => (
+                      <button
+                        key={min}
+                        type="button"
+                        className={min === minute ? "on" : undefined}
+                        onClick={() => onChange(`${pad2(hour)}:${pad2(min)}`)}
+                      >
+                        {pad2(min)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button type="button" className="btn primary full" onClick={() => setOpen(false)}>
+                אישור
+              </button>
+            </div>
+          </div>,
+          document.querySelector(".goi-biz") ?? document.body,
+        )}
+    </>
+  );
+}
+
 async function geocodeClient(address: string): Promise<SelectedPlace | null> {
   try {
     const url =
@@ -167,11 +331,13 @@ async function geocodeClient(address: string): Promise<SelectedPlace | null> {
 
 export function BusinessNewOrder(props: Props) {
   const { data: me } = useMyBusiness();
-  const [mobileExpanded, setMobileExpanded] = useState(!!props.dropoffText);
-  const [confirm, setConfirm] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const [custom, setCustom] = useState(false);
   const [customName, setCustomName] = useState("");
-  const readyLabel = props.pickupReadyNow ? "מוכן עכשיו" : "15 דקות";
+  const [showApt, setShowApt] = useState(false);
+  const [changePickup, setChangePickup] = useState(false);
+  const [sheetDay, setSheetDay] = useState<"today" | "other">("today");
+  const [readyMins, setReadyMins] = useState<(typeof READY_MINS)[number]>(15);
 
   const { data: branches = [], isFetched: branchesFetched } = useQuery({
     queryKey: ["business-branches", me?.id],
@@ -195,12 +361,34 @@ export function BusinessNewOrder(props: Props) {
     const fromCategory = props.deliveryTypes.map((t) => t.label);
     return Array.from(new Set([...GENERIC_KINDS, ...fromCategory]));
   }, [props.deliveryTypes]);
+  const packCards = useMemo(
+    () => buildPackCards(savedItems, props.deliveryTypes),
+    [savedItems, props.deliveryTypes],
+  );
+  const businessName = me?.business_name || me?.name || selectedBranch?.branch_name || "העסק";
+  const originAddress = selectedBranch?.full_address || props.pickup?.address || props.pickupText || props.businessPickupAddress || "";
+  const foodBiz = looksLikeFood(
+    `${businessName} ${(me as { business_niche?: string } | null)?.business_niche || ""} ${(me as { business_category?: string } | null)?.business_category || ""} ${packCards.map((c) => c.label).join(" ")}`,
+  );
+  const computedKm =
+    props.route?.distanceKm ??
+    (props.pickup && props.dropoff
+      ? haversineKm({ lat: props.pickup.lat, lng: props.pickup.lng }, { lat: props.dropoff.lat, lng: props.dropoff.lng })
+      : null);
+  const computedMins =
+    props.route?.durationMin ?? (computedKm != null ? Math.max(1, Math.round(computedKm * 3)) : null);
+  const etaRange =
+    computedMins != null ? `${Math.max(1, computedMins - 2)}-${computedMins + 2} דק׳` : "—";
+  const sheetTime =
+    props.timing === "scheduled"
+      ? props.scheduledAt.slice(11, 16) || props.todayTime || props.pickupReadyTime
+      : props.pickupReadyTime || props.todayTime;
 
   const large = /10|20|רכב/.test(props.deliveryType);
   const vehicleLabel = canonicalizeVehicleValue(props.vehicle) === "car" || large ? "רכב" : "קטנוע";
 
-  const distanceLabel = props.route ? `${props.route.distanceKm.toFixed(1)} ק״מ` : "—";
-  const durationLabel = props.route ? `${props.route.durationMin} דק׳` : "—";
+  const distanceLabel = computedKm != null ? `${computedKm.toFixed(1)} ק״מ` : "—";
+  const durationLabel = computedMins != null ? `${computedMins} דק׳` : "—";
   const priceLabel = props.suggestedPrice == null ? "—" : `₪${Math.round(props.suggestedPrice)}`;
 
   const selectBranch = async (id: string) => {
@@ -215,6 +403,33 @@ export function BusinessNewOrder(props: Props) {
     if (b?.phone) props.onPickupContactPhone(b.phone);
   };
 
+  const applyPack = (card: PackCard) => {
+    props.onDeliveryType(card.label);
+    if (card.item?.quantity) props.onQuantity(card.item.quantity);
+    if (card.item?.weight) props.onPackageWeight(card.item.weight);
+    if (card.item?.vehicle) props.onVehicle(card.item.vehicle);
+  };
+
+  const applyReadyMins = (mins: (typeof READY_MINS)[number]) => {
+    setReadyMins(mins);
+    props.onPickupReadyNow(false);
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + mins);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    props.onPickupReadyTime(`${hh}:${mm}`);
+  };
+
+  const setSheetTime = (value: string) => {
+    if (props.timing === "now") {
+      props.onPickupReadyTime(value);
+      return;
+    }
+    props.onTodayTime(value);
+    const date = sheetDay === "other" && props.scheduledAt.slice(0, 10) ? props.scheduledAt.slice(0, 10) : todayStamp();
+    props.onScheduledAt(`${date}T${value}`);
+  };
+
   const didSelectBranch = useRef(false);
   useEffect(() => {
     if (didSelectBranch.current) return;
@@ -226,6 +441,13 @@ export function BusinessNewOrder(props: Props) {
     void selectBranch(id);
   }, [branchOptions, branchesFetched, me?.id]);
 
+  useEffect(() => {
+    if (!packCards.length) return;
+    if (packCards.some((c) => c.label === props.deliveryType)) return;
+    applyPack(packCards[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packCards]);
+
   const review = () => {
     const routeOk = props.onValidateRoute();
     const detailsOk = props.onValidateDetails();
@@ -234,7 +456,7 @@ export function BusinessNewOrder(props: Props) {
       toast.error("בחרו תאריך ושעה עתידיים");
       return;
     }
-    setConfirm(true);
+    props.onSubmit();
   };
 
   const timingChoice = props.timing === "scheduled" ? "תזמון" : "עכשיו";
@@ -526,56 +748,267 @@ export function BusinessNewOrder(props: Props) {
             dropoff={props.dropoff}
             waypoints={props.waypoints}
             onRoute={props.onRoute}
-            pickupLabel={selectedBranch?.branch_name ? `איסוף · ${selectedBranch.branch_name}` : "איסוף"}
-            dropoffLabel={props.dropoffText ? `מסירה · ${shortAddress(props.dropoffText)}` : "מסירה"}
+            pickupLabel={cityFromAddress(props.pickup?.address || props.pickupText || originAddress) || "איסוף"}
+            dropoffLabel={props.dropoffText ? cityFromAddress(props.dropoffText) || shortAddress(props.dropoffText) : "מסירה"}
             className="goi-map"
           />
+          <div className="mobile-map-chrome">
+            {!mobileExpanded && (
+              <button
+                type="button"
+                className="mobile-new-cta"
+                onClick={() => {
+                  if (props.timing === "now") applyReadyMins(readyMins);
+                  setMobileExpanded(true);
+                }}
+              >
+                <Plus size={22} strokeWidth={2.4} />
+                <span>
+                  <strong>משלוח חדש</strong>
+                  <small>מיידי או מתוזמן</small>
+                </span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <Modal open={confirm} onClose={() => setConfirm(false)} title="המשלוח מוכן לצאת" description="בדקו את הפרטים לפני יצירת המשלוח.">
-        <div className="confirmation-route">
-          <div>
-            <span className="round-icon">
-              <Package size={23} />
-            </span>
-            <p>
-              איסוף
-              <strong>{props.pickup?.address || props.pickupText}</strong>
-            </p>
+      <form
+        className="mobile-order-sheet"
+        onSubmit={(e) => {
+          e.preventDefault();
+          review();
+        }}
+      >
+        <button type="button" className="mobile-sheet-handle" aria-label="סגור" onClick={() => setMobileExpanded(false)} />
+        <div className="mobile-sheet-scroll">
+          <div className="mobile-pickup-row">
+            <span className="mobile-store-icon">{foodBiz ? <Utensils size={18} /> : <Package size={18} />}</span>
+            <div>
+              <strong>{businessName}</strong>
+              <p>{shortAddress(originAddress) || "כתובת איסוף"}</p>
+            </div>
+            <button type="button" className="link" onClick={() => setChangePickup((v) => !v)}>
+              שינוי
+            </button>
           </div>
-          <div>
-            <span className="round-icon">
-              <MapPin />
+          {changePickup && (
+            <div className="mobile-pickup-edit">
+              {branchOptions.length > 1 ? (
+                <SelectBox
+                  value={activeBranchId}
+                  onChange={(v) => void selectBranch(v)}
+                  label="סניף איסוף"
+                  options={branchOptions.map((b) => ({ value: b.id, label: b.branch_name }))}
+                />
+              ) : (
+                <AddressAutocomplete
+                  variant="plain"
+                  label="כתובת איסוף"
+                  placeholder="חפש כתובת איסוף"
+                  value={props.pickupText}
+                  onChange={props.onPickupText}
+                  onSelect={props.onPickupSelect}
+                  accent="green"
+                  error={props.pickupError}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="mobile-drop-card" data-field="dropoff">
+            <MapPin size={18} />
+            <div>
+              <small>כתובת מסירה</small>
+              <AddressAutocomplete
+                variant="plain"
+                label="כתובת מסירה"
+                placeholder="רחוב ומספר בית"
+                value={props.dropoffText}
+                onChange={props.onDropoffText}
+                onSelect={(p) => {
+                  props.onDropoffSelect(p);
+                  if (!props.dropoffCity) props.onDropoffCity(cityFromAddress(p.address));
+                }}
+                accent="red"
+                error={props.dropoffError}
+              />
+            </div>
+          </div>
+          <button type="button" className="mobile-apt-toggle" onClick={() => setShowApt((v) => !v)}>
+            + כניסה, קומה ודירה (אופציונלי)
+          </button>
+          {showApt && (
+            <div className="mobile-apt-grid">
+              <label className="field">
+                כניסה
+                <input value={props.dropoffEntry} onChange={(e) => props.onDropoffEntry(e.target.value)} />
+              </label>
+              <label className="field">
+                קומה
+                <input value={props.dropoffFloor} onChange={(e) => props.onDropoffFloor(e.target.value)} />
+              </label>
+              <label className="field">
+                דירה
+                <input value={props.dropoffApt} onChange={(e) => props.onDropoffApt(e.target.value)} />
+              </label>
+            </div>
+          )}
+
+          <div className="mobile-contact-grid">
+            <label className="field">
+              <span>
+                <User size={14} /> שם הלקוח
+              </span>
+              <input required value={props.recipientName} onChange={(e) => props.onRecipientName(e.target.value)} placeholder="יוסי לוי" autoComplete="name" />
+            </label>
+            <label className="field">
+              <span>
+                <Phone size={14} /> טלפון
+              </span>
+              <input required type="tel" value={props.recipientPhone} onChange={(e) => props.onRecipientPhone(e.target.value)} placeholder="050-1234567" dir="ltr" autoComplete="tel" />
+            </label>
+          </div>
+
+          <label className="field mobile-notes">
+            <span>
+              <MessageSquare size={14} /> הערות לשליח (אופציונלי)
             </span>
-            <p>
-              מסירה
-              <strong>
-                {props.dropoffText}
-                {props.dropoffCity ? `, ${props.dropoffCity}` : ""}
-              </strong>
+            <input value={props.dropoffNotes} onChange={(e) => props.onDropoffNotes(e.target.value)} placeholder="להתקשר כשמגיעים" />
+          </label>
+
+          <h3 className="mobile-section-title">מה שולחים?</h3>
+          <div className="pack-grid">
+            {packCards.map((card) => {
+              const chosen = props.deliveryType === card.label;
+              return (
+                <button key={card.key} type="button" className={cn("pack-card", chosen && "chosen")} onClick={() => applyPack(card)}>
+                  {chosen && (
+                    <span className="pack-check">
+                      <Check size={12} />
+                    </span>
+                  )}
+                  <PackArt visual={card.visual} />
+                  <strong>{card.label}</strong>
+                </button>
+              );
+            })}
+          </div>
+
+          <h3 className="mobile-section-title">מתי לאסוף?</h3>
+          <div className="mobile-seg">
+            <button
+              type="button"
+              className={props.timing === "now" ? "on" : undefined}
+              onClick={() => {
+                props.onTiming("now");
+                applyReadyMins(readyMins);
+              }}
+            >
+              עכשיו
+            </button>
+            <button
+              type="button"
+              className={props.timing !== "now" ? "on" : undefined}
+              onClick={() => {
+                props.onTiming("scheduled");
+                props.onPickupReadyNow(false);
+                const t = sheetTime || "19:30";
+                props.onScheduledAt(`${todayStamp()}T${t}`);
+              }}
+            >
+              לתזמן
+            </button>
+          </div>
+          {props.timing === "now" ? (
+            <div className="mobile-ready">
+              <p>תוך כמה זמן ההזמנה מוכנה</p>
+              <div className="mobile-ready-mins">
+                {READY_MINS.map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    className={readyMins === mins ? "on" : undefined}
+                    onClick={() => applyReadyMins(mins)}
+                  >
+                    {mins} דק׳
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mobile-seg">
+                <button type="button" className={sheetDay === "today" ? "on" : undefined} onClick={() => setSheetDay("today")}>
+                  היום
+                </button>
+                <button type="button" className={sheetDay === "other" ? "on" : undefined} onClick={() => setSheetDay("other")}>
+                  <CalendarDays size={15} /> יום אחר
+                </button>
+              </div>
+              {sheetDay === "other" && (
+                <label className="field">
+                  תאריך
+                  <input
+                    type="date"
+                    value={props.scheduledAt.slice(0, 10) || todayStamp()}
+                    onChange={(e) => props.onScheduledAt(`${e.target.value}T${sheetTime || "12:00"}`)}
+                  />
+                </label>
+              )}
+              <HebrewTimePicker value={sheetTime || "12:00"} onChange={setSheetTime} />
+            </>
+          )}
+
+          <div className="mobile-cash-row">
+            <span>
+              <strong>תשלום מזומן</strong>
+              <small>תשלום יגבה מהלקוח</small>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={props.customerPayment === "מזומן"}
+              className={cn("mobile-switch", props.customerPayment === "מזומן" && "on")}
+              onClick={() => props.onCustomerPayment(props.customerPayment === "מזומן" ? "כרטיס אשראי" : "מזומן")}
+            />
+          </div>
+          {props.customerPayment === "מזומן" && (
+            <label className="field">
+              סכום לגבייה
+              <span className="cash-input">
+                <b>₪</b>
+                <input required type="number" min="0" step="0.01" value={props.cashCollect} onChange={(e) => props.onCashCollect(e.target.value)} placeholder="32" />
+              </span>
+            </label>
+          )}
+
+          <div className="mobile-quote-card">
+            <div className="mobile-quote">
+              <div>
+                <small>מחיר משלוח</small>
+                <strong>{priceLabel.replace("₪", "")} ₪</strong>
+              </div>
+              <div>
+                <small>מרחק</small>
+                <strong>{distanceLabel}</strong>
+              </div>
+              <div>
+                <small>הגעת שליח</small>
+                <strong>{etaRange}</strong>
+              </div>
+            </div>
+            <button type="submit" className="btn primary full find-courier" disabled={props.pending}>
+              {props.pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              מצא שליח
+            </button>
+            <p className="mobile-quote-note">
+              <Lock size={12} />
+              מחיר משוער · ללא התחייבות עד האישור
             </p>
           </div>
         </div>
-        <dl className="detail-dl">
-          <dt>שם הלקוח</dt>
-          <dd>{props.recipientName || "—"}</dd>
-          <dt>טלפון</dt>
-          <dd dir="ltr">{props.recipientPhone || "—"}</dd>
-          <dt>תכולה</dt>
-          <dd>
-            {props.quantity} × {props.deliveryType}
-          </dd>
-          <dt>מתי</dt>
-          <dd>{props.timing === "scheduled" ? props.scheduledAt.replace("T", " ") : readyLabel}</dd>
-          <dt>מחיר</dt>
-          <dd>{priceLabel}</dd>
-        </dl>
-        <button type="button" className="btn primary full" onClick={() => { setConfirm(false); props.onSubmit(); }} disabled={props.pending}>
-          {props.pending ? <Loader2 className="size-4 animate-spin" /> : <Send size={17} />}
-          אישור ויצירת משלוח
-        </button>
-      </Modal>
+      </form>
 
       <Modal open={custom} onClose={() => setCustom(false)} title="פריט מותאם למשלוח">
         <form

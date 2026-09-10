@@ -616,6 +616,11 @@ export class AccountsService implements OnModuleInit {
       customer.niche_details = { ...(customer.niche_details ?? {}), ...dto.niche_details };
       delete dto.niche_details;
     }
+    if (dto.default_delivery_price !== undefined) {
+      customer.default_delivery_price =
+        dto.default_delivery_price == null ? null : String(dto.default_delivery_price);
+      delete dto.default_delivery_price;
+    }
     Object.assign(customer, dto);
     return this.customers.save(customer);
   }

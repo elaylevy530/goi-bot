@@ -60,7 +60,7 @@ import {
 export const COMPANY_SECTIONS = [
   { id: "profile", title: "פרטי העסק", desc: "עדכון פרטי העסק, פרטי קשר וכתובת ראשית", icon: Building2, action: "עדכן פרטים" },
   { id: "branches", title: "סניפים וכתובות איסוף", desc: "נהל סניפים, כתובות איסוף והגדרות ברירת מחדל", icon: MapPin, action: "נהל סניפים" },
-  { id: "pricing", title: "תמחור משלוחים", desc: "צפייה בתעריף המערכת ובסימולציית מחיר", icon: Tag, action: "נהל תמחור" },
+  { id: "pricing", title: "תמחור משלוחים", desc: "בחר מסלול תמחור וקבע את המחירים האוטומטיים לעסק", icon: Tag, action: "נהל תמחור" },
   { id: "items", title: "פריטי משלוח שמורים", desc: "נהל את הפריטים שהעסק שולח וחסוך זמן בהזמנה", icon: Package, action: "נהל פריטים" },
   { id: "hours", title: "שעות פעילות", desc: "הגדר את שעות הפעילות של העסק ושעות האיסוף", icon: Clock3, action: "נהל שעות" },
   { id: "pickup", title: "הגדרות איסוף לשליח", desc: "הוראות כניסה, איש קשר ומיקום המתנה לשליח", icon: Bike, action: "נהל הגדרות" },
@@ -76,6 +76,8 @@ export const COMPANY_SECTIONS = [
 export type CompanySectionId = (typeof COMPANY_SECTIONS)[number]["id"];
 
 type Niche = Record<string, unknown>;
+type PricingModel = "distance_based" | "fixed_price" | "city_radius";
+type PricingZone = { id: string; city: string; radius_km: string; fixed_price: string };
 
 const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
@@ -156,7 +158,13 @@ export function BusinessCompany({ section }: { section?: string }) {
       </div>
       {section === "profile" && <ProfileSection me={me} saving={saveProfile.isPending} onSave={(body) => saveProfile.mutate(body)} />}
       {section === "branches" && <BranchesSection />}
-      {section === "pricing" && <PricingSection />}
+      {section === "pricing" && (
+        <PricingSection
+          me={me}
+          saving={saveProfile.isPending}
+          onSave={(body) => saveProfile.mutate(body)}
+        />
+      )}
       {section === "items" && <ItemsSection niche={niche} saving={saveNiche.isPending} onSave={(items) => saveNiche.mutate({ saved_items: items })} />}
       {section === "hours" && <HoursSection niche={niche} saving={saveNiche.isPending} onSave={(hours) => saveNiche.mutate({ operating_hours: hours })} />}
       {section === "pickup" && <PickupSection me={me} niche={niche} saving={saveProfile.isPending || saveNiche.isPending} onSaveProfile={(b) => saveProfile.mutate(b)} onSaveNiche={(n) => saveNiche.mutate(n)} />}
@@ -315,33 +323,147 @@ function BranchesSection() {
   );
 }
 
-function PricingSection() {
+function PricingSection({
+  me,
+  saving,
+  onSave,
+}: {
+  me: Record<string, unknown> | null | undefined;
+  saving: boolean;
+  onSave: (body: Record<string, unknown>) => void;
+}) {
   const { data: pricing } = useQuery({ queryKey: ["platform-pricing"], queryFn: nestGetPricing });
-  const sample = useMemo(() => {
-    const base = Number((pricing as any)?.base_price ?? (pricing as any)?.scooter_base ?? 0);
-    return [1, 3, 5, 10].map((km) => [km, money(base), "—"] as const);
-  }, [pricing]);
+  const savedConfig = ((me?.niche_details as Niche | undefined)?.pricing_config ?? {}) as {
+    model?: PricingModel;
+    base_price?: number;
+    price_per_km?: number;
+    minimum_price?: number;
+    fixed_price?: number;
+    zones?: Array<{ id?: string; city?: string; radius_km?: number; fixed_price?: number }>;
+  };
+  const savedModel = String(me?.default_pricing_type || savedConfig.model || "distance_based") as PricingModel;
+  const [model, setModel] = useState<PricingModel>(savedModel);
+  const [basePrice, setBasePrice] = useState(String(savedConfig.base_price ?? pricing?.base_price ?? ""));
+  const [pricePerKm, setPricePerKm] = useState(String(savedConfig.price_per_km ?? pricing?.price_per_km ?? ""));
+  const [minimumPrice, setMinimumPrice] = useState(String(savedConfig.minimum_price ?? pricing?.minimum_price ?? ""));
+  const [fixedPrice, setFixedPrice] = useState(String(me?.default_delivery_price ?? savedConfig.fixed_price ?? ""));
+  const [zones, setZones] = useState<PricingZone[]>(
+    (savedConfig.zones ?? []).map((zone) => ({
+      id: zone.id || crypto.randomUUID(),
+      city: zone.city || "",
+      radius_km: String(zone.radius_km ?? ""),
+      fixed_price: String(zone.fixed_price ?? ""),
+    })),
+  );
+
+  useEffect(() => {
+    setModel(savedModel);
+    setBasePrice(String(savedConfig.base_price ?? pricing?.base_price ?? ""));
+    setPricePerKm(String(savedConfig.price_per_km ?? pricing?.price_per_km ?? ""));
+    setMinimumPrice(String(savedConfig.minimum_price ?? pricing?.minimum_price ?? ""));
+    setFixedPrice(String(me?.default_delivery_price ?? savedConfig.fixed_price ?? ""));
+    setZones(
+      (savedConfig.zones ?? []).map((zone) => ({
+        id: zone.id || crypto.randomUUID(),
+        city: zone.city || "",
+        radius_km: String(zone.radius_km ?? ""),
+        fixed_price: String(zone.fixed_price ?? ""),
+      })),
+    );
+    // Values are synchronized when the profile/server pricing query refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, pricing]);
+
+  const save = () => {
+    const cleanZones = zones
+      .filter((zone) => zone.city.trim())
+      .map((zone) => ({
+        id: zone.id,
+        city: zone.city.trim(),
+        radius_km: Math.max(0, Number(zone.radius_km) || 0),
+        fixed_price: Math.max(0, Number(zone.fixed_price) || 0),
+      }));
+    onSave({
+      default_pricing_type: model,
+      default_delivery_price: model === "fixed_price" || model === "city_radius"
+        ? Math.max(0, Number(fixedPrice) || 0)
+        : null,
+      niche_details: {
+        pricing_config: {
+          model,
+          base_price: Math.max(0, Number(basePrice) || 0),
+          price_per_km: Math.max(0, Number(pricePerKm) || 0),
+          minimum_price: Math.max(0, Number(minimumPrice) || 0),
+          fixed_price: Math.max(0, Number(fixedPrice) || 0),
+          zones: cleanZones,
+        },
+      },
+    });
+  };
+
   return (
-    <>
-      <Panel title="תעריף המערכת">
-        <p className="hint">התמחור המסחרי מחושב בשרת לפי כללי הפלטפורמה. העסק אינו יכול לשנות את תעריף השליחים מכאן.</p>
-        <div className="field-grid">
-          {Object.entries(pricing || {})
-            .filter(([, v]) => typeof v === "number" || typeof v === "string")
-            .slice(0, 8)
-            .map(([k, v]) => (
-              <label className="field" key={k}>
-                {k}
-                <input value={String(v)} disabled />
-              </label>
-            ))}
+    <form onSubmit={(e) => { e.preventDefault(); save(); }}>
+      <Panel title="מסלול התמחור של העסק">
+        <p className="hint">המחיר במסך יצירת משלוח יחושב אוטומטית לפי המסלול שנבחר כאן.</p>
+        <div className="pricing-model-grid">
+          {([
+            ["distance_based", "בסיס + ק״מ", "מחיר בסיס ותוספת לכל קילומטר"],
+            ["fixed_price", "מחיר קבוע", "אותו מחיר לכל המשלוחים"],
+            ["city_radius", "עיר ורדיוס", "מחיר קבוע לפי עיר וטווח בק״מ"],
+          ] as const).map(([value, title, description]) => (
+            <button
+              key={value}
+              type="button"
+              className={model === value ? "is-selected" : undefined}
+              onClick={() => setModel(value)}
+            >
+              <strong>{title}</strong>
+              <small>{description}</small>
+            </button>
+          ))}
         </div>
       </Panel>
-      <Panel title="סימולציה">
-        <DataTable headers={["מרחק (ק״מ)", "מחיר בסיס", "הערכה מלאה"]} rows={sample.map((r) => [...r])} />
-        <p className="hint">לחישוב מדויק נוצר משלוח במסך ההזמנה — המחיר מחושב שם מול השרת.</p>
-      </Panel>
-    </>
+
+      {model === "distance_based" && (
+        <Panel title="תעריף לפי מרחק">
+          <div className="field-grid">
+            <label className="field">מחיר בסיס (₪)<input required type="number" min="0" step="0.01" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} /></label>
+            <label className="field">תוספת לכל ק״מ (₪)<input required type="number" min="0" step="0.01" value={pricePerKm} onChange={(e) => setPricePerKm(e.target.value)} /></label>
+            <label className="field">מחיר מינימום (₪)<input required type="number" min="0" step="0.01" value={minimumPrice} onChange={(e) => setMinimumPrice(e.target.value)} /></label>
+          </div>
+          <p className="hint">דוגמה ל־5 ק״מ: {money(Math.max(Number(minimumPrice) || 0, (Number(basePrice) || 0) + 5 * (Number(pricePerKm) || 0)))}</p>
+        </Panel>
+      )}
+
+      {model === "fixed_price" && (
+        <Panel title="מחיר קבוע לכל משלוח">
+          <label className="field">מחיר משלוח (₪)<input required type="number" min="0" step="0.01" value={fixedPrice} onChange={(e) => setFixedPrice(e.target.value)} /></label>
+        </Panel>
+      )}
+
+      {model === "city_radius" && (
+        <Panel title="מחירים לפי עיר ורדיוס">
+          <label className="field pricing-fallback-price">
+            מחיר ברירת מחדל מחוץ לאזורים (₪)
+            <input required type="number" min="0" step="0.01" value={fixedPrice} onChange={(e) => setFixedPrice(e.target.value)} />
+          </label>
+          <div className="pricing-zones">
+            {zones.map((zone) => (
+              <div className="pricing-zone-row" key={zone.id}>
+                <label className="field">עיר<input required value={zone.city} onChange={(e) => setZones((list) => list.map((item) => item.id === zone.id ? { ...item, city: e.target.value } : item))} placeholder="למשל תל אביב" /></label>
+                <label className="field">רדיוס (ק״מ)<input required type="number" min="0" step="0.1" value={zone.radius_km} onChange={(e) => setZones((list) => list.map((item) => item.id === zone.id ? { ...item, radius_km: e.target.value } : item))} /></label>
+                <label className="field">מחיר קבוע (₪)<input required type="number" min="0" step="0.01" value={zone.fixed_price} onChange={(e) => setZones((list) => list.map((item) => item.id === zone.id ? { ...item, fixed_price: e.target.value } : item))} /></label>
+                <button type="button" className="icon-btn" aria-label="מחיקת אזור" onClick={() => setZones((list) => list.filter((item) => item.id !== zone.id))}><Trash2 size={18} /></button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="btn secondary" onClick={() => setZones((list) => [...list, { id: crypto.randomUUID(), city: "", radius_km: "", fixed_price: "" }])}>
+            <Plus size={17} /> הוסף עיר ורדיוס
+          </button>
+        </Panel>
+      )}
+      <SaveBar saving={saving} />
+    </form>
   );
 }
 
