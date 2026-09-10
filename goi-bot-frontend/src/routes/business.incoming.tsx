@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Bike, CheckCheck, Eye, MapPin, Package, Phone, Plus, Search, X } from "lucide-react";
 import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
-import { Badge, FilterTabs, Panel, SearchBox, money } from "@/components/business/goi/GoiUi";
+import { Badge, FilterTabs, Panel, SearchBox, SelectBox, money } from "@/components/business/goi/GoiUi";
 import { nestCancelJob, type NestJob } from "@/lib/nest-jobs";
 import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import {
@@ -33,13 +33,21 @@ function IncomingPage() {
   const { data: jobs = [] } = useBusinessJobs(me?.id);
   const dispatchFn = useServerFn(dispatchJobToCouriers);
   const [filter, setFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [query, setQuery] = useState("");
 
-  const incoming = useMemo(() => jobs.filter(isIncomingJob), [jobs]);
-  const drafts = incoming.filter((j) => j.status === "טיוטה");
-  const quotes = incoming.filter((j) => j.pricing_type === "quote_request");
-  const shown = incoming
-    .filter((j) => filter === "all" || (filter === "draft" ? j.status === "טיוטה" : j.pricing_type === "quote_request"))
+  const approvalStatus = (job: NestJob) => {
+    const status = job.status.toLowerCase();
+    if (status === "בוטלה" || status === "נדחתה" || status === "rejected" || status === "cancelled" || status === "canceled") return "rejected";
+    if (isIncomingJob(job)) return "pending";
+    return "approved";
+  };
+  const approvedCount = jobs.filter((job) => approvalStatus(job) === "approved").length;
+  const rejectedCount = jobs.filter((job) => approvalStatus(job) === "rejected").length;
+  const sources = Array.from(new Set(jobs.map(jobSourceLabel))).sort((a, b) => a.localeCompare(b, "he"));
+  const shown = jobs
+    .filter((job) => filter === "all" || approvalStatus(job) === filter)
+    .filter((job) => sourceFilter === "all" || jobSourceLabel(job) === sourceFilter)
     .filter((j) => `${j.job_number} ${jobRecipientName(j)} ${j.dropoff_address || ""}`.includes(query.trim()));
 
   const dispatch = useMutation({
@@ -53,7 +61,7 @@ function IncomingPage() {
   const cancel = useMutation({
     mutationFn: (jobId: string) => nestCancelJob(jobId),
     onSuccess: () => {
-      toast.success("ההזמנה בוטלה");
+      toast.success("ההזמנה נדחתה");
       qc.invalidateQueries({ queryKey: ["business-jobs"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -72,7 +80,10 @@ function IncomingPage() {
     <Panel className="incoming-card" key={o.id}>
       <div className="incoming-data">
         <div className="incoming-customer">
-          <Badge text={o.status} tone={jobBadgeTone(o.status)} />
+          <Badge
+            text={approvalStatus(o) === "pending" ? "ממתינה לאישור" : approvalStatus(o) === "approved" ? "אושרה" : "נדחתה"}
+            tone={approvalStatus(o) === "rejected" ? "red" : approvalStatus(o) === "approved" ? "green" : jobBadgeTone(o.status)}
+          />
           <div className="incoming-name">
             <span className="round-icon">
               <Package size={24} />
@@ -110,11 +121,11 @@ function IncomingPage() {
           <small>מקור ההזמנה</small>
           <Badge text={jobSourceLabel(o)} tone="green" />
           <small>סטטוס</small>
-          <strong>{o.status}</strong>
+          <strong>{approvalStatus(o) === "pending" ? "ממתינה לאישור" : approvalStatus(o) === "approved" ? "אושרה" : "נדחתה"}</strong>
         </div>
       </div>
       <div className="incoming-actions">
-        {o.pricing_type === "quote_request" ? (
+        {isIncomingJob(o) && (o.pricing_type === "quote_request" ? (
           <Link to="/business/quotes" className="btn primary">
             <Search size={17} />
             בחירת הצעת מחיר
@@ -122,17 +133,17 @@ function IncomingPage() {
         ) : (
           <button type="button" className="btn primary" disabled={dispatch.isPending} onClick={() => dispatch.mutate(o.id)}>
             <Search size={17} />
-            הפץ לשליחים
+            אשר והפץ לשליחים
           </button>
-        )}
+        ))}
         <button type="button" className="btn outline" onClick={() => navigate({ to: "/business/order/$id", params: { id: o.id } })}>
           <Eye size={17} />
           פרטים
         </button>
-        <button type="button" className="btn outline" disabled={cancel.isPending} onClick={() => cancel.mutate(o.id)}>
+        {isIncomingJob(o) && <button type="button" className="btn outline" disabled={cancel.isPending} onClick={() => cancel.mutate(o.id)}>
           <X size={17} />
-          בטל
-        </button>
+          דחה
+        </button>}
       </div>
     </Panel>
   );
@@ -146,9 +157,18 @@ function IncomingPage() {
               value={filter}
               onChange={setFilter}
               options={[
-                { value: "all", label: "הכל", count: incoming.length },
-                { value: "draft", label: "טיוטות", count: drafts.length },
-                { value: "quote", label: "מכרזי מחיר", count: quotes.length },
+                { value: "all", label: "הכל", count: jobs.length },
+                { value: "approved", label: "אושרה", count: approvedCount },
+                { value: "rejected", label: "נדחתה", count: rejectedCount },
+              ]}
+            />
+            <SelectBox
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              label="מקור ההזמנה"
+              options={[
+                { value: "all", label: "כל המקורות" },
+                ...sources.map((source) => ({ value: source, label: source })),
               ]}
             />
             <SearchBox value={query} onChange={setQuery} placeholder="חיפוש משלוח או לקוח..." />

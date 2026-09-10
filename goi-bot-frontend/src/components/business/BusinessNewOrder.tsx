@@ -332,6 +332,7 @@ async function geocodeClient(address: string): Promise<SelectedPlace | null> {
 export function BusinessNewOrder(props: Props) {
   const { data: me } = useMyBusiness();
   const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [mobileStep, setMobileStep] = useState(0);
   const [custom, setCustom] = useState(false);
   const [customName, setCustomName] = useState("");
   const [showApt, setShowApt] = useState(false);
@@ -459,10 +460,26 @@ export function BusinessNewOrder(props: Props) {
     props.onSubmit();
   };
 
+  const nextFromMobileDetails = () => {
+    if (!props.dropoff) {
+      toast.error("יש לבחור כתובת מסירה מהרשימה");
+      return;
+    }
+    if (!props.recipientName.trim()) {
+      toast.error("יש להזין שם לקוח");
+      return;
+    }
+    if (props.recipientPhone.replace(/\D/g, "").length < 9) {
+      toast.error("יש להזין מספר טלפון תקין");
+      return;
+    }
+    setMobileStep(1);
+  };
+
   const timingChoice = props.timing === "scheduled" ? "תזמון" : "עכשיו";
 
   return (
-    <div className={"order-page " + (mobileExpanded ? "order-expanded" : "order-intro")}>
+    <div className={`order-page ${mobileExpanded ? "order-expanded" : "order-intro"} mobile-order-step-${mobileStep}`}>
       <div className="order-split">
         <form
           className="order-fields"
@@ -759,6 +776,7 @@ export function BusinessNewOrder(props: Props) {
                 className="mobile-new-cta"
                 onClick={() => {
                   if (props.timing === "now") applyReadyMins(readyMins);
+                  setMobileStep(0);
                   setMobileExpanded(true);
                 }}
               >
@@ -782,6 +800,19 @@ export function BusinessNewOrder(props: Props) {
       >
         <button type="button" className="mobile-sheet-handle" aria-label="סגור" onClick={() => setMobileExpanded(false)} />
         <div className="mobile-sheet-scroll">
+          <div className="mobile-step-head">
+            <div className="mobile-step-copy">
+              <small>שלב {mobileStep + 1} מתוך 2</small>
+              <strong>{["פרטי המשלוח", "מועד, תשלום וסיכום"][mobileStep]}</strong>
+            </div>
+            <div className="mobile-step-dots" aria-hidden="true">
+              {[0, 1].map((step) => (
+                <span key={step} className={step <= mobileStep ? "on" : undefined} />
+              ))}
+            </div>
+          </div>
+          {mobileStep === 0 && (
+            <section className="mobile-step-panel">
           <div className="mobile-pickup-row">
             <span className="mobile-store-icon">{foodBiz ? <Utensils size={18} /> : <Package size={18} />}</span>
             <div>
@@ -854,7 +885,11 @@ export function BusinessNewOrder(props: Props) {
               </label>
             </div>
           )}
+            </section>
+          )}
 
+          {mobileStep === 0 && (
+            <section className="mobile-step-panel">
           <div className="mobile-contact-grid">
             <label className="field">
               <span>
@@ -866,7 +901,18 @@ export function BusinessNewOrder(props: Props) {
               <span>
                 <Phone size={14} /> טלפון
               </span>
-              <input required type="tel" value={props.recipientPhone} onChange={(e) => props.onRecipientPhone(e.target.value)} placeholder="050-1234567" dir="ltr" autoComplete="tel" />
+              <input
+                required
+                type="tel"
+                value={props.recipientPhone}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  props.onRecipientPhone(value);
+                }}
+                placeholder="050-1234567"
+                dir="ltr"
+                autoComplete="tel"
+              />
             </label>
           </div>
 
@@ -876,13 +922,25 @@ export function BusinessNewOrder(props: Props) {
             </span>
             <input value={props.dropoffNotes} onChange={(e) => props.onDropoffNotes(e.target.value)} placeholder="להתקשר כשמגיעים" />
           </label>
+            </section>
+          )}
 
+          {mobileStep === 0 && (
+            <section className="mobile-step-panel">
           <h3 className="mobile-section-title">מה שולחים?</h3>
           <div className="pack-grid">
             {packCards.map((card) => {
               const chosen = props.deliveryType === card.label;
               return (
-                <button key={card.key} type="button" className={cn("pack-card", chosen && "chosen")} onClick={() => applyPack(card)}>
+                <button
+                  key={card.key}
+                  type="button"
+                  className={cn("pack-card", chosen && "chosen")}
+                  onClick={() => {
+                    applyPack(card);
+                    window.setTimeout(nextFromMobileDetails, 180);
+                  }}
+                >
                   {chosen && (
                     <span className="pack-check">
                       <Check size={12} />
@@ -894,7 +952,14 @@ export function BusinessNewOrder(props: Props) {
               );
             })}
           </div>
+              <div className="mobile-step-actions">
+                <button type="button" className="btn primary full" onClick={nextFromMobileDetails}>המשך למועד ותשלום</button>
+              </div>
+            </section>
+          )}
 
+          {mobileStep === 1 && (
+            <section className="mobile-step-panel">
           <h3 className="mobile-section-title">מתי לאסוף?</h3>
           <div className="mobile-seg">
             <button
@@ -929,7 +994,9 @@ export function BusinessNewOrder(props: Props) {
                     key={mins}
                     type="button"
                     className={readyMins === mins ? "on" : undefined}
-                    onClick={() => applyReadyMins(mins)}
+                    onClick={() => {
+                      applyReadyMins(mins);
+                    }}
                   >
                     {mins} דק׳
                   </button>
@@ -959,7 +1026,14 @@ export function BusinessNewOrder(props: Props) {
               <HebrewTimePicker value={sheetTime || "12:00"} onChange={setSheetTime} />
             </>
           )}
+              <div className="mobile-step-actions">
+                <button type="button" className="btn outline" onClick={() => setMobileStep(0)}>חזרה</button>
+              </div>
+            </section>
+          )}
 
+          {mobileStep === 1 && (
+            <section className="mobile-step-panel">
           <div className="mobile-cash-row">
             <span>
               <strong>תשלום מזומן</strong>
@@ -1007,6 +1081,8 @@ export function BusinessNewOrder(props: Props) {
               מחיר משוער · ללא התחייבות עד האישור
             </p>
           </div>
+            </section>
+          )}
         </div>
       </form>
 

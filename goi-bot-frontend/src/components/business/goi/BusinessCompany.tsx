@@ -375,6 +375,33 @@ function PricingSection({
   }, [me, pricing]);
 
   const save = () => {
+    const nonNegative = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
+    if (
+      model === "distance_based" &&
+      (![basePrice, pricePerKm, minimumPrice].every(nonNegative) ||
+        Number(basePrice) + Number(pricePerKm) <= 0)
+    ) {
+      toast.error("יש להזין תעריף בסיס ותוספת לק״מ תקינים");
+      return;
+    }
+    if ((model === "fixed_price" || model === "city_radius") && (!nonNegative(fixedPrice) || Number(fixedPrice) <= 0)) {
+      toast.error("יש להזין מחיר קבוע גדול מאפס");
+      return;
+    }
+    if (
+      model === "city_radius" &&
+      zones.some(
+        (zone) =>
+          !zone.city.trim() ||
+          !nonNegative(zone.radius_km) ||
+          Number(zone.radius_km) <= 0 ||
+          !nonNegative(zone.fixed_price) ||
+          Number(zone.fixed_price) <= 0,
+      )
+    ) {
+      toast.error("יש להשלים עיר, רדיוס ומחיר תקינים בכל אזור");
+      return;
+    }
     const cleanZones = zones
       .filter((zone) => zone.city.trim())
       .map((zone) => ({
@@ -462,7 +489,7 @@ function PricingSection({
           </button>
         </Panel>
       )}
-      <SaveBar saving={saving} />
+      <SaveBar saving={saving} onSave={save} />
     </form>
   );
 }
