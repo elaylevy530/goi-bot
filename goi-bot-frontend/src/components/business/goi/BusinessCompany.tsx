@@ -103,9 +103,10 @@ export function BusinessCompany({ section }: { section?: string }) {
   });
   const saveProfile = useMutation({
     mutationFn: async (body: Record<string, unknown>) => nestUpdateMyCustomer(body),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      qc.setQueryData(["business-me"], updated);
       toast.success("השינויים נשמרו");
-      qc.invalidateQueries({ queryKey: ["business-me"] });
+      qc.invalidateQueries({ queryKey: ["business-me"], refetchType: "none" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -162,7 +163,7 @@ export function BusinessCompany({ section }: { section?: string }) {
         <PricingSection
           me={me}
           saving={saveProfile.isPending}
-          onSave={(body) => saveProfile.mutate(body)}
+          onSave={(body) => saveProfile.mutateAsync(body)}
         />
       )}
       {section === "items" && <ItemsSection niche={niche} saving={saveNiche.isPending} onSave={(items) => saveNiche.mutate({ saved_items: items })} />}
@@ -330,7 +331,7 @@ function PricingSection({
 }: {
   me: Record<string, unknown> | null | undefined;
   saving: boolean;
-  onSave: (body: Record<string, unknown>) => void;
+  onSave: (body: Record<string, unknown>) => Promise<unknown>;
 }) {
   const { data: pricing } = useQuery({ queryKey: ["platform-pricing"], queryFn: nestGetPricing });
   const savedConfig = ((me?.niche_details as Niche | undefined)?.pricing_config ?? {}) as {
@@ -374,7 +375,7 @@ function PricingSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, pricing]);
 
-  const save = () => {
+  const save = async () => {
     const nonNegative = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
     if (
       model === "distance_based" &&
@@ -410,22 +411,26 @@ function PricingSection({
         radius_km: Math.max(0, Number(zone.radius_km) || 0),
         fixed_price: Math.max(0, Number(zone.fixed_price) || 0),
       }));
-    onSave({
-      default_pricing_type: model,
-      default_delivery_price: model === "fixed_price" || model === "city_radius"
-        ? Math.max(0, Number(fixedPrice) || 0)
-        : null,
-      niche_details: {
-        pricing_config: {
-          model,
-          base_price: Math.max(0, Number(basePrice) || 0),
-          price_per_km: Math.max(0, Number(pricePerKm) || 0),
-          minimum_price: Math.max(0, Number(minimumPrice) || 0),
-          fixed_price: Math.max(0, Number(fixedPrice) || 0),
-          zones: cleanZones,
+    try {
+      await onSave({
+        default_pricing_type: model,
+        default_delivery_price: model === "fixed_price" || model === "city_radius"
+          ? Math.max(0, Number(fixedPrice) || 0)
+          : null,
+        niche_details: {
+          pricing_config: {
+            model,
+            base_price: Math.max(0, Number(basePrice) || 0),
+            price_per_km: Math.max(0, Number(pricePerKm) || 0),
+            minimum_price: Math.max(0, Number(minimumPrice) || 0),
+            fixed_price: Math.max(0, Number(fixedPrice) || 0),
+            zones: cleanZones,
+          },
         },
-      },
-    });
+      });
+    } catch {
+      // The mutation displays the API error and keeps the edited values in place.
+    }
   };
 
   return (

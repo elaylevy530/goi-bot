@@ -886,6 +886,9 @@
     height: 24vh !important;
     height: 24dvh !important;
   }
+  .goi-biz .page-new .order-expanded.mobile-order-step-1 .order-map {
+    height: 100% !important;
+  }
   .goi-biz .mobile-map-chrome {
     display: block;
     position: absolute;
@@ -1188,6 +1191,11 @@
     top: 20vh;
     top: 20dvh;
   }
+  .goi-biz .mobile-order-step-1 .mobile-order-sheet {
+    top: auto;
+    height: auto;
+    max-height: calc(100dvh - 72px);
+  }
   .goi-biz .order-expanded .mobile-order-sheet {
     transform: translateY(0);
     pointer-events: auto;
@@ -1201,6 +1209,7 @@
     -webkit-overflow-scrolling: touch;
   }
   .goi-biz .mobile-step-head {
+    position: relative;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -1239,6 +1248,22 @@
   .goi-biz .mobile-step-dots span.on {
     width: 20px;
     background: #167143;
+  }
+  .goi-biz .mobile-step-back {
+    position: absolute;
+    left: 0;
+    top: 2px;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid #dfe7e2;
+    border-radius: 10px;
+    background: #fff;
+    color: #496353;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .goi-biz .mobile-order-step-1 .mobile-step-dots {
+    display: none;
   }
   .goi-biz .mobile-step-panel {
     animation: mobile-step-in .2s ease both;
@@ -1298,6 +1323,25 @@
   }
   .goi-biz .mobile-order-step-0 .mobile-step-actions {
     margin-top: 8px;
+  }
+  .goi-biz .mobile-order-step-1 .mobile-sheet-scroll {
+    padding-top: 11px;
+    padding-bottom: 0;
+  }
+  .goi-biz .mobile-order-step-1 .mobile-step-head {
+    padding-bottom: 10px;
+  }
+  .goi-biz .mobile-order-step-1 .mobile-section-title {
+    margin-block: 2px 8px;
+  }
+  .goi-biz .mobile-order-step-1 .mobile-ready {
+    margin-bottom: 8px;
+  }
+  .goi-biz .mobile-order-step-1 .mobile-step-actions {
+    margin-top: 8px;
+  }
+  .goi-biz .mobile-order-step-1 .he-clock-trigger {
+    margin-block: 6px 8px;
   }
   .goi-biz .mobile-pickup-row {
     display: flex;

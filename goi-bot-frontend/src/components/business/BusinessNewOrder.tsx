@@ -805,6 +805,11 @@ export function BusinessNewOrder(props: Props) {
               <small>שלב {mobileStep + 1} מתוך 2</small>
               <strong>{["פרטי המשלוח", "מועד, תשלום וסיכום"][mobileStep]}</strong>
             </div>
+            {mobileStep === 1 && (
+              <button type="button" className="mobile-step-back" onClick={() => setMobileStep(0)}>
+                חזרה
+              </button>
+            )}
             <div className="mobile-step-dots" aria-hidden="true">
               {[0, 1].map((step) => (
                 <span key={step} className={step <= mobileStep ? "on" : undefined} />
@@ -1026,9 +1031,6 @@ export function BusinessNewOrder(props: Props) {
               <HebrewTimePicker value={sheetTime || "12:00"} onChange={setSheetTime} />
             </>
           )}
-              <div className="mobile-step-actions">
-                <button type="button" className="btn outline" onClick={() => setMobileStep(0)}>חזרה</button>
-              </div>
             </section>
           )}
 
