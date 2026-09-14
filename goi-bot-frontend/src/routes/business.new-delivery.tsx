@@ -142,12 +142,23 @@ function NewDeliveryPage() {
     return () => { cancelled = true; };
   }, [useBusinessAddress, businessPickupAddress, pickup, geocodeAddrs]);
 
-  const defaultVehicle = category.serviceType === "moving" ? "רכב" : "קטנוע";
+  const savedDefaultVehicle = String(
+    (me as { niche_details?: { defaults?: { vehicle?: string } } } | null)?.niche_details?.defaults?.vehicle || "",
+  );
+  const configuredVehicle = canonicalizeVehicleValue(savedDefaultVehicle);
+  const defaultVehicle =
+    savedDefaultVehicle === "אוטומטי"
+      ? "אוטומטי"
+      : configuredVehicle
+      ? configuredVehicle
+      : category.serviceType === "moving"
+        ? "רכב"
+        : "קטנוע";
   const [vehicle, setVehicle] = useState(defaultVehicle);
   useEffect(() => {
     const fromSearch = canonicalizeVehicleValue(search.vehicle);
-    setVehicle(fromSearch || (category.serviceType === "moving" ? "רכב" : "קטנוע"));
-  }, [category.serviceType, search.vehicle]);
+    setVehicle(fromSearch || defaultVehicle);
+  }, [defaultVehicle, search.vehicle]);
 
   const [dropoffFloor, setDropoffFloor] = useState("");
   const [dropoffApt, setDropoffApt] = useState("");
@@ -459,7 +470,7 @@ function NewDeliveryPage() {
         package_type: deliveryType,
         fragile: attributes.has("fragile"),
         number_of_packages: quantity + validExtraStops.length,
-        vehicle_required: canonicalizeVehicleValue(vehicle) || vehicle || null,
+        vehicle_required: vehicle === "אוטומטי" ? null : canonicalizeVehicleValue(vehicle) || vehicle || null,
         job_date: jobDate,
         job_time: jobTime,
         delivery_deadline: deliveryDeadline,
@@ -524,7 +535,7 @@ function NewDeliveryPage() {
             <Save size={15} />
             שמור טיוטה
           </button>
-          <button type="button" className="btn outline" onClick={() => navigate({ to: "/business/dashboard" })}>
+          <button type="button" className="btn outline" onClick={() => navigate({ to: "/business/incoming" })}>
             ביטול
           </button>
         </div>

@@ -17,3 +17,7 @@ export function businessPhoneToEmail(phone: string): string {
 export function courierPhoneToEmail(phone: string): string {
   return `${normalizePhone(phone)}@couriers.goi.local`;
 }
+
+export function teamPhoneToEmail(phone: string): string {
+  return `${normalizePhone(phone)}@team.goi.local`;
+}

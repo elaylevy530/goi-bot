@@ -16,6 +16,9 @@ export class JobOutcome {
   @Column({ type: "text", nullable: true }) customer_comment!: string | null;
   @Column({ type: "numeric", nullable: true }) tip_amount!: string | null;
   @Column({ type: "text", nullable: true }) internal_notes!: string | null;
+  @Column({ type: "varchar", length: 255, nullable: true }) received_by_name!: string | null;
+  @Column({ type: "varchar", length: 512, nullable: true }) proof_photo_url!: string | null;
+  @Column({ type: "varchar", length: 512, nullable: true }) signature_url!: string | null;
   @CreateDateColumn({ type: "timestamptz" }) created_at!: Date;
   @UpdateDateColumn({ type: "timestamptz" }) updated_at!: Date;
 }

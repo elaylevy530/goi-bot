@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { KpiCard } from "@/components/business/KpiCard";
-import { EmptyState } from "./business.dashboard";
+import { EmptyState } from "@/components/business/EmptyState";
 import { Button } from "@/components/ui/button";
 import { JobStatusBadge } from "@/components/StatusBadges";
 import { nestCreateJob, nestGetJob, nestListJobs, type NestJob } from "@/lib/nest-jobs";

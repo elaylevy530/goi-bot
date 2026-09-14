@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { nestListSavedContacts, nestUpsertSavedContact, nestDeleteSavedContact } from "@/lib/nest-domain";
 import { Users, Plus, Pencil, Trash2, Phone, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState } from "./business.dashboard";
+import { EmptyState } from "@/components/business/EmptyState";
 
 export const Route = createFileRoute("/business/contacts")({
   head: () => ({ meta: [{ title: "אנשי קשר — Goi" }] }),
@@ -135,21 +135,23 @@ function ContactsPage() {
       </Card>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditing(null); setForm(emptyForm); } }}>
-        <DialogContent dir="rtl" className="max-w-md">
-          <DialogHeader><DialogTitle>{editing ? "עריכת איש קשר" : "איש קשר חדש"}</DialogTitle></DialogHeader>
+        <DialogContent dir="rtl" className="goi-modal">
+          <DialogHeader className="items-stretch text-right sm:text-right">
+            <DialogTitle className="text-right">{editing ? "עריכת איש קשר" : "איש קשר חדש"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div><Label>שם *</Label><Input value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} required /></div>
             <div className="grid grid-cols-2 gap-2">
-              <div><Label>טלפון</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+              <div><Label>טלפון</Label><Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div><Label>עיר</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
             </div>
             <div><Label>כתובת מלאה</Label><Input value={form.full_address} onChange={(e) => setForm({ ...form, full_address: e.target.value })} /></div>
             <div><Label>תגיות (בית, עבודה, וכו')</Label><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="מופרדות בפסיק" /></div>
             <div><Label>הערות</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => upsert.mutate()} disabled={!form.contact_name} className="bg-primary-deep hover:bg-primary-deep/90">שמור</Button>
+          <DialogFooter className="goi-modal-actions">
+            <Button onClick={() => upsert.mutate()} disabled={!form.contact_name} className="btn primary">שמירה</Button>
+            <Button variant="outline" className="btn outline" onClick={() => setOpen(false)}>ביטול</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

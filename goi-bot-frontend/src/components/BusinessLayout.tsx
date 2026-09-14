@@ -2,10 +2,9 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { nestLogout } from "@/lib/nest-auth";
-import { LogOut, LayoutDashboard, Zap, Truck, History, Building2 } from "lucide-react";
+import { LogOut, Zap, Truck, History, Building2 } from "lucide-react";
 
 const tabs = [
-  { to: "/business/dashboard", label: "דשבורד", icon: LayoutDashboard, highlight: false },
   { to: "/business/new-delivery", label: "הזמן משלוח", icon: Zap, highlight: true },
   { to: "/business/active", label: "פעילים", icon: Truck, highlight: false },
   { to: "/business/history", label: "היסטוריה", icon: History, highlight: false },

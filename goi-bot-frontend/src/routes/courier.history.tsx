@@ -12,14 +12,21 @@ import {
 import { resolveCourierBusinessConversation } from "@/lib/nest-chat";
 import { nestListMyCourierOutcomes } from "@/lib/nest-domain";
 import {
-  Banknote, CalendarDays, Check, CheckCircle2, ChevronDown, Clock, Copy, CreditCard,
+  Banknote, CalendarDays, Camera, Check, CheckCircle2, ChevronDown, Clock, Copy, CreditCard,
   Filter, History as HistoryIcon, Info, MapPin, MessageCircle, Navigation, Package,
-  Phone, Send, Star, Truck, XCircle,
+  Pencil, Phone, Send, Star, Truck, User, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { BusinessLogo } from "@/components/BusinessLogo";
 import { openWaze } from "@/lib/waze";
+import { DeliveryProofSheet } from "@/components/courier/DeliveryProofSheet";
+import {
+  type CourierDeliveryProof,
+  deliveryProofNeedsCapture,
+  deliveryProofRequirementList,
+  normalizeDeliveryProof,
+} from "@/lib/delivery-proof";
 
 
 export const Route = createFileRoute("/courier/history")({
@@ -217,6 +224,7 @@ export function ActiveJobs() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [contactJob, setContactJob] = useState<any>(null);
+  const [proofJob, setProofJob] = useState<any>(null);
   const [tab, setTab] = useState<ActiveTab>("today");
   const [statusFilter, setStatusFilter] = useState<"all" | Stage>("all");
   const [delivered, setDelivered] = useState<{
@@ -252,8 +260,16 @@ export function ActiveJobs() {
   });
 
   const setStep = useMutation({
-    mutationFn: async ({ job_id, step }: { job_id: string; step: string }) => {
-      await nestCourierUpdateProgress(job_id, step);
+    mutationFn: async ({
+      job_id,
+      step,
+      proof,
+    }: {
+      job_id: string;
+      step: string;
+      proof?: CourierDeliveryProof;
+    }) => {
+      await nestCourierUpdateProgress(job_id, step, proof);
       const statusMap: Record<string, string> = {
         "בדרך לאיסוף": "heading_to_pickup",
         "אספתי": "picked_up",
@@ -305,7 +321,11 @@ export function ActiveJobs() {
       }
       toast.success("הסטטוס עודכן");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      qc.invalidateQueries({ queryKey: ["active-jobs"] });
+      qc.invalidateQueries({ queryKey: ["active-job-steps"] });
+    },
   });
 
 
@@ -568,10 +588,20 @@ export function ActiveJobs() {
               </button>
             )}
 
+            {primary?.step === "נמסר" && (
+              <DeliveryProofHint job={j} />
+            )}
+
             {primary && (
               <button
                 type="button"
-                onClick={() => setStep.mutate({ job_id: j.id, step: primary.step })}
+                onClick={() => {
+                  if (primary.step === "נמסר" && deliveryProofNeedsCapture(proofOf(j))) {
+                    setProofJob(j);
+                    return;
+                  }
+                  setStep.mutate({ job_id: j.id, step: primary.step });
+                }}
                 disabled={setStep.isPending}
                 className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-card bg-primary-deep text-[14px] font-extrabold text-primary-foreground shadow-card-strong active:opacity-90 disabled:opacity-60"
               >
@@ -592,6 +622,18 @@ export function ActiveJobs() {
           const phone = contactJob?.recipient_phone ? String(contactJob.recipient_phone).replace(/\D/g, "") : "";
           if (phone) window.open(`https://wa.me/${phone}`, "_blank", "noreferrer");
           else toast.error("אין מספר לקוח");
+        }}
+      />
+
+      <DeliveryProofSheet
+        open={!!proofJob}
+        settings={proofOf(proofJob)}
+        submitting={setStep.isPending}
+        onOpenChange={(o) => { if (!o) setProofJob(null); }}
+        onSubmit={async (proof) => {
+          if (!proofJob) return;
+          await setStep.mutateAsync({ job_id: proofJob.id, step: "נמסר", proof });
+          setProofJob(null);
         }}
       />
 
@@ -900,6 +942,38 @@ function QuickBtn({ icon: Icon, label, onClick, tint }: { icon: any; label: stri
       <Icon className="size-4" />
       {label}
     </button>
+  );
+}
+
+function proofOf(job: { delivery_proof?: unknown } | null | undefined) {
+  return normalizeDeliveryProof(job?.delivery_proof);
+}
+
+function DeliveryProofHint({ job }: { job: { delivery_proof?: unknown } }) {
+  const settings = proofOf(job);
+  const items = deliveryProofRequirementList(settings);
+  const capture = deliveryProofNeedsCapture(settings);
+  const icons = { name: User, photo: Camera, signature: Pencil, done: Check };
+  return (
+    <div className="mt-2 rounded-card border border-border bg-primary-soft/40 px-2.5 py-2 text-right">
+      <p className="text-[10px] font-bold text-text-muted">
+        {capture ? "לפני נמסר נדרש גם" : "אישור מסירה"}
+      </p>
+      <div className="mt-1.5 flex flex-wrap justify-end gap-1.5">
+        {items.map((item) => {
+          const Icon = icons[item.key];
+          return (
+            <span
+              key={item.key}
+              className="inline-flex items-center gap-1 rounded-pill bg-surface px-2 py-1 text-[11px] font-extrabold text-text-strong"
+            >
+              <Icon className="size-3 text-primary" aria-hidden />
+              {item.label}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

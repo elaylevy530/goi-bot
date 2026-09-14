@@ -27,7 +27,27 @@ export const Route = createFileRoute("/business")({
     }
 
     if (location.pathname === "/business" || location.pathname === "/business/") {
-      throw redirect({ to: "/business/dashboard" });
+      throw redirect({ to: "/business/new-delivery" });
+    }
+
+    const teamRole = session.profile?.businessTeamRole;
+    if (teamRole === "dispatcher") {
+      const path = location.pathname;
+      const allowed =
+        path.startsWith("/business/new-") ||
+        path.startsWith("/business/incoming") ||
+        path.startsWith("/business/quotes") ||
+        path.startsWith("/business/active") ||
+        path.startsWith("/business/track") ||
+        path.startsWith("/business/history") ||
+        path.startsWith("/business/orders") ||
+        path.startsWith("/business/messages") ||
+        path.startsWith("/business/help") ||
+        path.startsWith("/business/support") ||
+        path.startsWith("/business/notifications");
+      if (!allowed) {
+        throw redirect({ to: "/business/new-delivery" });
+      }
     }
 
     return {

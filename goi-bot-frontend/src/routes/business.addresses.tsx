@@ -13,7 +13,7 @@ import {
   nestListMyBranches, nestCreateBranch, nestUpdateBranch, nestDeleteBranch, nestSetDefaultBranch,
 } from "@/lib/nest-domain";
 import { Plus, MapPin, Star, Trash2, Pencil } from "lucide-react";
-import { EmptyState } from "./business.dashboard";
+import { EmptyState } from "@/components/business/EmptyState";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/addresses")({
@@ -100,23 +100,25 @@ function AddressesPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent dir="rtl" className="max-w-lg">
-          <DialogHeader><DialogTitle>{editing ? "ערוך סניף" : "סניף חדש"}</DialogTitle></DialogHeader>
+        <DialogContent dir="rtl" className="goi-modal">
+          <DialogHeader className="items-stretch text-right sm:text-right">
+            <DialogTitle className="text-right">{editing ? "עריכת סניף" : "סניף חדש"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div><Label>שם הסניף</Label><Input value={f.branch_name} onChange={(e) => setF({ ...f, branch_name: e.target.value })} required /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>עיר</Label><Input value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
               <div><Label>כתובת מלאה</Label><Input value={f.full_address} onChange={(e) => setF({ ...f, full_address: e.target.value })} /></div>
               <div><Label>איש קשר</Label><Input value={f.contact_person} onChange={(e) => setF({ ...f, contact_person: e.target.value })} /></div>
-              <div><Label>טלפון</Label><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
+              <div><Label>טלפון</Label><Input dir="ltr" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
             </div>
             <div><Label>שעות פעילות</Label><Input value={f.business_hours} onChange={(e) => setF({ ...f, business_hours: e.target.value })} placeholder="לדוגמה: א'-ה' 09:00-22:00" /></div>
             <div><Label>הערות לשליחים</Label><Textarea rows={2} value={f.courier_notes} onChange={(e) => setF({ ...f, courier_notes: e.target.value })} /></div>
             <label className="flex items-center gap-2"><Switch checked={f.is_default} onCheckedChange={(v) => setF({ ...f, is_default: v })} /> סניף ברירת מחדל לאיסוף</label>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => save.mutate()} className="bg-primary-deep hover:bg-primary-deep/90">שמור</Button>
+          <DialogFooter className="goi-modal-actions">
+            <Button onClick={() => save.mutate()} className="btn primary">שמירה</Button>
+            <Button variant="outline" className="btn outline" onClick={() => setOpen(false)}>ביטול</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

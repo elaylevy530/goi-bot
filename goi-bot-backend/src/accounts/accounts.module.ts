@@ -8,6 +8,7 @@ import { BusinessNotification } from "./entities/business-notification.entity";
 import { CourierDocument } from "./entities/courier-document.entity";
 import { Courier } from "./entities/courier.entity";
 import { Customer } from "./entities/customer.entity";
+import { TeamMember } from "./entities/team-member.entity";
 import { ReferralCommission } from "./entities/referral-commission.entity";
 import { ReferralCommissionsService } from "./referral-commissions.service";
 
@@ -17,6 +18,7 @@ import { ReferralCommissionsService } from "./referral-commissions.service";
       Courier,
       CourierDocument,
       Customer,
+      TeamMember,
       BusinessNotification,
       Job,
       ReferralCommission,

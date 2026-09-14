@@ -1,20 +1,17 @@
 import "@/styles/goi-business.css";
-import { FormEvent, useEffect, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  BarChart3,
   Bell,
   ClipboardList,
   Headphones,
   History,
-  Home,
   LogOut,
   MapPin,
   Menu,
   MessageCircle,
   Plus,
-  Plug,
   ReceiptText,
   Settings,
   Store,
@@ -83,7 +80,6 @@ export function useBusinessJobs(businessId?: string) {
 
 const NAV = [
   { section: "תפעול משלוחים", items: [
-    { to: "/business/dashboard", label: "בית", icon: Home, match: (p: string) => p === "/business/dashboard" || p === "/business" || p === "/business/" },
     { to: "/business/new-delivery", label: "הזמנה חדשה", icon: Plus, match: (p: string) => p.startsWith("/business/new-") },
     { to: "/business/incoming", label: "הזמנות נכנסות לאישור", icon: ClipboardList, match: (p: string) => p.startsWith("/business/incoming") || p.startsWith("/business/quotes"), count: "incoming" as const },
     { to: "/business/active", label: "מעקב משלוחים פעילים", icon: MapPin, match: (p: string) => p.startsWith("/business/active") || p.startsWith("/business/track/"), count: "active" as const, tracking: true },
@@ -92,13 +88,10 @@ const NAV = [
   ]},
   { section: "ניהול העסק", items: [
     { to: "/business/billing", label: "חשבוניות וחיובים", icon: ReceiptText, match: (p: string) => p.startsWith("/business/billing") || p.startsWith("/business/wallet") },
-    { to: "/business/analytics", label: "דוחות וסטטיסטיקות", icon: BarChart3, match: (p: string) => p.startsWith("/business/analytics") },
-    { to: "/business/account", label: "העסק שלי", icon: Store, match: (p: string) => p.startsWith("/business/account") || p.startsWith("/business/company") || p.startsWith("/business/profile") || p.startsWith("/business/team") },
-    { to: "/business/integrations", label: "אינטגרציות וחיבורים", icon: Plug, match: (p: string) => p.startsWith("/business/integrations") },
+    { to: "/business/account", label: "העסק שלי", icon: Store, match: (p: string) => p.startsWith("/business/account") || p.startsWith("/business/company") || p.startsWith("/business/profile") || p.startsWith("/business/team") || p.startsWith("/business/integrations") },
   ]},
   { section: "החשבון שלי", items: [
     { to: "/business/settings", label: "הגדרות חשבון", icon: Settings, match: (p: string) => p.startsWith("/business/settings") },
-    { to: "/business/notifications", label: "הודעות ועדכונים", icon: Bell, match: (p: string) => p.startsWith("/business/notifications") },
     { to: "/business/help", label: "עזרה ותמיכה", icon: Headphones, match: (p: string) => p.startsWith("/business/help") || p.startsWith("/business/support") },
   ]},
 ];
@@ -109,13 +102,13 @@ function pageClass(pathname: string) {
   if (pathname.startsWith("/business/active") || pathname.startsWith("/business/track/")) return "page-tracking";
   if (pathname.startsWith("/business/history") || pathname.startsWith("/business/orders")) return "page-history";
   if (pathname.startsWith("/business/messages")) return "page-chat";
-  if (pathname.startsWith("/business/account") || pathname.startsWith("/business/company") || pathname.startsWith("/business/profile") || pathname.startsWith("/business/team")) return "business-shell";
-  if (pathname === "/business/dashboard" || pathname === "/business" || pathname === "/business/") return "page-home";
+  if (pathname.startsWith("/business/account") || pathname.startsWith("/business/company") || pathname.startsWith("/business/profile") || pathname.startsWith("/business/team") || pathname.startsWith("/business/integrations")) return "business-shell";
   return "extra-page";
 }
 
 function NotificationsBell({ businessId }: { businessId?: string }) {
   const qc = useQueryClient();
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const { data: unread = 0 } = useUnreadNotifications(businessId);
   const { data: items = [] } = useRecentNotifications(businessId);
   const markAll = useMutation({
@@ -126,17 +119,39 @@ function NotificationsBell({ businessId }: { businessId?: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notif-unread-count"] }),
   });
   const [open, setOpen] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState({ left: 16, top: 64 });
+
+  const toggleNotifications = () => {
+    setOpen((wasOpen) => {
+      if (!wasOpen && buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        const width = Math.min(320, window.innerWidth - 32);
+        setPopoverPosition({
+          left: Math.min(
+            Math.max(16, rect.right - width),
+            Math.max(16, window.innerWidth - width - 16),
+          ),
+          top: rect.bottom + 8,
+        });
+      }
+      return !wasOpen;
+    });
+  };
 
   return (
     <div className="relative">
-      <button className="bell-button icon-btn" aria-label="התראות" onClick={() => setOpen((v) => !v)}>
+      <button ref={buttonRef} className="bell-button icon-btn" aria-label="התראות" onClick={toggleNotifications}>
         <Bell size={23} />
         {unread > 0 && <b>{unread > 9 ? "9+" : unread}</b>}
       </button>
       {open && (
         <>
           <button type="button" className="fixed inset-0 z-40" aria-label="סגור התראות" onClick={() => setOpen(false)} />
-          <div className="panel absolute end-0 top-12 z-50 w-80 p-0" dir="rtl">
+          <div
+            className="notification-popover panel fixed z-50 w-80 max-w-[calc(100vw-2rem)] p-0"
+            dir="rtl"
+            style={popoverPosition}
+          >
             <div className="flex items-center justify-between border-b border-[#e5ebe8] px-4 py-3">
               <strong>התראות</strong>
               {unread > 0 && (
@@ -242,6 +257,13 @@ export function BusinessShell({
     return () => window.clearInterval(timer);
   }, [me?.id, qc]);
 
+  const isDispatcher = (me as { business_team_role?: string } | null)?.business_team_role === "dispatcher";
+  const navGroups = isDispatcher
+    ? NAV.filter((group) => group.section !== "ניהול העסק").map((group) => ({
+        ...group,
+        items: group.items.filter((item) => item.to !== "/business/settings"),
+      }))
+    : NAV;
   const displayName =
     (me as { business_name?: string; name?: string } | null)?.business_name ||
     (me as { name?: string } | null)?.name ||
@@ -265,7 +287,6 @@ export function BusinessShell({
     navigate({ to: "/auth", replace: true });
   };
 
-  const isHome = pageClass(pathname) === "page-home";
   const isOrder = pageClass(pathname) === "page-new";
 
   return (
@@ -276,7 +297,7 @@ export function BusinessShell({
       <div className="app-shell">
         <aside className={cn("app-sidebar", navOpen && "is-open")} id="business-nav">
           <div className="sidebar-brand">
-            <Link to="/business/dashboard" className="goi-word" onClick={() => setNavOpen(false)}>
+            <Link to="/business/new-delivery" className="goi-word" onClick={() => setNavOpen(false)}>
               GO<span>I</span>
               <small>BUSINESS</small>
             </Link>
@@ -285,7 +306,7 @@ export function BusinessShell({
             </button>
           </div>
           <nav className="main-nav" aria-label="ניווט עסקי">
-            {NAV.map((group, gi) => (
+            {navGroups.map((group, gi) => (
               <div key={group.section} className={gi > 0 ? "nav-divider" : undefined}>
                 <span className="nav-section-label">{group.section}</span>
                 {group.items.map((item) => {
@@ -352,11 +373,9 @@ export function BusinessShell({
                 {!(phone && isOrder) &&
                   (headerActions ?? (
                     <>
-                      {!isHome && (
-                        <form onSubmit={onSearch} className="search-box header-search">
-                          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש משלוח..." aria-label="חיפוש הזמנות" />
-                        </form>
-                      )}
+                      <form onSubmit={onSearch} className="search-box header-search">
+                        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="חיפוש משלוח..." aria-label="חיפוש הזמנות" />
+                      </form>
                       {!pathname.startsWith("/business/new-") && (
                         <Link to="/business/new-delivery" className="btn primary header-new">
                           <Plus size={18} />
@@ -370,7 +389,7 @@ export function BusinessShell({
             </header>
           )}
           <main className="page-scroll">
-            {isHome || isOrder || hideChrome ? (
+            {isOrder || hideChrome ? (
               children
             ) : (
               <div className="page-content">

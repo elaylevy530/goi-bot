@@ -32,6 +32,7 @@ export type NestAuthProfile = {
   customerType?: string | null;
   logoUrl?: string | null;
   courierStatus?: string | null;
+  businessTeamRole?: "owner" | "dispatcher" | null;
 };
 
 export type NestAuthUser = {
@@ -343,7 +344,7 @@ export function nestHomePath(user: NestAuthUser): string {
     if (niche === "restaurant") return "/restaurant";
     if (niche === "online_store") return "/store";
     if (niche === "pharmacy_clinic") return "/clinic";
-    return "/business/dashboard";
+    return "/business/new-delivery";
   }
   if (roles.includes("customer")) return "/customer/dashboard";
   return "/dashboard";

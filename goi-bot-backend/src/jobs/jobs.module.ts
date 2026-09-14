@@ -5,6 +5,7 @@ import { BusinessNotification } from "../accounts/entities/business-notification
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { Message } from "../chat/entities/message.entity";
 import { PartnersModule } from "../partners/partners.module";
 import { PlatformModule } from "../platform/platform.module";
@@ -35,6 +36,7 @@ import { PublicMoverJobsController } from "./public-mover-jobs.controller";
       OfferEvent,
       CourierJobDecline,
       Customer,
+      TeamMember,
       Courier,
       CourierStats,
       BusinessNotification,

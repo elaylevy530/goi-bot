@@ -63,7 +63,6 @@ import { Route as BusinessIndexRouteImport } from './routes/business.index'
 import { Route as BusinessAccountRouteImport } from './routes/business.account'
 import { Route as BusinessActiveRouteImport } from './routes/business.active'
 import { Route as BusinessAddressesRouteImport } from './routes/business.addresses'
-import { Route as BusinessAnalyticsRouteImport } from './routes/business.analytics'
 import { Route as BusinessBillingRouteImport } from './routes/business.billing'
 import { Route as BusinessContactsRouteImport } from './routes/business.contacts'
 import { Route as BusinessDashboardRouteImport } from './routes/business.dashboard'
@@ -416,11 +415,6 @@ const BusinessActiveRoute = BusinessActiveRouteImport.update({
 const BusinessAddressesRoute = BusinessAddressesRouteImport.update({
   id: '/addresses',
   path: '/addresses',
-  getParentRoute: () => BusinessRoute,
-} as any)
-const BusinessAnalyticsRoute = BusinessAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
   getParentRoute: () => BusinessRoute,
 } as any)
 const BusinessBillingRoute = BusinessBillingRouteImport.update({
@@ -853,7 +847,6 @@ export interface FileRoutesByFullPath {
   '/business/account': typeof BusinessAccountRoute
   '/business/active': typeof BusinessActiveRoute
   '/business/addresses': typeof BusinessAddressesRoute
-  '/business/analytics': typeof BusinessAnalyticsRoute
   '/business/billing': typeof BusinessBillingRoute
   '/business/contacts': typeof BusinessContactsRoute
   '/business/dashboard': typeof BusinessDashboardRoute
@@ -982,7 +975,6 @@ export interface FileRoutesByTo {
   '/business/account': typeof BusinessAccountRoute
   '/business/active': typeof BusinessActiveRoute
   '/business/addresses': typeof BusinessAddressesRoute
-  '/business/analytics': typeof BusinessAnalyticsRoute
   '/business/billing': typeof BusinessBillingRoute
   '/business/contacts': typeof BusinessContactsRoute
   '/business/dashboard': typeof BusinessDashboardRoute
@@ -1113,7 +1105,6 @@ export interface FileRoutesById {
   '/business/account': typeof BusinessAccountRoute
   '/business/active': typeof BusinessActiveRoute
   '/business/addresses': typeof BusinessAddressesRoute
-  '/business/analytics': typeof BusinessAnalyticsRoute
   '/business/billing': typeof BusinessBillingRoute
   '/business/contacts': typeof BusinessContactsRoute
   '/business/dashboard': typeof BusinessDashboardRoute
@@ -1245,7 +1236,6 @@ export interface FileRouteTypes {
     | '/business/account'
     | '/business/active'
     | '/business/addresses'
-    | '/business/analytics'
     | '/business/billing'
     | '/business/contacts'
     | '/business/dashboard'
@@ -1374,7 +1364,6 @@ export interface FileRouteTypes {
     | '/business/account'
     | '/business/active'
     | '/business/addresses'
-    | '/business/analytics'
     | '/business/billing'
     | '/business/contacts'
     | '/business/dashboard'
@@ -1504,7 +1493,6 @@ export interface FileRouteTypes {
     | '/business/account'
     | '/business/active'
     | '/business/addresses'
-    | '/business/analytics'
     | '/business/billing'
     | '/business/contacts'
     | '/business/dashboard'
@@ -2001,13 +1989,6 @@ declare module '@tanstack/react-router' {
       path: '/addresses'
       fullPath: '/business/addresses'
       preLoaderRoute: typeof BusinessAddressesRouteImport
-      parentRoute: typeof BusinessRoute
-    }
-    '/business/analytics': {
-      id: '/business/analytics'
-      path: '/analytics'
-      fullPath: '/business/analytics'
-      preLoaderRoute: typeof BusinessAnalyticsRouteImport
       parentRoute: typeof BusinessRoute
     }
     '/business/billing': {
@@ -2617,7 +2598,6 @@ interface BusinessRouteChildren {
   BusinessAccountRoute: typeof BusinessAccountRoute
   BusinessActiveRoute: typeof BusinessActiveRoute
   BusinessAddressesRoute: typeof BusinessAddressesRoute
-  BusinessAnalyticsRoute: typeof BusinessAnalyticsRoute
   BusinessBillingRoute: typeof BusinessBillingRoute
   BusinessContactsRoute: typeof BusinessContactsRoute
   BusinessDashboardRoute: typeof BusinessDashboardRoute
@@ -2649,7 +2629,6 @@ const BusinessRouteChildren: BusinessRouteChildren = {
   BusinessAccountRoute: BusinessAccountRoute,
   BusinessActiveRoute: BusinessActiveRoute,
   BusinessAddressesRoute: BusinessAddressesRoute,
-  BusinessAnalyticsRoute: BusinessAnalyticsRoute,
   BusinessBillingRoute: BusinessBillingRoute,
   BusinessContactsRoute: BusinessContactsRoute,
   BusinessDashboardRoute: BusinessDashboardRoute,

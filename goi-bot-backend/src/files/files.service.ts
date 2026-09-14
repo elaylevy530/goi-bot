@@ -26,6 +26,7 @@ export const FILE_BUCKETS = [
   "business-logos",
   "courier-ids",
   "courier-documents",
+  "delivery-proofs",
 ] as const;
 export type FileBucket = (typeof FILE_BUCKETS)[number];
 

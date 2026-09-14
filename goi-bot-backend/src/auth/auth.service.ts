@@ -20,6 +20,7 @@ import {
 } from "../accounts/referral-code";
 import { CourierPasswordReset } from "../accounts/entities/courier-password-reset.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { User } from "../accounts/entities/user.entity";
 import { UserRole } from "../accounts/entities/user-role.entity";
 import { Job } from "../jobs/entities/job.entity";
@@ -34,6 +35,7 @@ import type {
   NestAuthSession,
   PreviewPanel,
 } from "./auth.types";
+import { resolveBusinessAccess } from "./business-access";
 import type { RegisterBusinessDto } from "./dto/register-business.dto";
 import type { RegisterCourierDto } from "./dto/register-courier.dto";
 import type { RegisterCustomerDto } from "./dto/register-customer.dto";
@@ -44,6 +46,7 @@ import {
   courierPhoneToEmail,
   customerPhoneToEmail,
   normalizePhone,
+  teamPhoneToEmail,
 } from "./phone.util";
 
 /** Short-lived preview JWT lifetime. */
@@ -69,6 +72,7 @@ export class AuthService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(UserRole) private readonly userRoles: Repository<UserRole>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
+    @InjectRepository(TeamMember) private readonly teamMembers: Repository<TeamMember>,
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
     @InjectRepository(Job) private readonly jobs: Repository<Job>,
     @InjectRepository(CourierPasswordReset)
@@ -184,7 +188,14 @@ export class AuthService {
 
   async login(email: string, password: string): Promise<NestAuthSession> {
     const normalized = email.trim().toLowerCase();
-    const user = await this.users.findOne({ where: { email: normalized } });
+    let user = await this.users.findOne({ where: { email: normalized } });
+    if (!user && normalized.endsWith("@business.goi.local")) {
+      const phone = normalizePhone(normalized.split("@")[0] ?? "");
+      const member = await this.teamMembers.findOne({ where: { phone } });
+      if (member?.user_id) {
+        user = await this.users.findOne({ where: { id: member.user_id } });
+      }
+    }
     if (!user) {
       throw new UnauthorizedException("Invalid email or password");
     }
@@ -231,9 +242,41 @@ export class AuthService {
   }
 
   async getMyCustomer(userId: string): Promise<Customer | null> {
-    const id = previewCustomerId();
-    if (id) return this.customers.findOne({ where: { id } });
-    return this.customers.findOne({ where: { user_id: userId } });
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    return access?.customer ?? null;
+  }
+
+  async provisionBusinessTeamMember(
+    businessId: string,
+    name: string,
+    phoneRaw: string,
+    passwordRaw: string,
+  ) {
+    const phone = normalizePhone(phoneRaw);
+    if (phone.length < 10) throw new BadRequestException("Invalid phone number");
+    const password = String(passwordRaw || "").trim();
+    if (password.length < 6) throw new BadRequestException("הסיסמה חייבת לפחות 6 תווים");
+    const owner = await this.customers.findOne({ where: { id: businessId } });
+    if (!owner) throw new NotFoundException("Business not found");
+    if (normalizePhone(owner.phone || "") === phone) {
+      throw new BadRequestException("לא ניתן להוסיף את מספר הטלפון של מנהל העסק");
+    }
+    const existing = await this.teamMembers.findOne({ where: { phone } });
+    if (existing) throw new ConflictException("מספר הטלפון כבר משויך לצוות עסק");
+
+    const user = await this.createUser(teamPhoneToEmail(phone), password);
+    await this.userRoles.save(this.userRoles.create({ user_id: user.id, role: "business" }));
+    return this.teamMembers.save(
+      this.teamMembers.create({
+        business_id: businessId,
+        user_id: user.id,
+        name: name.trim(),
+        phone,
+        role: "dispatcher",
+        invited_at: new Date(),
+        accepted_at: new Date(),
+      }),
+    );
   }
 
   async getMyCourier(userId: string): Promise<(Courier & { has_live_active_job: boolean }) | null> {
@@ -990,19 +1033,9 @@ export class AuthService {
     const profile: AuthProfile = {};
 
     if (roles.includes("business") || roles.includes("customer")) {
-      const customer = await this.customers.findOne({
-        where: { user_id: userId },
-        select: [
-          "id",
-          "name",
-          "phone",
-          "business_name",
-          "business_niche",
-          "customer_type",
-          "logo_url",
-        ],
-      });
-      if (customer) {
+      const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+      if (access) {
+        const customer = access.customer;
         profile.customerId = customer.id;
         profile.name = customer.name;
         profile.phone = customer.phone;
@@ -1010,6 +1043,7 @@ export class AuthService {
         profile.businessNiche = customer.business_niche;
         profile.customerType = customer.customer_type;
         profile.logoUrl = customer.logo_url;
+        profile.businessTeamRole = access.role;
       }
     }
 

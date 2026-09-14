@@ -174,20 +174,22 @@ export function Modal({
   onClose,
   title,
   description,
+  className,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   description?: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent dir="rtl" className="goi-modal">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
+      <DialogContent dir="rtl" className={cn("goi-modal", className)}>
+        <DialogHeader className="items-stretch text-right sm:text-right">
+          <DialogTitle className="text-right">{title}</DialogTitle>
+          {description && <DialogDescription className="text-right">{description}</DialogDescription>}
         </DialogHeader>
         {children}
       </DialogContent>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,6 +6,7 @@ import {
   Building2,
   Camera,
   Car,
+  CheckCircle2,
   ChevronLeft,
   ClipboardCheck,
   Clock3,
@@ -19,12 +20,15 @@ import {
   Package,
   Pencil,
   Phone,
+  Plug,
   Plus,
   Settings,
+  ShieldCheck,
   Store,
   Tag,
   Trash2,
   User,
+  UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -43,7 +47,10 @@ import {
 } from "@/components/business/goi/GoiUi";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
 import { useMyBusiness } from "@/components/BusinessShell";
+import { BusinessLogo } from "@/components/BusinessLogo";
 import { nestUpdateMyCustomer } from "@/lib/nest-accounts";
+import { nestUploadFile } from "@/lib/nest-files";
+import { BUSINESS_CATEGORIES } from "@/config/businessCategories";
 import {
   nestCreateBranch,
   nestDeleteBranch,
@@ -54,23 +61,15 @@ import {
   nestSetDefaultBranch,
   nestDeleteTeamMember,
   nestUpdateBranch,
-  nestUpdateTeamMemberRole,
 } from "@/lib/nest-domain";
 
 export const COMPANY_SECTIONS = [
   { id: "profile", title: "פרטי העסק", desc: "עדכון פרטי העסק, פרטי קשר וכתובת ראשית", icon: Building2, action: "עדכן פרטים" },
-  { id: "branches", title: "סניפים וכתובות איסוף", desc: "נהל סניפים, כתובות איסוף והגדרות ברירת מחדל", icon: MapPin, action: "נהל סניפים" },
   { id: "pricing", title: "תמחור משלוחים", desc: "בחר מסלול תמחור וקבע את המחירים האוטומטיים לעסק", icon: Tag, action: "נהל תמחור" },
   { id: "items", title: "פריטי משלוח שמורים", desc: "נהל את הפריטים שהעסק שולח וחסוך זמן בהזמנה", icon: Package, action: "נהל פריטים" },
-  { id: "hours", title: "שעות פעילות", desc: "הגדר את שעות הפעילות של העסק ושעות האיסוף", icon: Clock3, action: "נהל שעות" },
-  { id: "pickup", title: "הגדרות איסוף לשליח", desc: "הוראות כניסה, איש קשר ומיקום המתנה לשליח", icon: Bike, action: "נהל הגדרות" },
-  { id: "cash", title: "הגדרות מזומן", desc: "הגדר גביית מזומן מהלקוח והנחיות לתשלום", icon: Wallet, action: "נהל מזומן" },
   { id: "delivery", title: "אישור מסירה", desc: "בחר איך יאשר השליח שהמשלוח הגיע ליעדו", icon: ClipboardCheck, action: "נהל אישור מסירה" },
-  { id: "notes", title: "הערות קבועות לשליחים", desc: "הוסף הוראות קבועות שיופיעו בכל משלוח", icon: MessageCircle, action: "נהל הערות" },
-  { id: "defaults", title: "ברירות מחדל", desc: "הגדר כתובת איסוף, אמצעי מסירה והזמנות נכנסות", icon: FileText, action: "נהל ברירות מחדל" },
-  { id: "team", title: "צוות והרשאות", desc: "ניהול אנשי הצוות בעסק וההרשאות שלהם במערכת", icon: Users, action: "ניהול הצוות" },
-  { id: "zones", title: "אזורי שירות", desc: "נהל לאילו אזורים העסק שולח", icon: Map, action: "נהל אזורים" },
-  { id: "status", title: "סטטוס העסק", desc: "נהל את מצב הפעילות של העסק במערכת GOI", icon: Settings, action: "שנה סטטוס" },
+  { id: "team", title: "צוות והרשאות", desc: "הוסף אנשי צוות וקבע מי יכול לנהל הזמנות והגדרות", icon: Users, action: "נהל צוות" },
+  { id: "integrations", title: "אינטגרציות וחיבורים", desc: "חבר מערכות הזמנות ומקורות חיצוניים לעסק", icon: Plug, action: "נהל אינטגרציות", route: "/business/integrations" },
 ] as const;
 
 export type CompanySectionId = (typeof COMPANY_SECTIONS)[number]["id"];
@@ -124,7 +123,12 @@ export function BusinessCompany({ section }: { section?: string }) {
         </div>
         <div className="business-grid">
           {COMPANY_SECTIONS.map((s) => (
-            <Link key={s.id} className="business-tile panel" to="/business/company/$section" params={{ section: s.id }}>
+            <Link
+              key={s.id}
+              className="business-tile panel"
+              to={(("route" in s ? s.route : "/business/company/$section") as never)}
+              params={{ section: s.id } as never}
+            >
               <span className="round-icon">
                 <s.icon size={27} />
               </span>
@@ -189,42 +193,196 @@ function ProfileSection({
   saving: boolean;
   onSave: (body: Record<string, unknown>) => void;
 }) {
+  const qc = useQueryClient();
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [f, setF] = useState({
     business_name: "",
     business_category: "",
     business_tax_id: "",
     email: "",
+    phone: "",
     address: "",
     city: "",
+    pickup_contact_name: "",
+    pickup_contact_phone: "",
+    logo_url: "",
+    vehicle_groups: ["two_wheel", "four_wheel"] as string[],
+  });
+  const uploadLogo = useMutation({
+    mutationFn: async (file: File) => {
+      if (!file.type.startsWith("image/")) throw new Error("יש לבחור קובץ תמונה");
+      if (file.size > 8 * 1024 * 1024) throw new Error("גודל הלוגו יכול להיות עד 8MB");
+      const uploaded = await nestUploadFile("business-logos", file);
+      const updated = await nestUpdateMyCustomer({ logo_url: uploaded.path });
+      return { path: uploaded.path, updated };
+    },
+    onSuccess: ({ path, updated }) => {
+      setF((current) => ({ ...current, logo_url: path }));
+      qc.setQueryData(["business-me"], updated);
+      qc.invalidateQueries({ queryKey: ["business-logo-signed", path] });
+      toast.success("הלוגו עודכן");
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
   useEffect(() => {
     if (!me) return;
+    const defaults = (me.niche_details?.defaults || {}) as {
+      vehicle?: string;
+      vehicle_groups?: string[];
+    };
+    const savedGroups = Array.isArray(defaults.vehicle_groups) ? defaults.vehicle_groups : [];
+    const vehicleGroups = savedGroups.length
+      ? savedGroups
+      : defaults.vehicle === "רכב" || defaults.vehicle === "רכב מסחרי"
+        ? ["four_wheel"]
+        : defaults.vehicle && defaults.vehicle !== "אוטומטי"
+          ? ["two_wheel"]
+          : ["two_wheel", "four_wheel"];
     setF({
       business_name: me.business_name || me.name || "",
       business_category: me.business_category || me.customer_type || "",
       business_tax_id: me.business_tax_id || "",
       email: me.email || "",
+      phone: me.phone || "",
       address: me.address || "",
       city: me.city || "",
+      pickup_contact_name: me.pickup_contact_name || me.business_name || me.name || "",
+      pickup_contact_phone: me.pickup_contact_phone || me.phone || "",
+      logo_url: me.logo_url || "",
+      vehicle_groups: vehicleGroups,
     });
   }, [me]);
   return (
     <div className="business-profile-grid">
       <div className="profile-main">
         <Panel title="פרטים בסיסיים" icon={<Pencil size={17} />}>
+          <div className="business-logo-editor">
+            <BusinessLogo path={f.logo_url} name={f.business_name} size={76} />
+            <div>
+              <strong>לוגו העסק</strong>
+              <p>הלוגו יוצג לשליחים לצד המשלוחים של העסק.</p>
+              <button
+                type="button"
+                disabled={uploadLogo.isPending}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                <Camera size={16} />
+                {uploadLogo.isPending ? "מעלה…" : f.logo_url ? "החלפת לוגו" : "העלאת לוגו"}
+              </button>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) uploadLogo.mutate(file);
+                  event.target.value = "";
+                }}
+              />
+            </div>
+          </div>
           <div className="field-grid">
             <label className="field">שם העסק<input value={f.business_name} onChange={(e) => setF({ ...f, business_name: e.target.value })} /></label>
-            <label className="field">קטגוריה<input value={f.business_category} onChange={(e) => setF({ ...f, business_category: e.target.value })} /></label>
+            <label className="field">
+              סוג העסק
+              <SelectBox
+                label="סוג העסק"
+                value={f.business_category}
+                onChange={(value) => setF({ ...f, business_category: value })}
+                options={[
+                  ...(BUSINESS_CATEGORIES.some((category) => category.key === f.business_category) || !f.business_category
+                    ? []
+                    : [{ value: f.business_category, label: f.business_category }]),
+                  ...BUSINESS_CATEGORIES.map((category) => ({
+                    value: category.key,
+                    label: `${category.emoji} ${category.label}`,
+                  })),
+                ]}
+              />
+            </label>
             <label className="field">ח.פ / עוסק<input value={f.business_tax_id} onChange={(e) => setF({ ...f, business_tax_id: e.target.value })} /></label>
-            <label className="field">טלפון<input value={me?.phone || ""} disabled /></label>
+            <label className="field">פלאפון<input type="tel" dir="ltr" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
             <label className="field">אימייל<input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
             <label className="field">עיר<input value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></label>
           </div>
         </Panel>
-        <Panel title="כתובת ראשית" icon={<MapPin size={18} />}>
-          <label className="field">רחוב ומספר<input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+        <Panel title="הגדרות איסוף ומשלוח" icon={<MapPin size={18} />}>
+          <label className="field">
+            כתובת איסוף ראשית
+            <input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} placeholder="רחוב, מספר ועיר" />
+            <small className="hint">כל משלוח חדש ייצא מכתובת זו. שינוי הכתובת יעדכן את נקודת האיסוף הקבועה.</small>
+          </label>
+          <div className="field-grid">
+            <label className="field">איש קשר באיסוף<input value={f.pickup_contact_name} onChange={(e) => setF({ ...f, pickup_contact_name: e.target.value })} /></label>
+            <label className="field">טלפון באיסוף<input type="tel" dir="ltr" value={f.pickup_contact_phone} onChange={(e) => setF({ ...f, pickup_contact_phone: e.target.value })} /></label>
+          </div>
+          <h3>אמצעי משלוח מתאימים לעסק</h3>
+          <p className="hint">המערכת תבחר שליח מתוך הקבוצות שסומנו בהתאם לגודל המשלוח.</p>
+          <div className="vehicle-group-choices" role="group" aria-label="אמצעי משלוח מתאימים">
+            <button
+              type="button"
+              className={f.vehicle_groups.length === 2 ? "is-selected" : undefined}
+              onClick={() => setF({ ...f, vehicle_groups: ["two_wheel", "four_wheel"] })}
+            >
+              הכל
+            </button>
+            {[
+              ["two_wheel", "דו־גלגלי", "אופניים, קורקינט וקטנוע"],
+              ["four_wheel", "4 גלגלים", "רכב ורכב מסחרי"],
+            ].map(([value, title, description]) => {
+              const selected = f.vehicle_groups.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={selected ? "is-selected" : undefined}
+                  onClick={() => {
+                    const next = selected
+                      ? f.vehicle_groups.filter((group) => group !== value)
+                      : [...f.vehicle_groups, value];
+                    setF({ ...f, vehicle_groups: next.length ? next : [value] });
+                  }}
+                >
+                  <strong>{title}</strong>
+                  <small>{description}</small>
+                </button>
+              );
+            })}
+          </div>
         </Panel>
-        <SaveBar saving={saving} onSave={() => onSave(f)} />
+        <SaveBar
+          saving={saving}
+          onSave={() => {
+            const defaults = (me?.niche_details?.defaults || {}) as Record<string, unknown>;
+            const defaultVehicle =
+              f.vehicle_groups.length === 2
+                ? "אוטומטי"
+                : f.vehicle_groups.includes("four_wheel")
+                  ? "רכב"
+                  : "קטנוע";
+            onSave({
+              business_name: f.business_name,
+              business_category: f.business_category,
+              business_tax_id: f.business_tax_id,
+              email: f.email,
+              phone: f.phone,
+              address: f.address,
+              city: f.city,
+              pickup_address: f.address,
+              pickup_contact_name: f.pickup_contact_name,
+              pickup_contact_phone: f.pickup_contact_phone,
+              logo_url: f.logo_url || null,
+              niche_details: {
+                defaults: {
+                  ...defaults,
+                  vehicle: defaultVehicle,
+                  vehicle_groups: f.vehicle_groups,
+                },
+              },
+            });
+          }}
+        />
       </div>
       <Panel className="profile-summary">
         <div className="business-logo big">{(f.business_name || "?")[0]}</div>
@@ -234,9 +392,9 @@ function ProfileSection({
           <dt><MapPin size={17} />סניף ראשי</dt>
           <dd>{f.address}, {f.city}</dd>
           <dt><Tag size={17} />קטגוריה</dt>
-          <dd>{f.business_category || "—"}</dd>
+          <dd>{BUSINESS_CATEGORIES.find((category) => category.key === f.business_category)?.label || f.business_category || "—"}</dd>
           <dt><Phone size={17} />טלפון</dt>
-          <dd dir="ltr">{me?.phone}</dd>
+          <dd dir="ltr">{f.phone || "—"}</dd>
           <dt><Mail size={17} />אימייל</dt>
           <dd>{f.email || "—"}</dd>
         </dl>
@@ -309,14 +467,16 @@ function BranchesSection() {
         ))}
         {filtered.length === 0 && <Panel className="empty-state">אין סניפים להצגה</Panel>}
       </div>
-      <Modal open={!!editor} onClose={() => setEditor(null)} title={editor?.id ? "עריכת סניף" : "סניף חדש"}>
+      <Modal open={!!editor} onClose={() => setEditor(null)} title={editor?.id ? "עריכת סניף" : "סניף חדש"} description="פרטי הסניף יוצגו לשליח באיסוף">
         {editor && (
           <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-            <label className="field">שם<input required value={editor.branch_name} onChange={(e) => setEditor({ ...editor, branch_name: e.target.value })} /></label>
+            <label className="field">שם הסניף<input required autoFocus value={editor.branch_name} onChange={(e) => setEditor({ ...editor, branch_name: e.target.value })} placeholder="למשל סניף מרכז" /></label>
+            <div className="team-invite-fields">
+              <label className="field">עיר<input value={editor.city} onChange={(e) => setEditor({ ...editor, city: e.target.value })} /></label>
+              <label className="field">טלפון<input dir="ltr" value={editor.phone} onChange={(e) => setEditor({ ...editor, phone: e.target.value })} /></label>
+            </div>
             <label className="field">כתובת<input value={editor.full_address} onChange={(e) => setEditor({ ...editor, full_address: e.target.value })} /></label>
-            <label className="field">עיר<input value={editor.city} onChange={(e) => setEditor({ ...editor, city: e.target.value })} /></label>
-            <label className="field">טלפון<input value={editor.phone} onChange={(e) => setEditor({ ...editor, phone: e.target.value })} /></label>
-            <SaveBar saving={save.isPending} />
+            <SaveBar saving={save.isPending} onCancel={() => setEditor(null)} />
           </form>
         )}
       </Modal>
@@ -535,14 +695,16 @@ function ItemsSection({ niche, saving, onSave }: { niche: Niche; saving: boolean
         />
       </Panel>
       <SaveBar saving={saving} onSave={() => onSave(items)} />
-      <Modal open={!!editor} onClose={() => setEditor(null)} title="פריט משלוח">
+      <Modal open={!!editor} onClose={() => setEditor(null)} title={editor?.id ? "עריכת פריט משלוח" : "פריט משלוח חדש"} description="הפריט יישמר לשימוש חוזר בהזמנות הבאות">
         {editor && (
           <form onSubmit={(e) => { e.preventDefault(); commit(); }}>
-            <label className="field">שם<input required value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} /></label>
-            <label className="field">משקל<SelectBox label="משקל" value={editor.weight} onChange={(v) => setEditor({ ...editor, weight: v })} options={["עד 5 ק״ג", "עד 10 ק״ג", "עד 20 ק״ג"]} /></label>
-            <label className="field">רכב<SelectBox label="רכב" value={editor.vehicle} onChange={(v) => setEditor({ ...editor, vehicle: v })} options={["קטנוע", "רכב"]} /></label>
+            <label className="field">שם הפריט<input required autoFocus value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} placeholder="למשל מגש פיצה" /></label>
+            <div className="team-invite-fields">
+              <label className="field">משקל<SelectBox label="משקל" value={editor.weight} onChange={(v) => setEditor({ ...editor, weight: v })} options={["עד 5 ק״ג", "עד 10 ק״ג", "עד 20 ק״ג"]} /></label>
+              <label className="field">רכב<SelectBox label="רכב" value={editor.vehicle} onChange={(v) => setEditor({ ...editor, vehicle: v })} options={["קטנוע", "רכב"]} /></label>
+            </div>
             <label className="field">כמות<input type="number" min="1" value={editor.quantity} onChange={(e) => setEditor({ ...editor, quantity: e.target.value })} /></label>
-            <SaveBar />
+            <SaveBar onCancel={() => setEditor(null)} />
           </form>
         )}
       </Modal>
@@ -647,36 +809,73 @@ function CashSection({ niche, saving, onSave }: { niche: Niche; saving: boolean;
 function DeliverySection({ niche, saving, onSave }: { niche: Niche; saving: boolean; onSave: (proof: any) => void }) {
   const proof = (niche.proof || {}) as Record<string, boolean | string>;
   const [f, setF] = useState({
-    name: proof.name !== false,
-    photo: proof.photo !== false,
-    signature: !!proof.signature,
-    done: proof.done !== false,
-    required: String(proof.required || "אופציונלי"),
+    name: proof.name === true,
+    photo: proof.photo === true,
+    signature: proof.signature === true,
   });
+  useEffect(() => {
+    const next = (niche.proof || {}) as Record<string, boolean | string>;
+    setF({
+      name: next.name === true,
+      photo: next.photo === true,
+      signature: next.signature === true,
+    });
+  }, [niche.proof]);
+  const extras = [
+    { k: "name" as const, t: "שם המקבל", icon: User, d: "השליח ירשום את שם האדם שקיבל" },
+    { k: "photo" as const, t: "תמונה", icon: Camera, d: "השליח יצלם את המשלוח בכתובת המסירה" },
+    { k: "signature" as const, t: "חתימה", icon: Pencil, d: "השליח יפתח מסך לחתימת המקבל" },
+  ];
+  const extrasOn = f.name || f.photo || f.signature;
+  const summary = extrasOn
+    ? `נמסר תמיד, ונוסף: ${[f.name && "שם המקבל", f.photo && "תמונה", f.signature && "חתימה"].filter(Boolean).join(" · ")}`
+    : "לחיצה על נמסר מספיקה. אפשר להוסיף שם, תמונה או חתימה.";
   return (
     <>
       <Panel title="הגדרת שיטות אישור מסירה">
-        <p className="hint">העדפות אלה נשמרות לעסק ומוצגות כהנחיה. השליח מאשר מסירה באפליקציית השליחים לפי התהליך הקיים.</p>
+        <p className="hint">לחיצה על נמסר תמיד נדרשת. אפשר להוסיף עוד שיטות — הן נפתחות אצל השליח בנוסף ללחיצה, לא במקומה.</p>
         <div className="delivery-methods">
-          {[
-            { k: "name" as const, t: "שם המקבל", icon: User, d: "רישום שם האדם שקיבל את המשלוח" },
-            { k: "photo" as const, t: "תמונה", icon: Camera, d: "צילום המשלוח בכתובת המסירה" },
-            { k: "signature" as const, t: "חתימה", icon: Pencil, d: "חתימת המקבל על מסך המכשיר" },
-            { k: "done" as const, t: "סימון השלמת מסירה", icon: ClipboardCheck, d: "אישור השליח שהמסירה הושלמה" },
-          ].map((m) => (
-            <div key={m.k} className="subpanel">
-              <Toggle label={m.t} checked={!!f[m.k]} onChange={(v) => setF({ ...f, [m.k]: v })} />
-              <span className="round-icon"><m.icon size={24} /></span>
-              <p>{m.d}</p>
-              <Badge text={f[m.k] ? "מאופשר" : "כבוי"} tone={f[m.k] ? "green" : "gray"} />
-            </div>
-          ))}
+          <div className="delivery-method on locked">
+            <span className="round-icon"><ClipboardCheck size={18} /></span>
+            <span className="delivery-method-copy">
+              <strong>לחיצה על נמסר</strong>
+              <p>ברירת המחדל — השליח תמיד מסמן שהמשלוח נמסר</p>
+            </span>
+            <span className="delivery-switch on" dir="ltr" aria-hidden><i /></span>
+          </div>
+          {extras.map((m) => {
+            const on = !!f[m.k];
+            return (
+              <button
+                key={m.k}
+                type="button"
+                className={on ? "delivery-method on" : "delivery-method"}
+                aria-pressed={on}
+                onClick={() => setF({ ...f, [m.k]: !on })}
+              >
+                <span className="round-icon"><m.icon size={18} /></span>
+                <span className="delivery-method-copy">
+                  <strong>{m.t}</strong>
+                  <p>{m.d}</p>
+                </span>
+                <span className={on ? "delivery-switch on" : "delivery-switch"} dir="ltr" aria-hidden>
+                  <i />
+                </span>
+              </button>
+            );
+          })}
         </div>
+        <p className="hint">{summary}</p>
       </Panel>
-      <Panel title="דרישת אישור מסירה">
-        <Choices className="vertical" label="דרישת אישור" value={f.required} onChange={(v) => setF({ ...f, required: v })} options={["חובה בכל הזמנה", "רק בהזמנות נבחרות", "אופציונלי"]} />
-      </Panel>
-      <SaveBar saving={saving} onSave={() => onSave(f)} />
+      <SaveBar
+        saving={saving}
+        onSave={() => onSave({
+          name: f.name,
+          photo: f.photo,
+          signature: f.signature,
+          done: true,
+        })}
+      />
     </>
   );
 }
@@ -732,7 +931,7 @@ function TeamSection() {
   const { data: me } = useMyBusiness();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", role: "dispatcher" });
+  const [form, setForm] = useState({ name: "", phone: "", password: "" });
   const { data: members = [] } = useQuery({
     queryKey: ["team-members", me?.id],
     enabled: !!me?.id,
@@ -740,20 +939,23 @@ function TeamSection() {
   });
   const invite = useMutation({
     mutationFn: async () => {
-      if (!form.name.trim() || !form.phone.trim()) throw new Error("נא למלא שם וטלפון");
-      await nestInviteTeamMember({ name: form.name.trim(), phone: form.phone.replace(/\D/g, ""), role: form.role });
+      if (!form.name.trim() || !form.phone.trim() || !form.password.trim()) {
+        throw new Error("נא למלא שם, טלפון וסיסמה");
+      }
+      if (form.password.trim().length < 6) throw new Error("הסיסמה חייבת לפחות 6 תווים");
+      return nestInviteTeamMember({
+        name: form.name.trim(),
+        phone: form.phone.replace(/\D/g, ""),
+        password: form.password.trim(),
+        role: "dispatcher",
+      });
     },
     onSuccess: () => {
-      toast.success("חבר צוות הוזמן");
+      toast.success("חבר צוות נוסף");
       qc.invalidateQueries({ queryKey: ["team-members"] });
+      setForm({ name: "", phone: "", password: "" });
       setOpen(false);
-      setForm({ name: "", phone: "", role: "dispatcher" });
     },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const changeRole = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: string }) => nestUpdateTeamMemberRole(id, role),
-    onSuccess: () => { toast.success("התפקיד עודכן"); qc.invalidateQueries({ queryKey: ["team-members"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useMutation({
@@ -761,7 +963,6 @@ function TeamSection() {
     onSuccess: () => { toast.success("הוסר"); qc.invalidateQueries({ queryKey: ["team-members"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const roleLabel: Record<string, string> = { manager: "מנהל", dispatcher: "משדר משלוחים", viewer: "צפייה בלבד" };
   return (
     <>
       <div className="three-cols">
@@ -771,23 +972,28 @@ function TeamSection() {
           <p>הוסף עובד והגדר את תפקידו בעסק</p>
           <button type="button" className="btn outline" onClick={() => setOpen(true)}>הוסף איש צוות</button>
         </Panel>
+        <Panel className="center-card team-manager-card">
+          <span className="round-icon"><ShieldCheck size={25} /></span>
+          <h3>{me?.business_name || me?.name || "מנהל העסק"}</h3>
+          <Badge text="מנהל · גישה מלאה" tone="green" />
+          <p>ניהול תפעול, כספים, הגדרות וצוות</p>
+        </Panel>
         <Panel className="center-card">
           <Users size={30} />
           <strong className="big-stat">{members.length}</strong>
-          <h3>אנשי צוות</h3>
+          <h3>אנשי צוות תפעול</h3>
         </Panel>
       </div>
       <Panel title="צוות העסק">
         <DataTable
           className="team-desktop"
-          headers={["שם מלא", "תפקיד", "טלפון", "סטטוס", "פעולות"]}
+          headers={["שם מלא", "הרשאה", "טלפון", "סטטוס", "פעולות"]}
           rows={members.map((t) => [
             t.name,
-            roleLabel[t.role] || t.role,
+            "תפעול משלוחים בלבד",
             t.phone,
             t.accepted_at ? "פעיל" : "ממתין",
             <div key="a" className="icon-actions">
-              <SelectBox label="תפקיד" value={t.role} onChange={(v) => changeRole.mutate({ id: t.id, role: v })} options={[{ value: "manager", label: "מנהל" }, { value: "dispatcher", label: "משדר משלוחים" }, { value: "viewer", label: "צפייה בלבד" }]} />
               <button type="button" aria-label="מחיקה" onClick={() => remove.mutate(t.id)}><Trash2 /></button>
             </div>,
           ])}
@@ -799,24 +1005,52 @@ function TeamSection() {
                 <span className="round-icon"><User size={21} /></span>
                 <div>
                   <h3>{t.name}</h3>
-                  <Badge text={roleLabel[t.role] || t.role} tone="green" />
+                  <Badge text="תפעול משלוחים בלבד" tone="green" />
                 </div>
               </div>
               <p><Phone size={15} /><bdi>{t.phone}</bdi></p>
               <footer>
-                <SelectBox label="תפקיד" value={t.role} onChange={(v) => changeRole.mutate({ id: t.id, role: v })} options={[{ value: "manager", label: "מנהל" }, { value: "dispatcher", label: "משדר משלוחים" }, { value: "viewer", label: "צפייה בלבד" }]} />
                 <button type="button" className="icon-btn red-text" onClick={() => remove.mutate(t.id)}><Trash2 size={16} /></button>
               </footer>
             </article>
           ))}
         </div>
       </Panel>
-      <Modal open={open} onClose={() => setOpen(false)} title="הוספת איש צוות">
-        <form onSubmit={(e) => { e.preventDefault(); invite.mutate(); }}>
-          <label className="field">שם<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label className="field">טלפון<input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-          <label className="field">הרשאה<SelectBox label="תפקיד" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[{ value: "manager", label: "מנהל" }, { value: "dispatcher", label: "משדר משלוחים" }, { value: "viewer", label: "צפייה בלבד" }]} /></label>
-          <SaveBar saving={invite.isPending} />
+      <Modal
+        open={open}
+        onClose={() => { setOpen(false); setForm({ name: "", phone: "", password: "" }); }}
+        title="הוספת איש צוות"
+        description="איש הצוות יקבל הרשאת תפעול משלוחים בלבד"
+        className="team-invite-dialog"
+      >
+        <form className="team-invite-form" onSubmit={(e) => { e.preventDefault(); invite.mutate(); }}>
+          <div className="team-invite-fields">
+            <label className="field">שם מלא<input required autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="שם איש הצוות" /></label>
+            <label className="field">מספר טלפון<input required type="tel" dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="050-000-0000" /></label>
+            <label className="field team-invite-password">סיסמה לכניסה<input required type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="לפחות 6 תווים" /></label>
+          </div>
+          <div className="team-permission-card">
+            <div className="team-permission-head">
+              <span className="team-invite-icon" aria-hidden><ShieldCheck size={20} /></span>
+              <span>
+                <strong>הרשאת תפעול משלוחים</strong>
+                <small>גישה מוגבלת לעבודה השוטפת בלבד</small>
+              </span>
+            </div>
+            <ul>
+              {["יצירת הזמנה חדשה", "אישור ומעקב משלוחים", "צ׳אט עם שליחים", "צ׳אט עם התמיכה"].map((item) => (
+                <li key={item}><CheckCircle2 size={15} />{item}</li>
+              ))}
+            </ul>
+            <p>ללא גישה לכספים, חשבוניות, הגדרות העסק או ניהול צוות.</p>
+          </div>
+          <div className="team-invite-actions">
+            <button type="submit" className="btn primary" disabled={invite.isPending}>
+              <UserPlus size={16} />
+              {invite.isPending ? "מוסיף…" : "הוספת איש צוות"}
+            </button>
+            <button type="button" className="btn outline" onClick={() => setOpen(false)}>ביטול</button>
+          </div>
         </form>
       </Modal>
     </>
@@ -860,12 +1094,12 @@ function ZonesSection({ niche, saving, onSave }: { niche: Niche; saving: boolean
         </Panel>
       </div>
       <SaveBar saving={saving} onSave={() => onSave(zones)} />
-      <Modal open={!!editor} onClose={() => setEditor(null)} title="אזור שירות">
+      <Modal open={!!editor} onClose={() => setEditor(null)} title={editor?.id ? "עריכת אזור שירות" : "אזור שירות חדש"} description="הגדירו אזור לפי שם ורדיוס בקילומטרים">
         {editor && (
           <form onSubmit={(e) => { e.preventDefault(); commit(); }}>
-            <label className="field">שם<input required value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} /></label>
+            <label className="field">שם האזור<input required autoFocus value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} placeholder="למשל מרכז העיר" /></label>
             <label className="field">רדיוס (ק״מ)<input type="number" min="0" step="0.1" value={editor.radius} onChange={(e) => setEditor({ ...editor, radius: e.target.value })} /></label>
-            <SaveBar />
+            <SaveBar onCancel={() => setEditor(null)} />
           </form>
         )}
       </Modal>

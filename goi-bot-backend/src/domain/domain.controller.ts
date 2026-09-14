@@ -391,14 +391,14 @@ export class AccountDomainController {
 
   @Get("customers/me/team-members")
   listTeam(@CurrentUser() auth: AuthUserContext) {
-    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+    return this.domain.requireBusinessAdmin(auth.userId).then((businessId) =>
       this.domain.listTeamMembers(businessId),
     );
   }
 
   @Post("customers/me/team-members")
   inviteTeam(@CurrentUser() auth: AuthUserContext, @Body() body: BodyData) {
-    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+    return this.domain.requireBusinessAdmin(auth.userId).then((businessId) =>
       this.domain.inviteTeamMember(businessId, body),
     );
   }
@@ -409,8 +409,8 @@ export class AccountDomainController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() body: { role?: string },
   ) {
-    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
-      this.domain.updateTeamMemberRole(businessId, id, String(body.role || "viewer")),
+    return this.domain.requireBusinessAdmin(auth.userId).then((businessId) =>
+      this.domain.updateTeamMemberRole(businessId, id, String(body.role || "dispatcher")),
     );
   }
 
@@ -419,7 +419,7 @@ export class AccountDomainController {
     @CurrentUser() auth: AuthUserContext,
     @Param("id", ParseUUIDPipe) id: string,
   ) {
-    return this.domain.requireBusinessUser(auth.userId).then((businessId) =>
+    return this.domain.requireBusinessAdmin(auth.userId).then((businessId) =>
       this.domain.deleteTeamMember(businessId, id),
     );
   }

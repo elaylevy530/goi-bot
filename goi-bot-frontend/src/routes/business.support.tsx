@@ -73,7 +73,7 @@ function SupportPage() {
           </div>
         )}
       </Panel>
-      <Modal open={open} onClose={() => setOpen(false)} title="פתח קריאת תמיכה">
+      <Modal open={open} onClose={() => setOpen(false)} title="פתח קריאת תמיכה" description="נחזור אליכם בהקדם האפשרי">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -86,9 +86,9 @@ function SupportPage() {
           </label>
           <label className="field">
             תיאור
-            <textarea required rows={4} value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} />
+            <textarea required rows={4} value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} placeholder="כתבו בקצרה מה הבעיה" />
           </label>
-          <SaveBar saving={submit.isPending} />
+          <SaveBar saving={submit.isPending} onCancel={() => setOpen(false)} />
         </form>
       </Modal>
     </BusinessShell>

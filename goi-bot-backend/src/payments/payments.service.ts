@@ -7,7 +7,8 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Customer } from "../accounts/entities/customer.entity";
-import { previewCustomerId } from "../auth/auth-als";
+import { TeamMember } from "../accounts/entities/team-member.entity";
+import { resolveBusinessAccess } from "../auth/business-access";
 import { Job } from "../jobs/entities/job.entity";
 import { BillingRecord } from "./entities/billing-record.entity";
 import { WalletTransaction } from "./entities/wallet-transaction.entity";
@@ -23,21 +24,21 @@ export class PaymentsService {
     private readonly jobs: Repository<Job>,
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
+    @InjectRepository(TeamMember)
+    private readonly teamMembers: Repository<TeamMember>,
     @InjectRepository(WalletTransaction)
     private readonly walletTx: Repository<WalletTransaction>,
   ) {}
 
-  private async requireBusinessId(userId: string) {
-    const previewId = previewCustomerId();
-    const customer = previewId
-      ? await this.customers.findOne({ where: { id: previewId }, select: ["id"] })
-      : await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
-    if (!customer) throw new ForbiddenException("Business profile required");
-    return customer.id;
+  private async requireBusinessOwner(userId: string) {
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    if (!access) throw new ForbiddenException("Business profile required");
+    if (access.role !== "owner") throw new ForbiddenException("אין הרשאה לכספים");
+    return access.customer.id;
   }
 
   async listWalletTransactions(userId: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.walletTx.find({
       where: { business_id: businessId },
       order: { created_at: "DESC" },
@@ -53,7 +54,7 @@ export class PaymentsService {
     userId: string,
     body: { amount: number; bonusVal?: number; pct?: number },
   ) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     const amount = Number(body.amount);
     if (!Number.isFinite(amount) || amount < 50) {
       throw new BadRequestException("Minimum recharge is ₪50");

@@ -386,7 +386,13 @@ export function BusinessNewOrder(props: Props) {
       : props.pickupReadyTime || props.todayTime;
 
   const large = /10|20|רכב/.test(props.deliveryType);
-  const vehicleLabel = canonicalizeVehicleValue(props.vehicle) === "car" || large ? "רכב" : "קטנוע";
+  const canonicalVehicle = canonicalizeVehicleValue(props.vehicle);
+  const vehicleLabel =
+    props.vehicle === "אוטומטי"
+      ? "אוטומטי"
+      : canonicalVehicle === "רכב" || canonicalVehicle === "רכב מסחרי" || large
+        ? "רכב"
+        : "דו־גלגלי";
 
   const distanceLabel = computedKm != null ? `${computedKm.toFixed(1)} ק״מ` : "—";
   const durationLabel = computedMins != null ? `${computedMins} דק׳` : "—";

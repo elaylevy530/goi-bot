@@ -36,11 +36,10 @@ export function AuthShell({
   return (
     <div
       dir={rtl ? "rtl" : "ltr"}
-      className="min-h-dvh w-full bg-bg flex flex-col font-sans"
+      className="min-h-dvh w-full bg-bg flex flex-col font-sans md:flex-row"
     >
-      {/* Green paints under the status bar; content sits below safe-area */}
-      <div className="relative bg-primary shrink-0 pt-[env(safe-area-inset-top,0px)]">
-        <div className="relative flex h-44 min-[400px]:h-56 sm:h-64 flex-col items-center justify-center overflow-hidden">
+      <div className="relative bg-primary shrink-0 pt-[env(safe-area-inset-top,0px)] md:order-2 md:flex md:min-h-dvh md:flex-1 md:items-center md:justify-center md:pt-0">
+        <div className="relative flex h-44 min-[400px]:h-56 sm:h-64 flex-col items-center justify-center overflow-hidden md:h-auto md:min-h-dvh md:py-16">
           <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full" />
           <div className="absolute top-20 -left-20 w-64 h-64 bg-black/10 rounded-full" />
 
@@ -48,7 +47,7 @@ export function AuthShell({
             <Link
               to="/"
               aria-label="חזרה לדף הבית"
-              className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-pill px-3 py-1.5 bg-white/15 backdrop-blur-sm ring-1 ring-white/25 transition"
+              className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-pill px-3 py-1.5 bg-white/15 backdrop-blur-sm ring-1 ring-white/25 transition md:top-8 md:right-8"
             >
               <ArrowRight className="size-3.5" />
               דף הבית
@@ -56,23 +55,23 @@ export function AuthShell({
           )}
 
           <div className="relative z-10 flex flex-col items-center">
-            <div className="w-20 h-20 bg-surface rounded-card flex items-center justify-center shadow-card-strong mb-4 rotate-6">
-              <div className="-rotate-6 text-primary text-4xl font-black leading-none">
+            <div className="w-20 h-20 bg-surface rounded-card flex items-center justify-center shadow-card-strong mb-4 rotate-6 md:mb-5 md:h-24 md:w-24 lg:h-28 lg:w-28">
+              <div className="-rotate-6 text-primary text-4xl font-black leading-none md:text-5xl">
                 {logo ?? "G"}
               </div>
             </div>
-            <h1 className="text-white text-3xl font-black tracking-tight font-wordmark">
+            <h1 className="text-white text-3xl font-black tracking-tight font-wordmark md:text-5xl lg:text-6xl">
               GOI
             </h1>
-            <p className="text-white/90 mt-1 text-sm font-light">{tagline}</p>
+            <p className="text-white/90 mt-1 text-sm font-light md:mt-2 md:text-base">{tagline}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-5 pt-7 shadow-card-strong z-20 mx-auto w-full max-w-md relative pb-[max(2rem,env(safe-area-inset-bottom,0px))] sm:px-6 sm:pt-8">
-        <h2 className="text-xl min-[400px]:text-2xl font-bold text-text-strong mb-5 sm:mb-6">{title}</h2>
+      <div className="flex-1 -mt-8 bg-surface rounded-t-[2.5rem] px-5 pt-7 shadow-card-strong z-20 mx-auto w-full max-w-md relative pb-[max(2rem,env(safe-area-inset-bottom,0px))] sm:px-6 sm:pt-8 md:order-1 md:mx-0 md:mt-0 md:flex md:h-auto md:min-h-dvh md:max-w-[min(32rem,46vw)] md:flex-col md:justify-center md:overflow-y-auto md:rounded-none md:px-10 md:py-12 md:shadow-none lg:px-12">
+        <h2 className="text-xl min-[400px]:text-2xl font-bold text-text-strong mb-5 sm:mb-6 md:text-[1.75rem]">{title}</h2>
         {children}
-        {footer && <div className="mt-8 pb-4 text-center">{footer}</div>}
+        {footer && <div className="mt-8 pb-4 text-center lg:pb-0">{footer}</div>}
       </div>
     </div>
   );

@@ -41,6 +41,21 @@ const ALL_TIMINGS: Timing[] = ["now", "within_hour", "today", "scheduled"];
 export const BUSINESS_CATEGORIES: BusinessCategory[] = [
   // ---------- Couriers ----------
   {
+    key: "restaurant", label: "מסעדה / בית אוכל", emoji: "🍽️", serviceType: "couriers",
+    deliveryTypes: [
+      { key: "prepared_meal", label: "ארוחה מוכנה", emoji: "🍽️" },
+      { key: "food_bag", label: "שקית אוכל", emoji: "🥡" },
+      { key: "food_tray", label: "מגש אוכל", emoji: "🍱" },
+      { key: "large_order", label: "הזמנה גדולה", emoji: "📦" },
+    ],
+    timings: ["now", "within_hour", "today", "scheduled"],
+    attributes: [
+      { key: "keep_upright", label: "לשמור ישר" },
+      { key: "hot_food", label: "מזון חם", optional: true },
+      { key: "cold_food", label: "מזון קר", optional: true },
+    ],
+  },
+  {
     key: "flowers", label: "חנות פרחים", emoji: "🌸", serviceType: "couriers",
     deliveryTypes: [
       { key: "bouquet", label: "זר פרחים", emoji: "💐" },

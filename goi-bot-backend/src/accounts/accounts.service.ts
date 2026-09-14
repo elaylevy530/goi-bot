@@ -14,7 +14,9 @@ import {
   ensureCourierReferralCode,
 } from "./referral-code";
 import { getPreviewClaim, previewCourierId, previewCustomerId } from "../auth/auth-als";
-import { normalizePhone } from "../auth/phone.util";
+import { resolveBusinessAccess } from "../auth/business-access";
+import { businessPhoneToEmail, normalizePhone } from "../auth/phone.util";
+import { User } from "./entities/user.entity";
 import { Job } from "../jobs/entities/job.entity";
 import { courierHasLiveActiveJob, LIVE_JOB_OFFLINE_ERROR } from "../jobs/job-schedule";
 import { BusinessNotification } from "./entities/business-notification.entity";
@@ -25,6 +27,7 @@ import {
 } from "./entities/courier-document.entity";
 import { Courier } from "./entities/courier.entity";
 import { Customer } from "./entities/customer.entity";
+import { TeamMember } from "./entities/team-member.entity";
 import { ReferralCommission } from "./entities/referral-commission.entity";
 import {
   isCurrentIsraelMonth,
@@ -89,6 +92,7 @@ export class AccountsService implements OnModuleInit {
     @InjectRepository(CourierDocument)
     private readonly courierDocuments: Repository<CourierDocument>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
+    @InjectRepository(TeamMember) private readonly teamMembers: Repository<TeamMember>,
     @InjectRepository(BusinessNotification)
     private readonly notifications: Repository<BusinessNotification>,
     @InjectRepository(Job) private readonly jobs: Repository<Job>,
@@ -585,19 +589,66 @@ export class AccountsService implements OnModuleInit {
     return { ok: true as const };
   }
 
-  async getMyCustomer(userId: string): Promise<Customer> {
-    const previewId = previewCustomerId();
-    const customer = previewId
-      ? await this.customers.findOne({ where: { id: previewId } })
-      : await this.customers.findOne({ where: { user_id: userId } });
-    if (!customer) {
+  async getMyCustomer(userId: string): Promise<Customer & { business_team_role?: string }> {
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    if (!access) {
       throw new NotFoundException("Customer profile not found");
     }
-    return customer;
+    return Object.assign(access.customer, { business_team_role: access.role });
   }
 
   async updateMyCustomer(userId: string, dto: UpdateCustomerSelfDto): Promise<Customer> {
-    const customer = await this.getMyCustomer(userId);
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    if (!access) {
+      throw new NotFoundException("Customer profile not found");
+    }
+    if (access.role !== "owner") {
+      throw new ForbiddenException("אין הרשאה לשנות הגדרות עסק");
+    }
+    const customer = access.customer;
+    if (dto.phone !== undefined) {
+      const phone = normalizePhone(dto.phone);
+      if (phone.length < 10) {
+        throw new BadRequestException("מספר טלפון לא תקין");
+      }
+      const taken = await this.customers
+        .createQueryBuilder("c")
+        .select("c.id")
+        .where("c.id != :id", { id: customer.id })
+        .andWhere("regexp_replace(coalesce(c.phone, ''), '\\D', '', 'g') LIKE :suffix", {
+          suffix: `%${phone.slice(-9)}`,
+        })
+        .getOne();
+      if (taken) {
+        throw new ConflictException("מספר הטלפון כבר בשימוש");
+      }
+      const teamTaken = await this.teamMembers
+        .createQueryBuilder("t")
+        .select("t.id")
+        .where("regexp_replace(coalesce(t.phone, ''), '\\D', '', 'g') LIKE :suffix", {
+          suffix: `%${phone.slice(-9)}`,
+        })
+        .getOne();
+      if (teamTaken) {
+        throw new ConflictException("מספר הטלפון כבר בשימוש אצל חבר צוות");
+      }
+      if (customer.user_id) {
+        const users = this.dataSource.getRepository(User);
+        const user = await users.findOne({ where: { id: customer.user_id } });
+        if (user) {
+          const loginEmail = businessPhoneToEmail(phone);
+          if (user.email !== loginEmail) {
+            const emailTaken = await users.findOne({ where: { email: loginEmail } });
+            if (emailTaken && emailTaken.id !== user.id) {
+              throw new ConflictException("מספר הטלפון כבר בשימוש");
+            }
+            user.email = loginEmail;
+            await users.save(user);
+          }
+        }
+      }
+      dto.phone = phone;
+    }
     if (dto.signed_agreement_name !== undefined) {
       customer.signed_agreement_at = new Date();
     }

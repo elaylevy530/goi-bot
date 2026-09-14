@@ -43,7 +43,7 @@ export const Route = createFileRoute("/auth")({
       if (niche === "restaurant") throw redirect({ to: "/restaurant" });
       if (niche === "online_store") throw redirect({ to: "/store" });
       if (niche === "pharmacy_clinic") throw redirect({ to: "/clinic" });
-      throw redirect({ to: "/business/dashboard" });
+      throw redirect({ to: "/business/new-delivery" });
     }
     if (roles.includes("customer")) throw redirect({ to: "/customer/dashboard" });
     throw redirect({ to: "/dashboard" });
@@ -128,40 +128,46 @@ function AuthPage() {
 
   return (
     <div dir="rtl" className="h-dvh overflow-hidden bg-[#111] font-sans text-white">
-      <div className="relative mx-auto flex h-full w-full max-w-[430px] flex-col overflow-hidden sm:shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
-        <img
-          key={role}
-          src={copy.hero}
-          alt=""
-          width={1440}
-          height={2560}
-          decoding="async"
-          fetchPriority="high"
-          className="pointer-events-none absolute inset-0 size-full object-cover object-[center_16%]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black via-black/65 to-transparent" />
+      <div className="relative mx-auto flex h-full w-full max-w-[430px] flex-col overflow-hidden sm:shadow-[0_0_0_1px_rgba(255,255,255,0.06)] md:max-w-none md:flex-row md:shadow-none">
+        <div className="relative order-1 min-h-0 flex-1 md:order-2 md:min-h-full">
+          <img
+            key={role}
+            src={copy.hero}
+            alt=""
+            width={1440}
+            height={2560}
+            decoding="async"
+            fetchPriority="high"
+            className="pointer-events-none absolute inset-0 size-full object-cover object-[center_16%] md:object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-transparent md:bg-gradient-to-l md:from-black/35 md:via-transparent md:to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black via-black/65 to-transparent md:hidden" />
 
-        <div className="relative z-10 flex h-10 shrink-0 items-center justify-center px-3 pt-[max(0.2rem,env(safe-area-inset-top))]">
-          <Link
-            to="/"
-            className="absolute start-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white ring-1 ring-white/30"
-          >
-            <ArrowRight className="size-3" />
-            דף הבית
-          </Link>
+          <div className="relative z-10 flex h-10 shrink-0 items-center justify-center px-3 pt-[max(0.2rem,env(safe-area-inset-top))] md:h-auto md:justify-start md:px-8 md:pt-[max(1.5rem,env(safe-area-inset-top))]">
+            <Link
+              to="/"
+              className="absolute start-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white ring-1 ring-white/30 md:start-8 md:top-[max(1.5rem,env(safe-area-inset-top))] md:translate-y-0"
+            >
+              <ArrowRight className="size-3" />
+              דף הבית
+            </Link>
+            <div
+              className="text-[18px] font-black tracking-[0.14em] text-white md:hidden"
+              style={{ fontFamily: "var(--font-wordmark)" }}
+            >
+              GOI
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 order-2 w-full shrink-0 rounded-t-[1.5rem] bg-[#0b0b0b]/94 px-4 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-2.5 max-h-[58vh] overflow-y-auto md:order-1 md:flex md:h-full md:max-h-none md:w-[min(28rem,44vw)] md:shrink-0 md:flex-col md:justify-center md:overflow-y-auto md:rounded-none md:bg-[#0b0b0b] md:px-8 md:py-10 md:pb-[max(2.5rem,env(safe-area-inset-bottom))] lg:w-[min(32rem,46vw)] lg:px-10">
           <div
-            className="text-[18px] font-black tracking-[0.14em] text-white"
+            className="mb-8 hidden text-[28px] font-black tracking-[0.14em] text-white md:block"
             style={{ fontFamily: "var(--font-wordmark)" }}
           >
             GOI
           </div>
-        </div>
-
-        <div className="relative z-10 min-h-0 flex-1" aria-hidden />
-
-        <div className="relative z-10 w-full shrink-0 rounded-t-[1.5rem] bg-[#0b0b0b]/94 px-4 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-2.5">
-          <div className="mb-2 grid grid-cols-2 gap-0.5 rounded-full bg-black/50 p-0.5 ring-1 ring-white/25">
+          <div className="mb-2 grid grid-cols-2 gap-0.5 rounded-full bg-black/50 p-0.5 ring-1 ring-white/25 md:mb-6">
             <RoleTab
               active={role === "courier"}
               icon={Bike}
@@ -176,15 +182,15 @@ function AuthPage() {
             />
           </div>
 
-          <h1 className="text-[20px] font-black leading-none">{copy.title}</h1>
-          <p className="mt-0.5 text-[12px] leading-snug text-white/70">{copy.subtitle}</p>
+          <h1 className="text-[20px] font-black leading-none md:text-[28px] lg:text-[32px]">{copy.title}</h1>
+          <p className="mt-0.5 text-[12px] leading-snug text-white/70 md:mt-2 md:text-[15px]">{copy.subtitle}</p>
 
-          <form onSubmit={submit} className="mt-2.5 space-y-2">
+          <form onSubmit={submit} className="mt-2.5 space-y-2 md:mt-6 md:space-y-4">
             <label className="block text-start">
-              <span className="mb-0.5 block text-[11px] font-bold text-white/75">מספר טלפון</span>
+              <span className="mb-0.5 block text-[11px] font-bold text-white/75 md:text-[13px]">מספר טלפון</span>
               <div
                 dir="ltr"
-                className="flex h-11 items-center rounded-xl border border-white/30 bg-black/30 focus-within:border-[#00A86B] focus-within:ring-2 focus-within:ring-[#00A86B]/30"
+                className="flex h-11 items-center rounded-xl border border-white/30 bg-black/30 focus-within:border-[#00A86B] focus-within:ring-2 focus-within:ring-[#00A86B]/30 md:h-12"
               >
                 <span className="shrink-0 pl-3.5 pr-2 text-[16px] font-medium tracking-wide text-white/55">
                   +972
@@ -209,7 +215,7 @@ function AuthPage() {
 
             <label className="block text-start">
               <span className="mb-0.5 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-white/75">סיסמה</span>
+                <span className="text-[11px] font-bold text-white/75 md:text-[13px]">סיסמה</span>
                 {role === "courier" ? (
                   <Link
                     to="/courier-reset-password"
@@ -223,7 +229,7 @@ function AuthPage() {
                   </span>
                 )}
               </span>
-              <div className="flex h-11 items-center rounded-xl border border-white/30 bg-black/30 ps-3.5 pe-1 focus-within:border-[#00A86B] focus-within:ring-2 focus-within:ring-[#00A86B]/30">
+              <div className="flex h-11 items-center rounded-xl border border-white/30 bg-black/30 ps-3.5 pe-1 focus-within:border-[#00A86B] focus-within:ring-2 focus-within:ring-[#00A86B]/30 md:h-12">
                 <input
                   id="auth-password"
                   type={showPassword ? "text" : "password"}
@@ -248,7 +254,7 @@ function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="relative flex h-11 w-full items-center justify-center rounded-xl bg-[#00A86B] pe-3 ps-11 text-[15px] font-black text-white transition active:scale-[0.98] disabled:opacity-70"
+              className="relative flex h-11 w-full items-center justify-center rounded-xl bg-[#00A86B] pe-3 ps-11 text-[15px] font-black text-white transition active:scale-[0.98] disabled:opacity-70 md:h-12 md:text-[16px]"
             >
               {loading ? <Loader2 className="size-5 animate-spin" /> : copy.cta}
               <span className="absolute left-1.5 grid size-8 place-items-center rounded-full bg-white/15">
@@ -257,7 +263,7 @@ function AuthPage() {
             </button>
           </form>
 
-          <p className="mt-2 text-center text-[12px] text-white/65">
+          <p className="mt-2 text-center text-[12px] text-white/65 md:mt-5 md:text-[13px]">
             {copy.footerLead}{" "}
             <Link
               to={copy.footerTo}
@@ -267,10 +273,10 @@ function AuthPage() {
             </Link>
           </p>
 
-          <div className="mt-1 text-center">
+          <div className="mt-1 text-center md:mt-3">
             <Link
               to="/admin-login"
-              className="inline-flex items-center gap-1 text-[10px] text-white/35 hover:text-white/70"
+              className="inline-flex items-center gap-1 text-[10px] text-white/35 hover:text-white/70 md:text-[12px]"
             >
               <ShieldCheck className="size-3" />
               כניסת מנהל מערכת
@@ -299,7 +305,7 @@ function RoleTab({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex h-9 items-center justify-center gap-1.5 rounded-full px-1 text-[12px] font-bold whitespace-nowrap transition",
+        "flex h-9 items-center justify-center gap-1.5 rounded-full px-1 text-[12px] font-bold whitespace-nowrap transition md:h-11 md:text-[13px]",
         active
           ? "bg-[#00A86B] text-white shadow-[0_0_14px_rgba(0,168,107,0.4)]"
           : "text-white/75 hover:text-white",

@@ -15,7 +15,9 @@ import { BusinessNotification } from "../accounts/entities/business-notification
 import { Courier } from "../accounts/entities/courier.entity";
 import { CourierStats } from "../accounts/entities/courier-stats.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
+import { resolveBusinessAccess } from "../auth/business-access";
 import type { AppRole } from "../auth/auth.types";
 import { Conversation } from "../push/entities/conversation.entity";
 import { OfferPushService } from "../push/offer-push.service";
@@ -41,6 +43,11 @@ import {
   isClaimableStatus as statusIsClaimable,
 } from "./job-statuses";
 import { courierVehicleFitsJob, jobNeededVehicleClass, pickDispatchCouriers } from "./courier-job-match";
+import {
+  type CourierDeliveryProof,
+  deliveryProofNeedsCapture,
+  proofFromNicheDetails,
+} from "./delivery-proof";
 
 function generateTrackingToken(): string {
   return randomBytes(16).toString("hex");
@@ -68,6 +75,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(CourierJobDecline)
     private readonly declines: Repository<CourierJobDecline>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
+    @InjectRepository(TeamMember) private readonly teamMembers: Repository<TeamMember>,
     @InjectRepository(Courier) private readonly couriers: Repository<Courier>,
     @InjectRepository(JobOutcome) private readonly outcomes: Repository<JobOutcome>,
     @InjectRepository(JobStop) private readonly jobStops: Repository<JobStop>,
@@ -92,6 +100,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     );
     void this.jobs.query(
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS delivery_minutes int`,
+    );
+    void this.jobs.query(
+      `ALTER TABLE job_outcomes ADD COLUMN IF NOT EXISTS received_by_name varchar(255)`,
+    );
+    void this.jobs.query(
+      `ALTER TABLE job_outcomes ADD COLUMN IF NOT EXISTS proof_photo_url varchar(512)`,
+    );
+    void this.jobs.query(
+      `ALTER TABLE job_outcomes ADD COLUMN IF NOT EXISTS signature_url varchar(512)`,
     );
     this.scheduledGoOnlineTimer = setInterval(() => {
       void this.activateCouriersForUpcomingScheduledJobs();
@@ -361,11 +378,13 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   ) {
     if (roles.includes("admin") || roles.includes("manager")) {
       return this.attachCouriers(
-        await this.jobs.find({
-          where: status ? { status } : {},
-          order: { created_at: "DESC" },
-          take: limit,
-        }),
+        await this.attachBusinessMeta(
+          await this.jobs.find({
+            where: status ? { status } : {},
+            order: { created_at: "DESC" },
+            take: limit,
+          }),
+        ),
       );
     }
 
@@ -373,13 +392,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       const customer = await this.findCustomerForUser(userId);
       if (!customer) return [];
       return this.attachCouriers(
-        await this.jobs.find({
-          where: status
-            ? { customer_id: customer.id, status }
-            : { customer_id: customer.id },
-          order: { created_at: "DESC" },
-          take: limit,
-        }),
+        await this.attachBusinessMeta(
+          await this.jobs.find({
+            where: status
+              ? { customer_id: customer.id, status }
+              : { customer_id: customer.id },
+            order: { created_at: "DESC" },
+            take: limit,
+          }),
+        ),
       );
     }
 
@@ -398,7 +419,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       });
       const byId = new Map<string, Job>();
       for (const j of [...assigned, ...open]) byId.set(j.id, j);
-      return this.attachCouriers([...byId.values()].slice(0, limit));
+      return this.attachCouriers(
+        await this.attachBusinessMeta([...byId.values()].slice(0, limit)),
+      );
     }
 
     return [];
@@ -413,7 +436,8 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async getForUserWithCourier(id: string, userId: string, roles: AppRole[]) {
     const job = await this.getForUser(id, userId, roles);
-    const [withCourier] = await this.attachCouriers([job]);
+    const [withBusiness] = await this.attachBusinessMeta([job]);
+    const [withCourier] = await this.attachCouriers([withBusiness]);
     const [withChat] = await this.attachJobChatMeta([withCourier]);
     return withChat;
   }
@@ -764,6 +788,38 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     }));
   }
 
+  private async attachBusinessMeta<T extends { customer_id?: string | null; customer_name?: string | null }>(
+    jobs: T[],
+  ) {
+    if (jobs.length === 0) return jobs;
+    const customerIds = [...new Set(jobs.map((job) => job.customer_id).filter(Boolean))] as string[];
+    if (customerIds.length === 0) {
+      return jobs.map((job) => ({
+        ...job,
+        customer_logo_path: null,
+        delivery_proof: proofFromNicheDetails(null),
+      }));
+    }
+    const customers = await this.customers.find({
+      where: { id: In(customerIds) },
+      select: ["id", "name", "business_name", "logo_url", "niche_details"],
+    });
+    const byId = new Map(customers.map((customer) => [customer.id, customer]));
+    return jobs.map((job) => {
+      const customer = job.customer_id ? byId.get(job.customer_id) : undefined;
+      return {
+        ...job,
+        customer_name:
+          job.customer_name ||
+          customer?.business_name ||
+          customer?.name ||
+          null,
+        customer_logo_path: customer?.logo_url ?? null,
+        delivery_proof: proofFromNicheDetails(customer?.niche_details ?? null),
+      };
+    });
+  }
+
   private async attachCouriers(jobs: Job[]) {
     const ids = [...new Set(jobs.map((j) => j.selected_courier_id).filter(Boolean))] as string[];
     if (ids.length === 0) {
@@ -795,17 +851,37 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   private async findCustomerForUser(
     userId: string,
   ): Promise<Pick<Customer, "id" | "name"> | null> {
-    const previewId = previewCustomerId();
-    if (previewId) {
-      return this.customers.findOne({
-        where: { id: previewId },
-        select: ["id", "name"],
-      });
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    if (!access) return null;
+    return { id: access.customer.id, name: access.customer.name };
+  }
+
+  private assertDeliveryProof(
+    required: ReturnType<typeof proofFromNicheDetails>,
+    proof?: CourierDeliveryProof,
+  ) {
+    if (!deliveryProofNeedsCapture(required)) return;
+    if (required.name && !proof?.recipient_name?.trim()) {
+      throw new BadRequestException("יש לרשום את שם המקבל");
     }
-    return this.customers.findOne({
-      where: { user_id: userId },
-      select: ["id", "name"],
-    });
+    if (required.photo && !proof?.photo_path) {
+      throw new BadRequestException("יש לצלם תמונת מסירה");
+    }
+    if (required.signature && !proof?.signature_path) {
+      throw new BadRequestException("יש לקחת חתימה");
+    }
+  }
+
+  private deliveryProofFileUrl(value?: string) {
+    if (!value) return null;
+    const raw = value.trim();
+    const path = raw.includes("/delivery-proofs/")
+      ? raw.split("/delivery-proofs/").pop() ?? ""
+      : raw.replace(/^\/+/, "");
+    if (!path || path.includes("..") || path.includes("/") || path.includes("\\")) {
+      throw new BadRequestException("קובץ אישור מסירה לא תקין");
+    }
+    return `/api/files/delivery-proofs/${path}`;
   }
 
   private async requireCourier(userId: string): Promise<Courier> {
@@ -827,9 +903,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       take: 200,
     });
     if (offers.length === 0) return [];
-    const jobs = await this.jobs.find({
-      where: { id: In(offers.map((o) => o.job_id)) },
-    });
+    const jobs = await this.attachBusinessMeta(
+      await this.jobs.find({
+        where: { id: In(offers.map((o) => o.job_id)) },
+      }),
+    );
     const jobMap = new Map(jobs.map((j) => [j.id, j]));
     return offers.map((o) => ({ ...o, jobs: jobMap.get(o.job_id) ?? null }));
   }
@@ -955,15 +1033,17 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async listOpenQuoteJobs(userId: string) {
     await this.requireCourier(userId);
-    return this.jobs.find({
-      where: {
-        pricing_type: "quote_request",
-        selected_quote_id: IsNull(),
-        status: In([...OPEN_STATUSES]),
-      },
-      order: { created_at: "DESC" },
-      take: 200,
-    });
+    return this.attachBusinessMeta(
+      await this.jobs.find({
+        where: {
+          pricing_type: "quote_request",
+          selected_quote_id: IsNull(),
+          status: In([...OPEN_STATUSES]),
+        },
+        order: { created_at: "DESC" },
+        take: 200,
+      }),
+    );
   }
 
   async listCourierQuotes(userId: string, jobIds: string[]) {
@@ -1283,24 +1363,26 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   async listOpenBroadcastJobs(userId: string) {
     await this.requireCourier(userId);
     const today = new Date().toISOString().slice(0, 10);
-    return this.jobs.find({
-      where: [
-        {
-          selected_courier_id: IsNull(),
-          status: "נשלחה לשליחים",
-          pricing_type: Not("quote_request"),
-          job_date: IsNull(),
-        },
-        {
-          selected_courier_id: IsNull(),
-          status: "נשלחה לשליחים",
-          pricing_type: Not("quote_request"),
-          job_date: MoreThanOrEqual(today),
-        },
-      ],
-      order: { created_at: "DESC" },
-      take: 200,
-    });
+    return this.attachBusinessMeta(
+      await this.jobs.find({
+        where: [
+          {
+            selected_courier_id: IsNull(),
+            status: "נשלחה לשליחים",
+            pricing_type: Not("quote_request"),
+            job_date: IsNull(),
+          },
+          {
+            selected_courier_id: IsNull(),
+            status: "נשלחה לשליחים",
+            pricing_type: Not("quote_request"),
+            job_date: MoreThanOrEqual(today),
+          },
+        ],
+        order: { created_at: "DESC" },
+        take: 200,
+      }),
+    );
   }
 
   async getByTrackingToken(token: string) {
@@ -1358,21 +1440,38 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       ? await this.outcomes.find({ where: { job_id: In(jobIds) } })
       : [];
     const outcomeByJob = new Map(outcomes.map((o) => [o.job_id, o]));
-    return this.attachJobChatMeta(
+    const withChat = await this.attachJobChatMeta(
       rows.map((j) => ({
         ...j,
         job_outcomes: outcomeByJob.get(j.id) ? [outcomeByJob.get(j.id)] : [],
       })),
     );
+    return this.attachBusinessMeta(withChat);
   }
 
-  async courierUpdateProgress(userId: string, jobId: string, step: string) {
+  async courierUpdateProgress(
+    userId: string,
+    jobId: string,
+    step: string,
+    proof?: CourierDeliveryProof,
+  ) {
     const courier = await this.requireCourier(userId);
     const job = await this.jobs.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException("Job not found");
     if (job.selected_courier_id !== courier.id) {
       throw new ForbiddenException("Not your job");
     }
+    const requiredProof = job.customer_id
+      ? proofFromNicheDetails(
+          (
+            await this.customers.findOne({
+              where: { id: job.customer_id },
+              select: ["id", "niche_details"],
+            })
+          )?.niche_details ?? null,
+        )
+      : proofFromNicheDetails(null);
+    if (step === "נמסר") this.assertDeliveryProof(requiredProof, proof);
     const now = new Date();
     job.courier_step = step;
     const statusMap: Record<string, string> = {
@@ -1399,6 +1498,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       if (!outcome) outcome = this.outcomes.create({ job_id: jobId, courier_id: courier.id });
       outcome.delivered_at = now;
       outcome.courier_id = courier.id;
+      if (requiredProof.name) outcome.received_by_name = proof?.recipient_name?.trim() || null;
+      if (requiredProof.photo) outcome.proof_photo_url = this.deliveryProofFileUrl(proof?.photo_path);
+      if (requiredProof.signature) outcome.signature_url = this.deliveryProofFileUrl(proof?.signature_path);
       await this.outcomes.save(outcome);
     }
     await this.jobs.save(job);

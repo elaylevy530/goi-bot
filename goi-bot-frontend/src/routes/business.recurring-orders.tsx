@@ -14,7 +14,7 @@ import {
   nestListRecurringOrders, nestSaveRecurringOrder, nestDeleteRecurringOrder, nestToggleRecurringOrderActive,
 } from "@/lib/nest-domain";
 import { Plus, Pause, Play, Trash2, Repeat, Pencil } from "lucide-react";
-import { EmptyState } from "./business.dashboard";
+import { EmptyState } from "@/components/business/EmptyState";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/recurring-orders")({
@@ -123,13 +123,15 @@ function RecurringPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent dir="rtl" className="max-w-lg">
-          <DialogHeader><DialogTitle>{editing ? "ערוך הזמנה קבועה" : "הזמנה קבועה חדשה"}</DialogTitle></DialogHeader>
+        <DialogContent dir="rtl" className="goi-modal">
+          <DialogHeader className="items-stretch text-right sm:text-right">
+            <DialogTitle className="text-right">{editing ? "עריכת הזמנה קבועה" : "הזמנה קבועה חדשה"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>סוג</Label>
               <Select value={f.recurrence_type} onValueChange={(v) => setF({ ...f, recurrence_type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="select-box"><SelectValue /></SelectTrigger>
                 <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -144,21 +146,21 @@ function RecurringPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>שעת התחלה</Label><Input type="time" value={f.start_time} onChange={(e) => setF({ ...f, start_time: e.target.value })} /></div>
-              <div><Label>שעת סיום</Label><Input type="time" value={f.end_time} onChange={(e) => setF({ ...f, end_time: e.target.value })} /></div>
+              <div><Label>שעת התחלה</Label><Input type="time" dir="ltr" value={f.start_time} onChange={(e) => setF({ ...f, start_time: e.target.value })} /></div>
+              <div><Label>שעת סיום</Label><Input type="time" dir="ltr" value={f.end_time} onChange={(e) => setF({ ...f, end_time: e.target.value })} /></div>
             </div>
             <div><Label>כתובת איסוף</Label><Input value={f.pickup_address} onChange={(e) => setF({ ...f, pickup_address: e.target.value })} /></div>
             <div><Label>כתובת מסירה (אם רלוונטי)</Label><Input value={f.dropoff_address} onChange={(e) => setF({ ...f, dropoff_address: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>תשלום (₪)</Label><Input type="number" value={f.payment} onChange={(e) => setF({ ...f, payment: e.target.value })} /></div>
-              <div><Label>מספר שליחים</Label><Input type="number" min="1" value={f.couriers_needed} onChange={(e) => setF({ ...f, couriers_needed: e.target.value })} /></div>
+              <div><Label>תשלום (₪)</Label><Input type="number" dir="ltr" value={f.payment} onChange={(e) => setF({ ...f, payment: e.target.value })} /></div>
+              <div><Label>מספר שליחים</Label><Input type="number" min="1" dir="ltr" value={f.couriers_needed} onChange={(e) => setF({ ...f, couriers_needed: e.target.value })} /></div>
             </div>
             <div><Label>הערות</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
             <label className="flex items-center gap-2"><Switch checked={f.active} onCheckedChange={(v) => setF({ ...f, active: v })} /> פעיל</label>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
-            <Button onClick={() => save.mutate()} className="bg-primary-deep hover:bg-primary-deep/90">שמור</Button>
+          <DialogFooter className="goi-modal-actions">
+            <Button onClick={() => save.mutate()} className="btn primary">שמירה</Button>
+            <Button variant="outline" className="btn outline" onClick={() => setOpen(false)}>ביטול</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

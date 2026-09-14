@@ -137,9 +137,17 @@ export class JobsController {
   @UseGuards(JwtAuthGuard)
   courierProgress(
     @CurrentUser() auth: AuthUserContext,
-    @Body() body: { job_id: string; step: string },
+    @Body() body: {
+      job_id: string;
+      step: string;
+      proof?: {
+        recipient_name?: string;
+        photo_path?: string;
+        signature_path?: string;
+      };
+    },
   ) {
-    return this.jobs.courierUpdateProgress(auth.userId, body.job_id, body.step);
+    return this.jobs.courierUpdateProgress(auth.userId, body.job_id, body.step, body.proof);
   }
 
   @Get(":id")

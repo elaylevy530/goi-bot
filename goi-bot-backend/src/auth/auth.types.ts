@@ -31,6 +31,7 @@ export type AuthProfile = {
   customerType?: string | null;
   logoUrl?: string | null;
   courierStatus?: string | null;
+  businessTeamRole?: "owner" | "dispatcher" | null;
 };
 
 export type NestAuthSession = {

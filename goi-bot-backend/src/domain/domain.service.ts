@@ -18,6 +18,8 @@ import { ReferralCommission } from "../accounts/entities/referral-commission.ent
 import { SavedContact } from "../accounts/entities/saved-contact.entity";
 import { TeamMember } from "../accounts/entities/team-member.entity";
 import { previewCourierId, previewCustomerId } from "../auth/auth-als";
+import { AuthService } from "../auth/auth.service";
+import { resolveBusinessAccess } from "../auth/business-access";
 import type { AppRole } from "../auth/auth.types";
 import { Message } from "../chat/entities/message.entity";
 import {
@@ -87,6 +89,7 @@ export class DomainService {
     @InjectRepository(ReferralCommission)
     private readonly referralCommissions: Repository<ReferralCommission>,
     private readonly adminPush: AdminPushService,
+    private readonly auth: AuthService,
   ) {}
 
   getOutcome(jobId: string) {
@@ -113,11 +116,13 @@ export class DomainService {
     if (previewC || previewB) {
       return { courierId: previewC, businessId: previewB };
     }
-    const [courier, business] = await Promise.all([
+    const [courier, owned] = await Promise.all([
       this.couriers.findOne({ where: { user_id: userId }, select: ["id"] }),
       this.customers.findOne({ where: { user_id: userId }, select: ["id"] }),
     ]);
-    return { courierId: courier?.id, businessId: business?.id };
+    if (owned?.id) return { courierId: courier?.id, businessId: owned.id };
+    const member = await this.teamMembers.findOne({ where: { user_id: userId }, select: ["business_id"] });
+    return { courierId: courier?.id, businessId: member?.business_id };
   }
 
   async listConversations(userId: string, roles: AppRole[]) {
@@ -811,22 +816,18 @@ export class DomainService {
   }
 
   inviteTeamMember(businessId: string, body: Mutable) {
-    return this.teamMembers.save(
-      this.teamMembers.create({
-        business_id: businessId,
-        name: String(body.name || ""),
-        phone: (body.phone as string | null) ?? null,
-        role: String(body.role || "viewer"),
-        invited_at: new Date(),
-        accepted_at: null,
-      }),
+    return this.auth.provisionBusinessTeamMember(
+      businessId,
+      String(body.name || ""),
+      String(body.phone || ""),
+      String(body.password || ""),
     );
   }
 
   async updateTeamMemberRole(businessId: string, id: string, role: string) {
     const row = await this.teamMembers.findOne({ where: { id, business_id: businessId } });
     if (!row) throw new NotFoundException("Team member not found");
-    row.role = role;
+    row.role = role === "dispatcher" ? role : "dispatcher";
     return this.teamMembers.save(row);
   }
 
@@ -1043,12 +1044,18 @@ export class DomainService {
   }
 
   private async requireBusinessId(userId: string) {
-    const previewId = previewCustomerId();
-    const customer = previewId
-      ? await this.customers.findOne({ where: { id: previewId }, select: ["id"] })
-      : await this.customers.findOne({ where: { user_id: userId }, select: ["id"] });
-    if (!customer) throw new ForbiddenException("Business profile required");
-    return customer.id;
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    if (!access) throw new ForbiddenException("Business profile required");
+    return access.customer.id;
+  }
+
+  private async requireBusinessOwner(userId: string) {
+    const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
+    if (!access) throw new ForbiddenException("Business profile required");
+    if (access.role !== "owner") {
+      throw new ForbiddenException("אין הרשאה לניהול העסק");
+    }
+    return access.customer.id;
   }
 
   listBranches(businessId: string) {
@@ -1184,6 +1191,10 @@ export class DomainService {
     return this.requireBusinessId(userId);
   }
 
+  async requireBusinessAdmin(userId: string) {
+    return this.requireBusinessOwner(userId);
+  }
+
   private async requireCourierId(userId: string) {
     const previewId = previewCourierId();
     const courier = previewId
@@ -1214,47 +1225,47 @@ export class DomainService {
   }
 
   async branchesForUser(userId: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.listBranches(businessId);
   }
 
   async createBranchForUser(userId: string, body: Mutable) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.saveBranch(businessId, body);
   }
 
   async updateBranchForUser(userId: string, id: string, body: Mutable) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.saveBranch(businessId, body, id);
   }
 
   async deleteBranchForUser(userId: string, id: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.deleteBranch(businessId, id);
   }
 
   async setDefaultBranchForUser(userId: string, id: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.setDefaultBranch(businessId, id);
   }
 
   async integrationForUser(userId: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.getOrCreateIntegration(businessId);
   }
 
   async patchIntegrationForUser(userId: string, body: Mutable) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.updateIntegration(businessId, body);
   }
 
   async integrationLogsForUser(userId: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.listIntegrationLogs(businessId);
   }
 
   async billingForUser(userId: string) {
-    const businessId = await this.requireBusinessId(userId);
+    const businessId = await this.requireBusinessOwner(userId);
     return this.listBillingRecords(businessId);
   }
 

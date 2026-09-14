@@ -8,12 +8,14 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { BusinessLogo } from "@/components/BusinessLogo";
 import { cn } from "@/lib/utils";
 
 type JobDetails = {
   job_number?: string | number | null;
   order_number?: string | number | null;
   customer_name?: string | null;
+  customer_logo_path?: string | null;
   pickup_address?: string | null;
   pickup_area?: string | null;
   pickup_contact_name?: string | null;
@@ -99,6 +101,7 @@ export function JobDetailsSheet({
             tone="pickup"
             title="איסוף"
             icon={<ShoppingBag className="size-4" />}
+            logoPath={job.customer_logo_path}
             name={job.customer_name || job.pickup_contact_name || "נקודת איסוף"}
             address={job.pickup_address || job.pickup_area}
             contactName={job.pickup_contact_name}
@@ -156,6 +159,7 @@ function StopCard({
   tone,
   title,
   icon,
+  logoPath,
   name,
   address,
   contactName,
@@ -169,6 +173,7 @@ function StopCard({
   tone: "pickup" | "dropoff";
   title: string;
   icon: ReactNode;
+  logoPath?: string | null;
   name?: string | null;
   address?: string | null;
   contactName?: string | null;
@@ -184,9 +189,13 @@ function StopCard({
     <section className="rounded-card border border-border bg-surface p-3 shadow-card">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <div className={cn("grid size-9 place-items-center rounded-pill", isPickup ? "bg-info-bg text-info" : "bg-primary-soft text-primary")}>
-            {icon}
-          </div>
+          {isPickup && logoPath ? (
+            <BusinessLogo path={logoPath} name={name} size={36} className="ring-primary/20" />
+          ) : (
+            <div className={cn("grid size-9 place-items-center rounded-pill", isPickup ? "bg-info-bg text-info" : "bg-primary-soft text-primary")}>
+              {icon}
+            </div>
+          )}
           <p className={cn("text-sm font-extrabold", isPickup ? "text-info" : "text-primary")}>{title}</p>
         </div>
         <div className="flex shrink-0 gap-1.5">

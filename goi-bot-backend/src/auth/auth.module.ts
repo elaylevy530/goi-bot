@@ -8,6 +8,7 @@ import { Job } from "../jobs/entities/job.entity";
 import { Courier } from "../accounts/entities/courier.entity";
 import { CourierPasswordReset } from "../accounts/entities/courier-password-reset.entity";
 import { Customer } from "../accounts/entities/customer.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { User } from "../accounts/entities/user.entity";
 import { UserRole } from "../accounts/entities/user-role.entity";
 import { CronSecretGuard } from "../workers/guards/cron-secret.guard";
@@ -38,6 +39,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       User,
       UserRole,
       Customer,
+      TeamMember,
       Courier,
       Job,
       CourierPasswordReset,

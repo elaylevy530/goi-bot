@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Customer } from "../accounts/entities/customer.entity";
+import { TeamMember } from "../accounts/entities/team-member.entity";
 import { Job } from "../jobs/entities/job.entity";
 import { BillingRecord } from "./entities/billing-record.entity";
 import { WalletTransaction } from "./entities/wallet-transaction.entity";
@@ -13,6 +14,7 @@ import { PaymentsService } from "./payments.service";
       BillingRecord,
       Job,
       Customer,
+      TeamMember,
       WalletTransaction,
     ]),
   ],

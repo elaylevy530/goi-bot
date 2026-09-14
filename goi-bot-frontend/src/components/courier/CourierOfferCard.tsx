@@ -8,6 +8,7 @@ import {
   Store,
 } from "lucide-react";
 import type { MapJob } from "@/components/CourierJobsMap";
+import { BusinessLogo } from "@/components/BusinessLogo";
 import type { CourierTerms } from "@/lib/courier-kind";
 import type { DrivingRoute } from "@/lib/google-driving-route";
 import { pickupReadyBadge } from "@/lib/pickup-ready";
@@ -154,6 +155,7 @@ export function CourierOfferCard({
             <p className="mb-1 text-right text-[13px] font-extrabold text-text-strong">פרטי המשלוח</p>
             <StopsTimeline
               businessName={businessName}
+              businessLogoPath={job.customer_logo_path}
               pickup={pickup}
               dropTitle={dropTitle}
               dropoffArea={job.dropoff_area}
@@ -202,6 +204,7 @@ export function CourierOfferCard({
           <div className="mt-1.5 shrink-0">
             <StopsTimeline
               businessName={businessName}
+              businessLogoPath={job.customer_logo_path}
               pickup={pickup}
               dropTitle={dropTitle}
               dropoffArea={job.dropoff_area}
@@ -398,6 +401,7 @@ function RewardBanner({
 
 function StopsTimeline({
   businessName,
+  businessLogoPath,
   pickup,
   dropTitle,
   dropoffArea,
@@ -407,6 +411,7 @@ function StopsTimeline({
   dense = false,
 }: {
   businessName: string;
+  businessLogoPath?: string | null;
   pickup: string;
   dropTitle: string;
   dropoffArea?: string | null;
@@ -428,7 +433,11 @@ function StopsTimeline({
 
       <StopRow
         tone="pickup"
-        icon={<Store className="size-4" strokeWidth={2.3} />}
+        icon={
+          businessLogoPath
+            ? <BusinessLogo path={businessLogoPath} name={businessName} size={32} className="border-0 ring-0 shadow-none" />
+            : <Store className="size-4" strokeWidth={2.3} />
+        }
         label="איסוף"
         title={businessName}
         subtitle={pickup}

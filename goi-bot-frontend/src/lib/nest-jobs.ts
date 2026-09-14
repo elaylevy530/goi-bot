@@ -223,11 +223,19 @@ export function nestListCourierActiveJobs() {
   return apiFetch<NestJob[]>("/api/jobs/courier/active-jobs", { accessToken: token() });
 }
 
-export function nestCourierUpdateProgress(jobId: string, step: string) {
+export function nestCourierUpdateProgress(
+  jobId: string,
+  step: string,
+  proof?: {
+    recipient_name?: string;
+    photo_path?: string;
+    signature_path?: string;
+  },
+) {
   return apiFetch<{ ok: true }>("/api/jobs/courier/progress", {
     method: "POST",
     accessToken: token(),
-    body: JSON.stringify({ job_id: jobId, step }),
+    body: JSON.stringify({ job_id: jobId, step, proof }),
   });
 }
 
