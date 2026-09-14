@@ -297,6 +297,22 @@ function NavSection({ title, children, dense }: { title: string; children: React
   );
 }
 
+function CourierLogoutButton({ onSignOut, compact }: { onSignOut: () => void; compact?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onSignOut}
+      className={cn(
+        "flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-2.5 font-semibold text-[#E11900] hover:bg-danger-bg active:bg-danger-bg",
+        compact ? "mx-2 mb-0.5 h-8 text-[13px]" : "mx-2 mb-1 h-9 text-sm",
+      )}
+    >
+      <LogOut className={cn("shrink-0", compact ? "size-3.5" : "size-4")} strokeWidth={1.9} />
+      <span className="flex-1 text-right">יציאה</span>
+    </button>
+  );
+}
+
 function CourierSideDrawer() {
   const { open, setOpen, closeMenu } = useCourierMenu();
   const { data: me } = useDrawerCourier();
@@ -411,7 +427,7 @@ function CourierSideDrawer() {
             </div>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1.5" aria-label="תפריט צד">
+          <nav className="shrink-0 overflow-hidden px-1.5" aria-label="תפריט צד">
             <NavSection title="עבודה" dense>
               {work.map((item) => (
                 <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} dense />
@@ -425,16 +441,9 @@ function CourierSideDrawer() {
             </NavSection>
           </nav>
 
-          <div className="shrink-0 border-t border-border/80">
+          <div className="mt-1.5 shrink-0 border-t border-border/80">
             <InstallAppSidebarItem variant="light" compact />
-            <button
-              type="button"
-              onClick={() => void handleSignOut()}
-              className="mx-2 mb-0.5 flex h-8 w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold text-[#E11900] hover:bg-danger-bg active:bg-danger-bg"
-            >
-              <LogOut className="size-3.5 shrink-0" strokeWidth={1.9} />
-              <span className="flex-1 text-right">יציאה</span>
-            </button>
+            <CourierLogoutButton compact onSignOut={() => void handleSignOut()} />
             <div className="pb-[max(0.35rem,env(safe-area-inset-bottom))]" aria-hidden />
           </div>
         </div>
@@ -448,17 +457,24 @@ export function CourierDesktopNav() {
   const { data: me } = useDrawerCourier();
   const { data: counts } = useDrawerNavCounts(me);
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const navigate = useNavigate();
+  const qc = useQueryClient();
   const t = termsFor((me as { courier_kind?: "courier" | "mover" } | null | undefined)?.courier_kind);
   const { work, account } = courierNavGroups(t, counts);
   const displayName = firstNameOf(me?.full_name) || t.worker;
 
+  const handleSignOut = async () => {
+    const to = await signOutCourierSession(qc);
+    navigate({ to, replace: true });
+  };
+
   return (
-    <aside className="hidden h-full w-72 shrink-0 flex-col border-l border-border bg-surface lg:flex">
-      <div className="border-b border-border px-5 py-5">
+    <aside className="hidden h-full w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-surface lg:flex">
+      <div className="shrink-0 border-b border-border px-5 py-4">
         <p className="text-lg font-extrabold text-text-strong">Goi שליח</p>
         <p className="mt-1 truncate text-sm text-text-muted">{displayName}</p>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-2" aria-label="תפריט מחשב">
+      <nav className="shrink-0 overflow-hidden px-2 py-2" aria-label="תפריט מחשב">
         <NavSection title="עבודה">
           {work.map((item) => (
             <DrawerNavLink key={item.key} item={item} path={path} />
@@ -471,6 +487,9 @@ export function CourierDesktopNav() {
           ))}
         </NavSection>
       </nav>
+      <div className="mt-1.5 shrink-0 border-t border-border/80 pt-1">
+        <CourierLogoutButton onSignOut={() => void handleSignOut()} />
+      </div>
     </aside>
   );
 }

@@ -2,33 +2,25 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft,
-  Bike,
   CalendarDays,
-  Car,
   Check,
   Clock3,
   Loader2,
   Lock,
   MapPin,
   MessageSquare,
-  Minus,
   Package,
   Phone,
   Plus,
-  Search,
-  Send,
-  Tag,
   User,
   Utensils,
 } from "lucide-react";
 import { AddressAutocomplete, type SelectedPlace } from "@/components/customer/AddressAutocomplete";
 import { OrderMap } from "@/components/customer/OrderMap";
-import { Choices, Modal, Panel, SelectBox } from "@/components/business/goi/GoiUi";
+import { Modal, SelectBox } from "@/components/business/goi/GoiUi";
 import { useMyBusiness } from "@/components/BusinessShell";
 import type { Timing } from "@/config/businessCategories";
 import { nestListMyBranches } from "@/lib/nest-domain";
-import { canonicalizeVehicleValue } from "@/lib/courier-vehicles";
 import { haversineKm, type DrivingRoute, type LatLng } from "@/lib/google-driving-route";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -42,7 +34,6 @@ type DeliveryType = { key: string; label: string };
 type PricingModel = "fixed_price" | "distance_based" | "city_radius" | "quote_request";
 
 const GENERIC_KINDS = ["מעטפה", "שקית", "חבילה עד 5 קילו", "חבילה עד 10 קילו", "עד 20 קילו"];
-const PAY_OPTIONS = ["כרטיס אשראי", "יתרה", "מזומן"];
 const READY_MINS = [15, 30, 45, 60] as const;
 
 type SavedItem = { id: string; name: string; weight?: string; vehicle?: string; quantity?: number };
@@ -130,7 +121,6 @@ type Props = {
   pricePerKmError?: string;
   pending: boolean;
   onSubmit: () => void;
-  onDraft: () => void;
   onValidateRoute: () => boolean;
   onValidateDetails: () => boolean;
   quantity: number;
@@ -358,10 +348,6 @@ export function BusinessNewOrder(props: Props) {
   const selectedBranch = branchOptions.find((b) => b.id === (branchId || branchOptions.find((x) => x.is_default)?.id || branchOptions[0]?.id));
   const activeBranchId = selectedBranch?.id ?? "";
 
-  const genericKinds = useMemo(() => {
-    const fromCategory = props.deliveryTypes.map((t) => t.label);
-    return Array.from(new Set([...GENERIC_KINDS, ...fromCategory]));
-  }, [props.deliveryTypes]);
   const packCards = useMemo(
     () => buildPackCards(savedItems, props.deliveryTypes),
     [savedItems, props.deliveryTypes],
@@ -385,17 +371,7 @@ export function BusinessNewOrder(props: Props) {
       ? props.scheduledAt.slice(11, 16) || props.todayTime || props.pickupReadyTime
       : props.pickupReadyTime || props.todayTime;
 
-  const large = /10|20|רכב/.test(props.deliveryType);
-  const canonicalVehicle = canonicalizeVehicleValue(props.vehicle);
-  const vehicleLabel =
-    props.vehicle === "אוטומטי"
-      ? "אוטומטי"
-      : canonicalVehicle === "רכב" || canonicalVehicle === "רכב מסחרי" || large
-        ? "רכב"
-        : "דו־גלגלי";
-
   const distanceLabel = computedKm != null ? `${computedKm.toFixed(1)} ק״מ` : "—";
-  const durationLabel = computedMins != null ? `${computedMins} דק׳` : "—";
   const priceLabel = props.suggestedPrice == null ? "—" : `₪${Math.round(props.suggestedPrice)}`;
 
   const selectBranch = async (id: string) => {
@@ -482,321 +458,9 @@ export function BusinessNewOrder(props: Props) {
     setMobileStep(1);
   };
 
-  const timingChoice = props.timing === "scheduled" ? "תזמון" : "עכשיו";
-
   return (
     <div className={`order-page ${mobileExpanded ? "order-expanded" : "order-intro"} mobile-order-step-${mobileStep}`}>
       <div className="order-split">
-        <form
-          className="order-fields"
-          onSubmit={(e) => {
-            e.preventDefault();
-            review();
-          }}
-        >
-          <div className="order-form-title">
-            <h1>הזמנה חדשה</h1>
-            <Package size={20} />
-          </div>
-
-          <Panel className="pickup-form-card">
-            <h2>
-              <span className="step-number">1</span>
-              איסוף
-            </h2>
-            <div className="pickup-selected">
-              <MapPin size={23} />
-              <div data-field="pickup">
-                {branchOptions.length > 0 ? (
-                  <SelectBox
-                    value={activeBranchId}
-                    onChange={(v) => void selectBranch(v)}
-                    label="סניף איסוף"
-                    options={branchOptions.map((b) => ({ value: b.id, label: b.branch_name }))}
-                  />
-                ) : (
-                  <AddressAutocomplete
-                    variant="plain"
-                    label="כתובת איסוף"
-                    placeholder="חפש כתובת איסוף"
-                    value={props.pickupText}
-                    onChange={props.onPickupText}
-                    onSelect={props.onPickupSelect}
-                    accent="green"
-                    error={props.pickupError}
-                  />
-                )}
-                <p>
-                  {selectedBranch?.full_address || props.pickup?.address || props.pickupText || props.businessPickupAddress || "בחרו נקודת איסוף"}
-                  {props.pickupError ? ` · ${props.pickupError}` : ""}
-                </p>
-                {props.businessPickupAddress && branchOptions.length > 0 ? (
-                  <button type="button" className="link" onClick={props.onChangePickupAddress}>
-                    כתובת איסוף אחרת
-                  </button>
-                ) : null}
-              </div>
-              <Check size={21} />
-            </div>
-            {!props.useBusinessAddress && (
-              <div style={{ marginTop: 12 }} className="field">
-                <AddressAutocomplete
-                  variant="plain"
-                  label="כתובת איסוף"
-                  placeholder="חפש כתובת איסוף"
-                  value={props.pickupText}
-                  onChange={props.onPickupText}
-                  onSelect={props.onPickupSelect}
-                  accent="green"
-                  error={props.pickupError}
-                />
-              </div>
-            )}
-          </Panel>
-
-          <div className="mobile-order-start">
-            <h2>לאן תרצה לשלוח היום?</h2>
-            <label className="field" data-field="dropoff">
-              כתובת מסירה
-              <input
-                value={props.dropoffText}
-                onChange={(e) => props.onDropoffText(e.target.value)}
-                placeholder="הזן כתובת מסירה"
-              />
-            </label>
-            <button type="button" className="btn primary full" onClick={() => setMobileExpanded(true)}>
-              המשך להזמנה <ArrowLeft size={17} />
-            </button>
-          </div>
-
-          <div className="expanded-form-content">
-            <Panel>
-              <h2>
-                <span className="step-number">2</span>
-                פרטי הלקוח והמסירה
-              </h2>
-              <div className="field-grid">
-                <label className="field">
-                  שם הלקוח
-                  <input required value={props.recipientName} onChange={(e) => props.onRecipientName(e.target.value)} placeholder="שם מלא" autoComplete="name" />
-                </label>
-                <label className="field">
-                  טלפון
-                  <input required type="tel" value={props.recipientPhone} onChange={(e) => props.onRecipientPhone(e.target.value)} placeholder="050-000-0000" autoComplete="tel" dir="ltr" />
-                </label>
-              </div>
-              <div className="address-grid" data-field="dropoff">
-                <div className="field">
-                  כתובת המסירה
-                  <div className="addr-wrap">
-                    <AddressAutocomplete
-                      variant="plain"
-                      label="כתובת המסירה"
-                      placeholder="רחוב ומספר בית"
-                      value={props.dropoffText}
-                      onChange={props.onDropoffText}
-                      onSelect={(p) => {
-                        props.onDropoffSelect(p);
-                        if (!props.dropoffCity) props.onDropoffCity(cityFromAddress(p.address));
-                      }}
-                      accent="red"
-                      error={props.dropoffError}
-                    />
-                    <Search className="addr-search" size={18} aria-hidden />
-                  </div>
-                </div>
-                <label className="field">
-                  עיר
-                  <input required value={props.dropoffCity} onChange={(e) => props.onDropoffCity(e.target.value)} autoComplete="address-level2" />
-                </label>
-              </div>
-              <div className="four-cols compact-fields">
-                <label className="field">
-                  כניסה
-                  <input value={props.dropoffEntry} onChange={(e) => props.onDropoffEntry(e.target.value)} placeholder="—" />
-                </label>
-                <label className="field">
-                  קומה
-                  <input value={props.dropoffFloor} onChange={(e) => props.onDropoffFloor(e.target.value)} placeholder="—" />
-                </label>
-                <label className="field">
-                  דירה
-                  <input value={props.dropoffApt} onChange={(e) => props.onDropoffApt(e.target.value)} placeholder="—" />
-                </label>
-                <label className="field">
-                  קוד כניסה
-                  <input value={props.dropoffCode} onChange={(e) => props.onDropoffCode(e.target.value)} placeholder="—" />
-                </label>
-              </div>
-              <ExtraStopsEditor stops={props.extraStops} setStops={props.setExtraStops} />
-            </Panel>
-
-            <Panel>
-              <h2>
-                <span className="step-number">3</span>
-                פרטי המשלוח
-              </h2>
-              <p className="hint">בחרו אפשרות משלוח מתאימה, או פריט ששמרתם לעסק.</p>
-              <h3 className="field-title">אפשרויות גנריות</h3>
-              <Choices className="item-choices" label="סוג משלוח" value={props.deliveryType} onChange={props.onDeliveryType} options={genericKinds} />
-              {savedItems.length > 0 && (
-                <>
-                  <h3 className="field-title">פריטים שמורים לעסק</h3>
-                  <Choices
-                    className="item-choices"
-                    label="פריט שמור"
-                    value={props.deliveryType}
-                    onChange={(v) => {
-                      const i = savedItems.find((x) => x.name === v);
-                      props.onDeliveryType(v);
-                      if (i?.quantity) props.onQuantity(i.quantity);
-                      if (i?.weight) props.onPackageWeight(i.weight);
-                      if (i?.vehicle) props.onVehicle(i.vehicle === "רכב" ? "car" : "scooter");
-                    }}
-                    options={savedItems.map((i) => i.name)}
-                  />
-                </>
-              )}
-              <button type="button" className="link add-item" onClick={() => setCustom(true)}>
-                <Plus size={16} />
-                הוסף פריט מותאם
-              </button>
-              <div className="vehicle-quantity">
-                <span>
-                  {vehicleLabel === "רכב" ? <Car size={20} /> : <Bike size={20} />}
-                  רכב מתאים: <strong>{vehicleLabel}</strong>
-                </span>
-                <div className="quantity-stepper">
-                  <button type="button" aria-label="הפחת כמות" disabled={props.quantity <= 1} onClick={() => props.onQuantity(props.quantity - 1)}>
-                    <Minus size={16} />
-                  </button>
-                  <output aria-label="כמות פריטים">{props.quantity}</output>
-                  <button type="button" aria-label="הוסף כמות" disabled={props.quantity >= 20} onClick={() => props.onQuantity(props.quantity + 1)}>
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </div>
-            </Panel>
-
-            <Panel>
-              <h2>
-                <span className="step-number">4</span>
-                מתי לבצע
-              </h2>
-              <Choices
-                label="מועד משלוח"
-                value={timingChoice}
-                onChange={(v) => props.onTiming(v === "תזמון" ? "scheduled" : "now")}
-                options={["עכשיו", "תזמון"]}
-              />
-              {props.timing === "scheduled" && (
-                <div className="field-grid" data-field="scheduledAt">
-                  <label className="field">
-                    תאריך
-                    <input
-                      required
-                      type="date"
-                      value={props.scheduledAt.slice(0, 10)}
-                      onChange={(e) => props.onScheduledAt(`${e.target.value}T${props.scheduledAt.slice(11, 16) || "12:00"}`)}
-                    />
-                  </label>
-                  <label className="field">
-                    שעת איסוף
-                    <input
-                      required
-                      type="time"
-                      value={props.scheduledAt.slice(11, 16)}
-                      onChange={(e) => props.onScheduledAt(`${props.scheduledAt.slice(0, 10) || new Date().toISOString().slice(0, 10)}T${e.target.value}`)}
-                    />
-                  </label>
-                </div>
-              )}
-            </Panel>
-
-            <Panel>
-              <h2>
-                <span className="step-number">5</span>
-                תשלום
-              </h2>
-              <Choices label="תשלום" value={props.customerPayment} onChange={props.onCustomerPayment} options={PAY_OPTIONS} />
-              {props.customerPayment === "מזומן" && (
-                <label className="field">
-                  סכום לגבייה מהלקוח
-                  <span className="cash-input">
-                    <b>₪</b>
-                    <input required type="number" min="0" step="0.01" value={props.cashCollect} onChange={(e) => props.onCashCollect(e.target.value)} placeholder="32" />
-                  </span>
-                  <span className="hint">הסכום מגיע לשליח ומסייע להזמנה</span>
-                </label>
-              )}
-            </Panel>
-
-            <Panel>
-              <h2>
-                <span className="step-number">6</span>
-                הערות למשלוח
-              </h2>
-              <textarea className="order-note" aria-label="הערות לשליח" value={props.dropoffNotes} onChange={(e) => props.onDropoffNotes(e.target.value)} placeholder="הזן הערות לשליח (אופציונלי)" />
-            </Panel>
-
-            <Panel className="order-summary-bar">
-              <div className="three-cols">
-                <div>
-                  <MapPin />
-                  <span>מרחק</span>
-                  <strong>{distanceLabel}</strong>
-                </div>
-                <div>
-                  <Clock3 />
-                  <span>זמן הגעה</span>
-                  <strong>{durationLabel}</strong>
-                </div>
-                <div>
-                  <Tag />
-                  <span>סכום משלוח</span>
-                  <strong>{priceLabel}</strong>
-                </div>
-              </div>
-              <button type="submit" className="btn primary full find-courier" disabled={props.pending}>
-                {props.pending ? <Loader2 className="size-4 animate-spin" /> : <Send size={22} />}
-                {props.pricingModel === "quote_request" ? "בקש הצעות משליחים" : "מצא שליח"}
-              </button>
-            </Panel>
-          </div>
-        </form>
-
-        <div className="order-map">
-          <OrderMap
-            pickup={props.pickup}
-            dropoff={props.dropoff}
-            waypoints={props.waypoints}
-            onRoute={props.onRoute}
-            pickupLabel={cityFromAddress(props.pickup?.address || props.pickupText || originAddress) || "איסוף"}
-            dropoffLabel={props.dropoffText ? cityFromAddress(props.dropoffText) || shortAddress(props.dropoffText) : "מסירה"}
-            className="goi-map"
-          />
-          <div className="mobile-map-chrome">
-            {!mobileExpanded && (
-              <button
-                type="button"
-                className="mobile-new-cta"
-                onClick={() => {
-                  if (props.timing === "now") applyReadyMins(readyMins);
-                  setMobileStep(0);
-                  setMobileExpanded(true);
-                }}
-              >
-                <Plus size={22} strokeWidth={2.4} />
-                <span>
-                  <strong>משלוח חדש</strong>
-                  <small>מיידי או מתוזמן</small>
-                </span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       <form
         className="mobile-order-sheet"
         onSubmit={(e) => {
@@ -807,7 +471,11 @@ export function BusinessNewOrder(props: Props) {
         <button type="button" className="mobile-sheet-handle" aria-label="סגור" onClick={() => setMobileExpanded(false)} />
         <div className="mobile-sheet-scroll">
           <div className="mobile-step-head">
-            <div className="mobile-step-copy">
+            <div className="mobile-step-copy desktop-order-title">
+              <small>משלוח חדש</small>
+              <strong>הזמנה חדשה</strong>
+            </div>
+            <div className="mobile-step-copy mobile-order-title">
               <small>שלב {mobileStep + 1} מתוך 2</small>
               <strong>{["פרטי המשלוח", "מועד, תשלום וסיכום"][mobileStep]}</strong>
             </div>
@@ -822,8 +490,7 @@ export function BusinessNewOrder(props: Props) {
               ))}
             </div>
           </div>
-          {mobileStep === 0 && (
-            <section className="mobile-step-panel">
+            <section className="mobile-step-panel js-step-0">
           <div className="mobile-pickup-row">
             <span className="mobile-store-icon">{foodBiz ? <Utensils size={18} /> : <Package size={18} />}</span>
             <div>
@@ -896,11 +563,12 @@ export function BusinessNewOrder(props: Props) {
               </label>
             </div>
           )}
+            <div className="desktop-extra-stops">
+              <ExtraStopsEditor stops={props.extraStops} setStops={props.setExtraStops} />
+            </div>
             </section>
-          )}
 
-          {mobileStep === 0 && (
-            <section className="mobile-step-panel">
+            <section className="mobile-step-panel js-step-0">
           <div className="mobile-contact-grid">
             <label className="field">
               <span>
@@ -934,10 +602,8 @@ export function BusinessNewOrder(props: Props) {
             <input value={props.dropoffNotes} onChange={(e) => props.onDropoffNotes(e.target.value)} placeholder="להתקשר כשמגיעים" />
           </label>
             </section>
-          )}
 
-          {mobileStep === 0 && (
-            <section className="mobile-step-panel">
+            <section className="mobile-step-panel js-step-0">
           <h3 className="mobile-section-title">מה שולחים?</h3>
           <div className="pack-grid">
             {packCards.map((card) => {
@@ -949,7 +615,9 @@ export function BusinessNewOrder(props: Props) {
                   className={cn("pack-card", chosen && "chosen")}
                   onClick={() => {
                     applyPack(card);
-                    window.setTimeout(nextFromMobileDetails, 180);
+                    if (window.matchMedia("(max-width: 767px)").matches) {
+                      window.setTimeout(nextFromMobileDetails, 180);
+                    }
                   }}
                 >
                   {chosen && (
@@ -963,14 +631,16 @@ export function BusinessNewOrder(props: Props) {
               );
             })}
           </div>
+              <button type="button" className="link add-item" onClick={() => setCustom(true)}>
+                <Plus size={16} />
+                פריט מותאם
+              </button>
               <div className="mobile-step-actions">
                 <button type="button" className="btn primary full" onClick={nextFromMobileDetails}>המשך למועד ותשלום</button>
               </div>
             </section>
-          )}
 
-          {mobileStep === 1 && (
-            <section className="mobile-step-panel">
+            <section className="mobile-step-panel js-step-1">
           <h3 className="mobile-section-title">מתי לאסוף?</h3>
           <div className="mobile-seg">
             <button
@@ -1038,10 +708,8 @@ export function BusinessNewOrder(props: Props) {
             </>
           )}
             </section>
-          )}
 
-          {mobileStep === 1 && (
-            <section className="mobile-step-panel">
+            <section className="mobile-step-panel js-step-1">
           <div className="mobile-cash-row">
             <span>
               <strong>תשלום מזומן</strong>
@@ -1090,9 +758,40 @@ export function BusinessNewOrder(props: Props) {
             </p>
           </div>
             </section>
-          )}
         </div>
       </form>
+
+        <div className="order-map">
+          <OrderMap
+            pickup={props.pickup}
+            dropoff={props.dropoff}
+            waypoints={props.waypoints}
+            onRoute={props.onRoute}
+            pickupLabel={cityFromAddress(props.pickup?.address || props.pickupText || originAddress) || "איסוף"}
+            dropoffLabel={props.dropoffText ? cityFromAddress(props.dropoffText) || shortAddress(props.dropoffText) : "מסירה"}
+            className="goi-map"
+          />
+          <div className="mobile-map-chrome">
+            {!mobileExpanded && (
+              <button
+                type="button"
+                className="mobile-new-cta"
+                onClick={() => {
+                  if (props.timing === "now") applyReadyMins(readyMins);
+                  setMobileStep(0);
+                  setMobileExpanded(true);
+                }}
+              >
+                <Plus size={22} strokeWidth={2.4} />
+                <span>
+                  <strong>משלוח חדש</strong>
+                  <small>מיידי או מתוזמן</small>
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
       <Modal open={custom} onClose={() => setCustom(false)} title="פריט מותאם למשלוח">
         <form

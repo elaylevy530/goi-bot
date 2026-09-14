@@ -1,10 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Ban,
   Bike,
   Check,
   CheckCheck,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Eye,
   MapPin,
@@ -15,10 +19,11 @@ import {
   Store,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
 import { DeliveryDetailsSheet } from "@/components/business/goi/DeliveryDetailsSheet";
 import { Avatar, Badge, FilterTabs, Panel, SearchBox, SelectBox, money } from "@/components/business/goi/GoiUi";
-import type { NestJob } from "@/lib/nest-jobs";
+import { nestCancelJob, type NestJob } from "@/lib/nest-jobs";
 import {
   courierStepLabel,
   formatJobWhen,
@@ -57,12 +62,14 @@ export function ActiveTracking({
   initialFilter = "all",
 }: Props) {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [status, setStatus] = useState(initialFilter);
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("all");
   const [view, setView] = useState("map");
   const [detailId, setDetailId] = useState<string | null>(null);
   const mapHost = useRef<HTMLDivElement>(null);
+  const ordersRail = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const groups = [
@@ -104,16 +111,46 @@ export function ActiveTracking({
     );
   };
 
+  const scrollCardIntoRail = (id: string) => {
+    cardRefs.current[id]?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  };
+
+  const scrollOrdersBy = (direction: number) => {
+    const rail = ordersRail.current;
+    if (!rail) return;
+    const card = rail.querySelector(".tracking-card") as HTMLElement | null;
+    const amount = (card?.offsetWidth ?? 360) + 14;
+    rail.scrollBy({ left: direction * amount, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const rail = ordersRail.current;
+    if (!rail || view !== "map") return;
+    const onWheel = (event: WheelEvent) => {
+      if (event.shiftKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      event.preventDefault();
+      rail.scrollLeft += event.deltaY;
+    };
+    rail.addEventListener("wheel", onWheel, { passive: false });
+    return () => rail.removeEventListener("wheel", onWheel);
+  }, [view, shown.length]);
+
+  useEffect(() => {
+    if (!selectedId || view !== "map") return;
+    scrollCardIntoRail(selectedId);
+  }, [selectedId, view]);
+
   const selectMarker = (id: string) => {
     if (id === "store") {
       onSelect(undefined);
       return;
     }
     onSelect(id);
-    cardRefs.current[id]?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "nearest",
-    });
+    scrollCardIntoRail(id);
   };
 
   const openChat = (job: NestJob) => {
@@ -122,6 +159,25 @@ export function ActiveTracking({
       to: "/business/messages",
       search: { courierId: job.selected_courier_id, jobId: job.id },
     });
+  };
+
+  const cancelJob = useMutation({
+    mutationFn: (job: NestJob) => nestCancelJob(job.id, "ביטול ממעקב פעילים"),
+    onSuccess: (_data, job) => {
+      toast.success(`משלוח #${job.job_number} בוטל`);
+      if (selectedId === job.id) onSelect(undefined);
+      if (detailId === job.id) setDetailId(null);
+      qc.invalidateQueries({ queryKey: ["business-jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "לא ניתן לבטל את המשלוח"),
+  });
+
+  const requestCancel = (job: NestJob) => {
+    if (jobHasCourier(job) || cancelJob.isPending) return;
+    const ok = window.confirm(
+      `לבטל את משלוח #${job.job_number}?\nהוא יוסר מהמעקב הפעיל ולא יופיע יותר לשליחים.`,
+    );
+    if (ok) cancelJob.mutate(job);
   };
 
   return (
@@ -172,128 +228,6 @@ export function ActiveTracking({
         )}
       </div>
       <div className={"tracking-workspace tracking-view-" + view}>
-        <div className="tracking-orders" aria-label="רשימת משלוחים פעילים">
-          {shown.map((job) => {
-            const courier = jobCourierName(job);
-            const assigned = jobHasCourier(job);
-            const stage = trackingStageIndex(job);
-            const eta = jobEtaMinutes(job);
-            return (
-              <article
-                key={job.id}
-                ref={(node) => {
-                  cardRefs.current[job.id] = node;
-                }}
-                className={"tracking-card " + (chosen?.id === job.id ? "is-selected" : "")}
-              >
-                <header>
-                  <button type="button" className="tracking-order-id" onClick={() => setDetailId(job.id)}>
-                    #{job.job_number}
-                    <Eye size={15} />
-                  </button>
-                  <Badge text={courierStepLabel(job)} tone={jobBadgeTone(job.status)} />
-                  <span className="source-tag">{jobSourceLabel(job)}</span>
-                </header>
-                <div className="tracking-recipient">
-                  <span className="round-icon">
-                    <Package size={21} />
-                  </span>
-                  <div>
-                    <h2>{jobRecipientName(job)}</h2>
-                    <p>
-                      <MapPin size={14} />
-                      {job.dropoff_address || job.dropoff_area || "כתובת מסירה לא צוינה"}
-                    </p>
-                  </div>
-                  <strong>
-                    {money(jobPrice(job))}
-                    <small>עלות משלוח</small>
-                  </strong>
-                </div>
-                <div className="tracking-progress" aria-label={"שלב נוכחי: " + STAGES[stage]}>
-                  {STAGES.map((name, i) => (
-                    <div key={name} className={i < stage ? "complete" : i === stage ? "current" : ""}>
-                      <span>{i < stage ? <Check size={11} /> : i + 1}</span>
-                      <small>{name}</small>
-                    </div>
-                  ))}
-                </div>
-                <div className="tracking-courier">
-                  {assigned ? (
-                    <>
-                      <Avatar name={courier || "שליח"} />
-                      <div>
-                        <strong>{courier}</strong>
-                        <small>
-                          <Bike size={13} />
-                          שליח · {jobCourierVehicle(job) || "לא צוין"}
-                        </small>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="pending-courier">
-                        <Search size={19} />
-                      </span>
-                      <div>
-                        <strong>{job.status === "נשלחה לשליחים" ? "מחפשים שליח למשלוח" : "ממתין לשיבוץ שליח"}</strong>
-                        <small>פרטי השליח יופיעו לאחר השיבוץ</small>
-                      </div>
-                    </>
-                  )}
-                  <div className="tracking-eta">
-                    <small>{assigned ? "הגעה משוערת" : "נוצר"}</small>
-                    <strong>{assigned ? (eta != null ? `${eta} דק׳` : "—") : formatJobWhen(job.created_at)}</strong>
-                  </div>
-                </div>
-                <div className="tracking-meta">
-                  <span>
-                    <Clock3 size={14} />
-                    {formatJobWhen(job.created_at)}
-                  </span>
-                  <span>{(job as { number_of_packages?: number | null }).number_of_packages || 1} פריטים</span>
-                  <span>{jobItemsLabel(job)}</span>
-                </div>
-                <footer className="tracking-card-actions">
-                  <button type="button" className="btn primary tracking-follow" onClick={() => focusMap(job.id)}>
-                    <MapPin size={17} />
-                    <span>עקוב במפה</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn outline tracking-chat"
-                    disabled={!assigned}
-                    title={assigned ? `פתיחת שיחה עם ${courier}` : "הצ׳אט יהיה זמין לאחר שיבוץ שליח"}
-                    onClick={() => openChat(job)}
-                  >
-                    <MessageCircle size={17} />
-                    <span>צ׳אט עם השליח</span>
-                  </button>
-                  <button type="button" className="btn outline tracking-details" onClick={() => setDetailId(job.id)}>
-                    <Eye size={16} />
-                    פרטי משלוח
-                  </button>
-                  {!assigned && <small className="tracking-chat-note">הצ׳אט יהיה זמין לאחר שיבוץ שליח</small>}
-                </footer>
-              </article>
-            );
-          })}
-          {shown.length === 0 && (
-            <Panel className="tracking-empty">
-              <CheckCheck size={35} />
-              <h2>{jobs.length ? "אין משלוחים שמתאימים לחיפוש" : "כל המשלוחים טופלו"}</h2>
-              <p>{jobs.length ? "נסה לשנות את הסינון או לחפש משלוח אחר." : "משלוחים שהסתיימו מופיעים בהיסטוריה."}</p>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => (jobs.length ? clearFilters() : navigate({ to: "/business/new-delivery" }))}
-              >
-                {jobs.length ? <Search size={17} /> : <Plus size={17} />}
-                {jobs.length ? "הצג את כל הפעילים" : "הזמנה חדשה"}
-              </button>
-            </Panel>
-          )}
-        </div>
         {view === "map" && (
           <div className="tracking-map-panel" ref={mapHost}>
             <div className="tracking-map-heading">
@@ -320,6 +254,26 @@ export function ActiveTracking({
                   פרטים
                   <ArrowLeft size={15} />
                 </button>
+                {jobHasCourier(chosen) ? (
+                  <button
+                    type="button"
+                    className="btn outline small tracking-chat"
+                    title={`פתיחת שיחה עם ${jobCourierName(chosen) || "השליח"}`}
+                    onClick={() => openChat(chosen)}
+                  >
+                    <MessageCircle size={15} />
+                    צ׳אט
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn outline small tracking-cancel"
+                    disabled={cancelJob.isPending}
+                    onClick={() => requestCancel(chosen)}
+                  >
+                    בטל
+                  </button>
+                )}
                 <button type="button" className="icon-btn" onClick={() => onSelect(undefined)} aria-label="בטל בחירת משלוח">
                   <X size={17} />
                 </button>
@@ -327,7 +281,7 @@ export function ActiveTracking({
             ) : (
               <div className="tracking-map-hint">
                 <Store size={17} />
-                <span>בחר משלוח ברשימה או סמן במפה כדי להתמקד בו.</span>
+                <span>בחר משלוח בכרטיסים למטה או סמן במפה כדי להתמקד בו.</span>
               </div>
             )}
             <div className="tracking-map-legend">
@@ -342,10 +296,167 @@ export function ActiveTracking({
             </div>
           </div>
         )}
+        <div className="tracking-carousel">
+          {view === "map" && shown.length > 1 && (
+            <button
+              type="button"
+              className="tracking-carousel-btn"
+              aria-label="משלוחים קודמים"
+              onClick={() => scrollOrdersBy(1)}
+            >
+              <ChevronRight size={18} />
+            </button>
+          )}
+          <div className="tracking-orders" ref={ordersRail} aria-label="רשימת משלוחים פעילים">
+            {shown.map((job) => {
+              const courier = jobCourierName(job);
+              const assigned = jobHasCourier(job);
+              const stage = trackingStageIndex(job);
+              const eta = jobEtaMinutes(job);
+              return (
+                <article
+                  key={job.id}
+                  ref={(node) => {
+                    cardRefs.current[job.id] = node;
+                  }}
+                  className={"tracking-card " + (chosen?.id === job.id ? "is-selected" : "")}
+                  onClick={() => onSelect(job.id)}
+                >
+                  <header>
+                    <button type="button" className="tracking-order-id" onClick={() => setDetailId(job.id)}>
+                      #{job.job_number}
+                      <Eye size={15} />
+                    </button>
+                    <Badge text={courierStepLabel(job)} tone={jobBadgeTone(job.status)} />
+                    <span className="source-tag">{jobSourceLabel(job)}</span>
+                  </header>
+                  <div className="tracking-recipient">
+                    <span className="round-icon">
+                      <Package size={21} />
+                    </span>
+                    <div>
+                      <h2>{jobRecipientName(job)}</h2>
+                      <p>
+                        <MapPin size={14} />
+                        {job.dropoff_address || job.dropoff_area || "כתובת מסירה לא צוינה"}
+                      </p>
+                    </div>
+                    <strong>
+                      {money(jobPrice(job))}
+                      <small>עלות משלוח</small>
+                    </strong>
+                  </div>
+                  <div className="tracking-progress" aria-label={"שלב נוכחי: " + STAGES[stage]}>
+                    {STAGES.map((name, i) => (
+                      <div key={name} className={i < stage ? "complete" : i === stage ? "current" : ""}>
+                        <span>{i < stage ? <Check size={11} /> : i + 1}</span>
+                        <small>{name}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="tracking-courier">
+                    {assigned ? (
+                      <>
+                        <Avatar name={courier || "שליח"} />
+                        <div>
+                          <strong>{courier}</strong>
+                          <small>
+                            <Bike size={13} />
+                            שליח · {jobCourierVehicle(job) || "לא צוין"}
+                          </small>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="pending-courier">
+                          <Search size={19} />
+                        </span>
+                        <div>
+                          <strong>{job.status === "נשלחה לשליחים" ? "מחפשים שליח למשלוח" : "ממתין לשיבוץ שליח"}</strong>
+                          <small>פרטי השליח יופיעו לאחר השיבוץ</small>
+                        </div>
+                      </>
+                    )}
+                    <div className="tracking-eta">
+                      <small>{assigned ? "הגעה משוערת" : "נוצר"}</small>
+                      <strong>{assigned ? (eta != null ? `${eta} דק׳` : "—") : formatJobWhen(job.created_at)}</strong>
+                    </div>
+                  </div>
+                  <div className="tracking-meta">
+                    <span>
+                      <Clock3 size={14} />
+                      {formatJobWhen(job.created_at)}
+                    </span>
+                    <span>{(job as { number_of_packages?: number | null }).number_of_packages || 1} פריטים</span>
+                    <span>{jobItemsLabel(job)}</span>
+                  </div>
+                  <footer className="tracking-card-actions">
+                    <button type="button" className="btn primary tracking-follow" onClick={() => focusMap(job.id)}>
+                      <MapPin size={17} />
+                      <span>עקוב במפה</span>
+                    </button>
+                    {assigned ? (
+                      <button
+                        type="button"
+                        className="btn outline tracking-chat"
+                        title={`פתיחת שיחה עם ${courier}`}
+                        onClick={() => openChat(job)}
+                      >
+                        <MessageCircle size={17} />
+                        <span>צ׳אט עם השליח</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn outline tracking-cancel"
+                        disabled={cancelJob.isPending}
+                        onClick={() => requestCancel(job)}
+                      >
+                        <Ban size={17} />
+                        <span>בטל משלוח</span>
+                      </button>
+                    )}
+                    <button type="button" className="btn outline tracking-details" onClick={() => setDetailId(job.id)}>
+                      <Eye size={16} />
+                      פרטי משלוח
+                    </button>
+                  </footer>
+                </article>
+              );
+            })}
+            {shown.length === 0 && (
+              <Panel className="tracking-empty">
+                <CheckCheck size={35} />
+                <h2>{jobs.length ? "אין משלוחים שמתאימים לחיפוש" : "כל המשלוחים טופלו"}</h2>
+                <p>{jobs.length ? "נסה לשנות את הסינון או לחפש משלוח אחר." : "משלוחים שהסתיימו מופיעים בהיסטוריה."}</p>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => (jobs.length ? clearFilters() : navigate({ to: "/business/new-delivery" }))}
+                >
+                  {jobs.length ? <Search size={17} /> : <Plus size={17} />}
+                  {jobs.length ? "הצג את כל הפעילים" : "הזמנה חדשה"}
+                </button>
+              </Panel>
+            )}
+          </div>
+          {view === "map" && shown.length > 1 && (
+            <button
+              type="button"
+              className="tracking-carousel-btn"
+              aria-label="משלוחים הבאים"
+              onClick={() => scrollOrdersBy(-1)}
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
+        </div>
       </div>
       <DeliveryDetailsSheet
         job={jobs.find((j) => j.id === detailId) ?? null}
         onClose={() => setDetailId(null)}
+        cancelling={cancelJob.isPending}
+        onCancel={(job) => requestCancel(job)}
         onChat={(job) => {
           setDetailId(null);
           openChat(job);

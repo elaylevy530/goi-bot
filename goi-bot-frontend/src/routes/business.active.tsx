@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
 import { ActiveTracking } from "@/components/business/goi/ActiveTracking";
 import { isTrackingJob, type LiveMapPin } from "@/lib/business-panel";
@@ -19,6 +19,10 @@ function LiveTrackingPage() {
   const { data: me } = useMyBusiness();
   const { data: jobs = [] } = useBusinessJobs(me?.id);
   const [selectedId, setSelectedId] = useState<string | undefined>(job);
+
+  useEffect(() => {
+    if (job) setSelectedId(job);
+  }, [job]);
 
   const active = useMemo(() => jobs.filter(isTrackingJob), [jobs]);
   const pickupLat = Number((me as { pickup_lat?: number | null } | null)?.pickup_lat);

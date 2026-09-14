@@ -624,19 +624,24 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     return { ok: true as const, whatsapp };
   }
 
-  /** Admin/manager cancel — closes the job and clears pending courier offers. */
+  /**
+   * Cancel a job and clear pending courier offers.
+   * Staff can cancel any open job. Business/customer owners can cancel only
+   * while no courier is assigned (still waiting in active tracking).
+   */
   async cancelByStaff(
     id: string,
     userId: string,
     roles: AppRole[],
     reason?: string | null,
   ) {
-    if (!roles.includes("admin") && !roles.includes("manager")) {
-      throw new ForbiddenException("Only staff can cancel jobs");
-    }
+    const isStaff = roles.includes("admin") || roles.includes("manager");
     const job = await this.getForUser(id, userId, roles);
     if (job.status === "בוטלה" || job.status === "הושלמה") {
       throw new BadRequestException("Job is already closed");
+    }
+    if (!isStaff && job.selected_courier_id) {
+      throw new ForbiddenException("לא ניתן לבטל משלוח אחרי ששובץ שליח");
     }
 
     const previousStatus = job.status;
@@ -644,6 +649,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     await this.jobs.save(job);
     await this.cancelPendingOffersForJob(job.id);
 
+    const actorNote = isStaff ? "ביטול אדמין" : "ביטול על ידי העסק";
     await this.statusLogs.save(
       this.statusLogs.create({
         entity_type: "job",
@@ -651,7 +657,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         changed_by: userId,
         old_status: previousStatus,
         new_status: "בוטלה",
-        note: reason?.trim() ? `ביטול אדמין: ${reason.trim()}` : "ביטול אדמין",
+        note: reason?.trim() ? `${actorNote}: ${reason.trim()}` : actorNote,
       }),
     );
 
@@ -663,7 +669,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       });
     }
     outcome.was_cancelled = true;
-    outcome.cancellation_reason = reason?.trim() || "ביטול על ידי אדמין";
+    outcome.cancellation_reason = reason?.trim() || actorNote;
     if (!outcome.courier_id && job.selected_courier_id) {
       outcome.courier_id = job.selected_courier_id;
     }

@@ -69,7 +69,7 @@ function NewRoutePage() {
     },
     onSuccess: (data) => {
       toast.success(`קו חלוקה נפתח: ${data.job_number}`);
-      navigate({ to: "/business/order/$id", params: { id: data.id } });
+      navigate({ to: "/business/active", search: { job: data.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });

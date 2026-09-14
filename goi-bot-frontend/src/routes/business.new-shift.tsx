@@ -72,7 +72,7 @@ function NewShiftPage() {
     },
     onSuccess: (data) => {
       toast.success(`משמרת נפתחה: ${data.job_number}`);
-      navigate({ to: "/business/order/$id", params: { id: data.id } });
+      navigate({ to: "/business/active", search: { job: data.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });

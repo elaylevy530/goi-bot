@@ -6,7 +6,7 @@ export const Route = createFileRoute("/business/company/$section")({
   head: () => ({ meta: [{ title: "העסק שלי — Goi" }] }),
   ssr: false,
   beforeLoad: ({ params }) => {
-    if (!["profile", "pricing", "items", "delivery", "team"].includes(params.section)) {
+    if (!["profile", "pricing", "items", "delivery", "incoming", "team"].includes(params.section)) {
       throw redirect({ to: "/business/account", replace: true });
     }
   },

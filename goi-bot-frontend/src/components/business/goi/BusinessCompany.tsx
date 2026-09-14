@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ClipboardCheck,
+  ClipboardList,
   Clock3,
   DoorOpen,
   FileText,
@@ -68,6 +69,7 @@ export const COMPANY_SECTIONS = [
   { id: "pricing", title: "תמחור משלוחים", desc: "בחר מסלול תמחור וקבע את המחירים האוטומטיים לעסק", icon: Tag, action: "נהל תמחור" },
   { id: "items", title: "פריטי משלוח שמורים", desc: "נהל את הפריטים שהעסק שולח וחסוך זמן בהזמנה", icon: Package, action: "נהל פריטים" },
   { id: "delivery", title: "אישור מסירה", desc: "בחר איך יאשר השליח שהמשלוח הגיע ליעדו", icon: ClipboardCheck, action: "נהל אישור מסירה" },
+  { id: "incoming", title: "הזמנות נכנסות לאישור", desc: "הפעל או כבה את מסך האישור להזמנות שמגיעות לעסק", icon: ClipboardList, action: "נהל הזמנות נכנסות" },
   { id: "team", title: "צוות והרשאות", desc: "הוסף אנשי צוות וקבע מי יכול לנהל הזמנות והגדרות", icon: Users, action: "נהל צוות" },
   { id: "integrations", title: "אינטגרציות וחיבורים", desc: "חבר מערכות הזמנות ומקורות חיצוניים לעסק", icon: Plug, action: "נהל אינטגרציות", route: "/business/integrations" },
 ] as const;
@@ -175,6 +177,13 @@ export function BusinessCompany({ section }: { section?: string }) {
       {section === "pickup" && <PickupSection me={me} niche={niche} saving={saveProfile.isPending || saveNiche.isPending} onSaveProfile={(b) => saveProfile.mutate(b)} onSaveNiche={(n) => saveNiche.mutate(n)} />}
       {section === "cash" && <CashSection niche={niche} saving={saveNiche.isPending} onSave={(cash) => saveNiche.mutate({ cash })} />}
       {section === "delivery" && <DeliverySection niche={niche} saving={saveNiche.isPending} onSave={(proof) => saveNiche.mutate({ proof })} />}
+      {section === "incoming" && (
+        <IncomingSection
+          niche={niche}
+          saving={saveNiche.isPending}
+          onSave={(incoming_approvals) => saveNiche.mutate({ incoming_approvals })}
+        />
+      )}
       {section === "notes" && <NotesSection me={me} saving={saveProfile.isPending} onSave={(body) => saveProfile.mutate(body)} />}
       {section === "defaults" && <DefaultsSection me={me} niche={niche} saving={saveNiche.isPending} onSave={(defaults) => saveNiche.mutate({ defaults })} />}
       {section === "team" && <TeamSection />}
@@ -876,6 +885,51 @@ function DeliverySection({ niche, saving, onSave }: { niche: Niche; saving: bool
           done: true,
         })}
       />
+    </>
+  );
+}
+
+function IncomingSection({
+  niche,
+  saving,
+  onSave,
+}: {
+  niche: Niche;
+  saving: boolean;
+  onSave: (incoming: { enabled: boolean }) => void;
+}) {
+  const saved = (niche.incoming_approvals || {}) as { enabled?: boolean };
+  const [enabled, setEnabled] = useState(saved.enabled === true);
+  useEffect(() => {
+    const next = (niche.incoming_approvals || {}) as { enabled?: boolean };
+    setEnabled(next.enabled === true);
+  }, [niche.incoming_approvals]);
+
+  return (
+    <>
+      <Panel title="הזמנות נכנסות לאישור">
+        <p className="hint">
+          כשההגדרה פעילה, מסך «הזמנות נכנסות לאישור» מופיע בתפריט ומשמש לאישור הזמנות שמגיעות לעסק. כשהיא כבויה הפריט מוסתר מהתפריט.
+        </p>
+        <div className="delivery-methods">
+          <button
+            type="button"
+            className={enabled ? "delivery-method on" : "delivery-method"}
+            aria-pressed={enabled}
+            onClick={() => setEnabled((v) => !v)}
+          >
+            <span className="round-icon"><ClipboardList size={18} /></span>
+            <span className="delivery-method-copy">
+              <strong>הזמנות נכנסות לאישור</strong>
+              <p>{enabled ? "הסקשן מוצג ופעיל בתפריט תפעול המשלוחים" : "הסקשן מוסתר מהתפריט"}</p>
+            </span>
+            <span className={enabled ? "delivery-switch on" : "delivery-switch"} dir="ltr" aria-hidden>
+              <i />
+            </span>
+          </button>
+        </div>
+      </Panel>
+      <SaveBar saving={saving} onSave={() => onSave({ enabled })} />
     </>
   );
 }

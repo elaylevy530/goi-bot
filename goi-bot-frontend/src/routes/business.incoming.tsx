@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bike, CheckCheck, Eye, MapPin, Package, Phone, Plus, Search, X } from "lucide-react";
 import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
@@ -7,6 +7,7 @@ import { LiveJobsMap } from "@/components/business/LiveJobsMap";
 import { Badge, FilterTabs, Panel, SearchBox, SelectBox, money } from "@/components/business/goi/GoiUi";
 import { nestCancelJob, nestDispatchJob, type NestJob } from "@/lib/nest-jobs";
 import {
+  isIncomingInboxEnabled,
   isIncomingJob,
   jobBadgeTone,
   jobItemsLabel,
@@ -27,11 +28,18 @@ export const Route = createFileRoute("/business/incoming")({
 function IncomingPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: me } = useMyBusiness();
+  const { data: me, isFetched } = useMyBusiness();
   const { data: jobs = [] } = useBusinessJobs(me?.id);
   const [filter, setFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!isFetched || !me) return;
+    if (!isIncomingInboxEnabled(me as { niche_details?: Record<string, unknown> | null })) {
+      navigate({ to: "/business/account", replace: true });
+    }
+  }, [isFetched, me, navigate]);
 
   const approvalStatus = (job: NestJob) => {
     const status = job.status.toLowerCase();

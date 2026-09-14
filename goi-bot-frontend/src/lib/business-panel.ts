@@ -221,7 +221,17 @@ export function jobItemsLabel(job: NestJob): string {
 }
 
 export function jobHasCourier(job: NestJob): boolean {
-  return Boolean(job.selected_courier_id);
+  if (job.selected_courier_id) return true;
+  const nested = (job as { couriers?: { id?: string | null } | null }).couriers;
+  if (nested?.id) return true;
+  return ACTIVE_STATUSES.has(job.status);
+}
+
+export function isIncomingInboxEnabled(
+  me?: { niche_details?: Record<string, unknown> | null } | null,
+): boolean {
+  const incoming = me?.niche_details?.incoming_approvals as { enabled?: boolean } | undefined;
+  return incoming?.enabled === true;
 }
 
 export function isIncomingJob(job: NestJob): boolean {

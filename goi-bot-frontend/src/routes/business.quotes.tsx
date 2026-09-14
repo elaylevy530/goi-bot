@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { nestListJobs, nestListJobQuotes, nestSelectJobQuote, nestUpdateJob } from "@/lib/nest-jobs";
 import { CheckCircle2, Loader2, Star, Inbox, XCircle, MapPin, Clock, HandCoins, Truck } from "lucide-react";
 import { toast } from "sonner";
+import { isIncomingInboxEnabled } from "@/lib/business-panel";
 
 export const Route = createFileRoute("/business/quotes")({
   head: () => ({ meta: [{ title: "הצעות משליחים — Goi עסקים" }] }),
@@ -15,8 +17,16 @@ export const Route = createFileRoute("/business/quotes")({
 });
 
 function BusinessQuotesPage() {
-  const { data: me } = useMyBusiness();
+  const navigate = useNavigate();
+  const { data: me, isFetched } = useMyBusiness();
   const qc = useQueryClient();
+
+  useEffect(() => {
+    if (!isFetched || !me) return;
+    if (!isIncomingInboxEnabled(me as { niche_details?: Record<string, unknown> | null })) {
+      navigate({ to: "/business/account", replace: true });
+    }
+  }, [isFetched, me, navigate]);
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ["business-quote-jobs", me?.id],

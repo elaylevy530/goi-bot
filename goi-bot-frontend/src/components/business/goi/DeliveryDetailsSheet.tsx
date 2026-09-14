@@ -1,4 +1,4 @@
-import { Bike, Check, MapPin, MessageCircle, Package, Phone } from "lucide-react";
+import { Ban, Bike, Check, MapPin, MessageCircle, Package, Phone } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, Badge, Panel, money } from "@/components/business/goi/GoiUi";
 import type { NestJob } from "@/lib/nest-jobs";
@@ -30,9 +30,11 @@ type Props = {
   job: NestJob | null;
   onClose: () => void;
   onChat?: (job: NestJob) => void;
+  onCancel?: (job: NestJob) => void;
+  cancelling?: boolean;
 };
 
-export function DeliveryDetailsSheet({ job, onClose, onChat }: Props) {
+export function DeliveryDetailsSheet({ job, onClose, onChat, onCancel, cancelling }: Props) {
   const assigned = job ? jobHasCourier(job) : false;
   const courier = job ? jobCourierName(job) : null;
   const level = job ? deliverySheetLevel(job) : 0;
@@ -164,6 +166,17 @@ export function DeliveryDetailsSheet({ job, onClose, onChat }: Props) {
               <button type="button" className="btn primary full" onClick={() => onChat(job)}>
                 <MessageCircle size={17} />
                 צ׳אט עם השליח
+              </button>
+            ) : null}
+            {!assigned && onCancel ? (
+              <button
+                type="button"
+                className="btn outline full tracking-cancel"
+                disabled={cancelling}
+                onClick={() => onCancel(job)}
+              >
+                <Ban size={17} />
+                בטל משלוח
               </button>
             ) : null}
           </div>

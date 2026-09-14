@@ -55,6 +55,7 @@ const COPY: Record<
   Role,
   {
     hero: string;
+    heroPosition: string;
     title: string;
     subtitle: string;
     cta: string;
@@ -65,6 +66,7 @@ const COPY: Record<
 > = {
   business: {
     hero: businessHero,
+    heroPosition: "object-[center_top]",
     title: "טוב שחזרת",
     subtitle: "המשלוחים של העסק מתחילים כאן",
     cta: "כניסה לעסק",
@@ -74,6 +76,7 @@ const COPY: Record<
   },
   courier: {
     hero: courierHero,
+    heroPosition: "object-[center_12%] md:object-[center_8%]",
     title: "טוב שחזרת",
     subtitle: "העבודות שלך מחכות כאן",
     cta: "כניסה לשליח",
@@ -138,7 +141,10 @@ function AuthPage() {
             height={2560}
             decoding="async"
             fetchPriority="high"
-            className="pointer-events-none absolute inset-0 size-full object-cover object-[center_16%] md:object-center"
+            className={cn(
+              "pointer-events-none absolute inset-0 size-full object-cover",
+              copy.heroPosition,
+            )}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-transparent md:bg-gradient-to-l md:from-black/35 md:via-transparent md:to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black via-black/65 to-transparent md:hidden" />

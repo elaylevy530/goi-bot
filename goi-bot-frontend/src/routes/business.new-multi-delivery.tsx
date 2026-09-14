@@ -152,7 +152,7 @@ function NewMultiDeliveryPage() {
           ? `נוצרה בקשת הצעה ${res.jobNumber} — ממתינים להצעות שליחים`
           : `נוצר משלוח ${res.jobNumber} ונשלח לשליחים`,
       );
-      navigate({ to: "/business/orders" });
+      navigate({ to: "/business/active", search: { job: res.jobId } });
     },
     onError: (e: any) => toast.error(e?.message || "שגיאה ביצירת המשלוח"),
   });

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
@@ -15,7 +15,6 @@ import type { DrivingRoute } from "@/lib/google-driving-route";
 import { haversineKm } from "@/lib/google-driving-route";
 import { toast } from "sonner";
 import { canonicalizeVehicleValue } from "@/lib/courier-vehicles";
-import { Check, Save } from "lucide-react";
 
 type FieldKey =
   | "pickup"
@@ -172,7 +171,6 @@ function NewDeliveryPage() {
   const [pricePerKm, setPricePerKm] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [driveRoute, setDriveRoute] = useState<DrivingRoute | null>(null);
-  const asDraftRef = useRef(false);
   const businessPricing = useMemo(() => {
     const profile = me as {
       default_pricing_type?: string | null;
@@ -352,21 +350,11 @@ function NewDeliveryPage() {
   }, [suggestedPrice]);
 
   const attemptSubmit = () => {
-    asDraftRef.current = false;
     if (!me) {
       toast.error("חסר פרופיל עסק — השלימו את הפרופיל וחזרו לכאן");
       return;
     }
     if (!applyErrors(collectFieldErrors("all", suggestedPrice))) return;
-    submit.mutate();
-  };
-
-  const attemptDraft = () => {
-    if (!pickup || !dropoff) {
-      toast.error("בחרו כתובת איסוף ומסירה כדי לשמור טיוטה");
-      return;
-    }
-    asDraftRef.current = true;
     submit.mutate();
   };
 
@@ -483,18 +471,11 @@ function NewDeliveryPage() {
         description: [`קטגוריה: ${category.label}`, `${quantity} × ${deliveryType}`, validExtraStops.length ? `${validExtraStops.length + 1} יעדים` : null, payNote].filter(Boolean).join(" · "),
         invoice_required: (me as { invoice_required?: boolean }).invoice_required ?? false,
         order_number: orderNumber.trim() || null,
-        status: asDraftRef.current ? "טיוטה" : "נשלחה לשליחים",
+        status: "נשלחה לשליחים",
       };
 
       const data = await nestCreateJob(payload);
-      const isDraft = asDraftRef.current;
-      asDraftRef.current = false;
       geocode({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
-
-      if (isDraft) {
-        toast.success("הטיוטה נשמרה");
-        return data;
-      }
 
       if (pricingModel === "quote_request") {
         notify({ data: { jobId: data.id } }).catch((e) => console.error(e));
@@ -512,29 +493,13 @@ function NewDeliveryPage() {
     },
     onSuccess: (data) => {
       toast.success("המשלוח נוצר");
-      navigate({ to: "/business/order/$id", params: { id: data.id } });
+      navigate({ to: "/business/active", search: { job: data.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
-    <BusinessShell
-      headerActions={
-        <div className="order-top-actions">
-          <span>
-            <Check size={15} />
-            נשמר אוטומטית
-          </span>
-          <button type="button" className="btn primary" onClick={attemptDraft} disabled={submit.isPending}>
-            <Save size={15} />
-            שמור טיוטה
-          </button>
-          <button type="button" className="btn outline" onClick={() => navigate({ to: "/business/incoming" })}>
-            ביטול
-          </button>
-        </div>
-      }
-    >
+    <BusinessShell>
       <BusinessNewOrder
         pickupText={pickupText}
         pickup={pickup}
@@ -622,7 +587,6 @@ function NewDeliveryPage() {
         pricePerKmError={fieldErrors.pricePerKm}
         pending={submit.isPending}
         onSubmit={attemptSubmit}
-        onDraft={attemptDraft}
         onValidateRoute={() => applyErrors(collectFieldErrors("route"))}
         onValidateDetails={() => applyErrors(collectFieldErrors("details"))}
         quantity={quantity}

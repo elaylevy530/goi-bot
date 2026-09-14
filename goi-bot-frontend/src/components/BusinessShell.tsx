@@ -26,7 +26,7 @@ import {
   type NestBusinessNotification,
 } from "@/lib/nest-accounts";
 import { nestListJobs } from "@/lib/nest-jobs";
-import { formatHebrewDate, isIncomingJob, isTrackingJob, walletBalance } from "@/lib/business-panel";
+import { formatHebrewDate, isIncomingInboxEnabled, isIncomingJob, isTrackingJob, walletBalance } from "@/lib/business-panel";
 import { cn } from "@/lib/utils";
 
 export function useMyBusiness() {
@@ -258,12 +258,17 @@ export function BusinessShell({
   }, [me?.id, qc]);
 
   const isDispatcher = (me as { business_team_role?: string } | null)?.business_team_role === "dispatcher";
-  const navGroups = isDispatcher
+  const incomingEnabled = isIncomingInboxEnabled(me as { niche_details?: Record<string, unknown> | null } | null);
+  const navGroups = (isDispatcher
     ? NAV.filter((group) => group.section !== "ניהול העסק").map((group) => ({
         ...group,
         items: group.items.filter((item) => item.to !== "/business/settings"),
       }))
-    : NAV;
+    : NAV
+  ).map((group) => ({
+    ...group,
+    items: incomingEnabled ? group.items : group.items.filter((item) => item.to !== "/business/incoming"),
+  }));
   const displayName =
     (me as { business_name?: string; name?: string } | null)?.business_name ||
     (me as { name?: string } | null)?.name ||
@@ -271,7 +276,11 @@ export function BusinessShell({
   const incomingCount = jobs.filter(isIncomingJob).length;
   const activeCount = jobs.filter(isTrackingJob).length;
   const counts = { incoming: incomingCount, active: activeCount };
-  const hideChrome = pathname.startsWith("/business/new-multi-delivery") || pathname.startsWith("/business/new-route") || pathname.startsWith("/business/new-shift");
+  const hideChrome =
+    pathname.startsWith("/business/new-delivery") ||
+    pathname.startsWith("/business/new-multi-delivery") ||
+    pathname.startsWith("/business/new-route") ||
+    pathname.startsWith("/business/new-shift");
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -350,6 +359,16 @@ export function BusinessShell({
         </aside>
 
         <div className={cn("app-main", pageClass(pathname))}>
+          {lockOrderViewport && (
+            <div className="order-float-chrome">
+              <button type="button" className="mobile-menu icon-btn" aria-label="פתח תפריט" aria-expanded={navOpen} aria-controls="business-nav" onClick={() => setNavOpen(true)}>
+                <Menu size={24} />
+              </button>
+              <div className="header-actions">
+                <NotificationsBell businessId={me?.id} />
+              </div>
+            </div>
+          )}
           {!hideChrome && (
             <header className="app-header">
               <div className="header-business">
