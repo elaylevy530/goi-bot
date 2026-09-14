@@ -13,13 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { nestListAreas, nestSendWhatsapp } from "@/lib/nest-domain";
 import { nestListCouriers } from "@/lib/nest-accounts";
-import { nestCreateJob } from "@/lib/nest-jobs";
+import { nestCreateJob, nestDispatchJob } from "@/lib/nest-jobs";
 import { JOB_TYPES, VEHICLE_TYPES } from "@/lib/constants";
 import { vehicleLabel } from "@/lib/courier-vehicles";
 import { Copy, MessageCircle, CheckCheck, Search, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 
 export const Route = createFileRoute("/_authenticated/send-job")({
   head: () => ({ meta: [{ title: "שליחת עבודה — Goi" }] }),
@@ -28,7 +26,6 @@ export const Route = createFileRoute("/_authenticated/send-job")({
 
 function SendJobPage() {
   const qc = useQueryClient();
-  const dispatch = useServerFn(dispatchJobToCouriers);
   const [jobType, setJobType] = useState<string>("משלוח בודד");
   const [pickup, setPickup] = useState<string>("");
   const [dropoff, setDropoff] = useState<string>("");
@@ -93,7 +90,7 @@ ${description ? `הערות: ${description}\n` : ""}רוצה לקחת? השב 1.
       });
       // Nest dispatch creates offer_events + push/WhatsApp fan-out
       try {
-        const res = await dispatch({ data: { jobId: data.id } });
+        const res = await nestDispatchJob(data.id);
         if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
         else toast.message("העבודה נוצרה — אין שליחים תואמים כרגע");
       } catch (e) {

@@ -24,7 +24,7 @@ import {
   type MultiStop,
 } from "@/components/MultiStopBuilder";
 import { createMultiStopJob } from "@/lib/multi-stop.functions";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
+import { nestDispatchJob } from "@/lib/nest-jobs";
 import { nestComputePrice, nestGetPricing } from "@/lib/nest-domain";
 import { COURIER_VEHICLE_OPTIONS } from "@/lib/courier-vehicles";
 
@@ -37,7 +37,6 @@ export const Route = createFileRoute("/business/new-multi-delivery")({
 function NewMultiDeliveryPage() {
   const navigate = useNavigate();
   const createFn = useServerFn(createMultiStopJob);
-  const dispatchFn = useServerFn(dispatchJobToCouriers);
 
 
   const [stops, setStops] = useState<MultiStop[]>(() => [
@@ -143,7 +142,7 @@ function NewMultiDeliveryPage() {
       });
       // Quote-request jobs wait for courier bids; others dispatch immediately
       if (pricingType !== "quote_request") {
-        await dispatchFn({ data: { jobId: res.jobId } });
+        await nestDispatchJob(res.jobId);
       }
       return res;
     },

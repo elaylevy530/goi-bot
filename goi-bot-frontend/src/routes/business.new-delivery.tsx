@@ -4,10 +4,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { BusinessNewOrder, type ExtraStop } from "@/components/business/BusinessNewOrder";
-import { nestCreateJob, nestUpdateJob } from "@/lib/nest-jobs";
+import { nestCreateJob, nestDispatchJob } from "@/lib/nest-jobs";
 import { nestComputePrice, nestGetPricing } from "@/lib/nest-domain";
 import { notifyCouriersOfQuoteRequest } from "@/lib/whatsapp-quotes.functions";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import { geocodeJob } from "@/lib/geocode-job.functions";
 import { geocodeAddresses } from "@/lib/geocode.functions";
 import { getCategory, getDeliveryTypesForCategory, type Timing } from "@/config/businessCategories";
@@ -51,7 +50,6 @@ function NewDeliveryPage() {
   const navigate = useNavigate();
   const { data: me } = useMyBusiness();
   const search = Route.useSearch();
-  const dispatch = useServerFn(dispatchJobToCouriers);
   const notify = useServerFn(notifyCouriersOfQuoteRequest);
   const geocode = useServerFn(geocodeJob);
   const geocodeAddrs = useServerFn(geocodeAddresses);
@@ -502,16 +500,12 @@ function NewDeliveryPage() {
         notify({ data: { jobId: data.id } }).catch((e) => console.error(e));
       } else {
         try {
-          const res = await dispatch({ data: { jobId: data.id } });
+          const res = await nestDispatchJob(data.id);
           if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
-          else {
-            await nestUpdateJob(data.id, { status: "טיוטה" });
-            toast.message("המשלוח נוצר — אין שליחים תואמים כרגע");
-          }
+          else toast.message("המשלוח פתוח לשליחים — יופיע כששליח זמין");
         } catch (e) {
           console.error(e);
-          await nestUpdateJob(data.id, { status: "טיוטה" });
-          toast.error("שיגור נכשל: " + (e as Error).message);
+          toast.error("המשלוח נוצר, אבל השיגור נכשל: " + (e as Error).message);
         }
       }
       return data;

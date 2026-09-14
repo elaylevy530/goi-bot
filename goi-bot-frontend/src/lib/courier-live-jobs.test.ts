@@ -145,4 +145,14 @@ describe("courier matching is GPS or work areas", () => {
       }),
     ).toBe(false);
   });
+
+  it("matches when the courier has not set work areas yet", () => {
+    expect(
+      matchesCourier(job, {
+        vehicle_type: "רכב",
+        working_areas: [],
+        location_sharing_enabled: false,
+      }),
+    ).toBe(true);
+  });
 });

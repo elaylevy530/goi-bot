@@ -7,8 +7,7 @@ import { KpiCard } from "@/components/business/KpiCard";
 import { EmptyState } from "@/components/business/EmptyState";
 import { Button } from "@/components/ui/button";
 import { JobStatusBadge } from "@/components/StatusBadges";
-import { nestCreateJob, nestGetJob, nestListJobs, type NestJob } from "@/lib/nest-jobs";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
+import { nestCreateJob, nestDispatchJob, nestGetJob, nestListJobs, type NestJob } from "@/lib/nest-jobs";
 import { geocodeJob } from "@/lib/geocode-job.functions";
 import type { JobStatus } from "@/lib/constants";
 import { toast } from "sonner";
@@ -55,7 +54,6 @@ function OrdersPage() {
   const { data: me } = useMyBusiness();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const dispatchFn = useServerFn(dispatchJobToCouriers);
   const geocodeFn = useServerFn(geocodeJob);
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState(searchFromUrl);
@@ -88,7 +86,7 @@ function OrdersPage() {
       geocodeFn({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
       if ((data as { pricing_type?: string }).pricing_type !== "quote_request") {
         try {
-          await dispatchFn({ data: { jobId: data.id } });
+          await nestDispatchJob(data.id);
         } catch (e) {
           console.error("dispatch", e);
         }

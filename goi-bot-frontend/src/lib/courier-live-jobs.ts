@@ -209,6 +209,7 @@ export function matchesCourier(job: any, courier?: any | null) {
         courier.custom_work_area,
         courier.custom_pickup_area,
       );
+  if (areas.length === 0) return true;
   return locationMatchesWorkAreas(pickup, areas);
 }
 
@@ -241,10 +242,11 @@ export function isLivePendingOffer(offer: any, courier?: any | null) {
   const job = Array.isArray(offer?.jobs) ? offer.jobs[0] : offer?.jobs;
   if (!isCourierReceivingJobs(courier) || !job || offer?.response !== "pending") return false;
   if (offer?.expires_at && new Date(offer.expires_at).getTime() <= Date.now()) return false;
+  // Dispatch already chose this courier. Do not hide the offer again by city/GPS.
   return job.selected_courier_id == null
     && OPEN_JOB_STATUSES.has(String(job.status ?? ""))
     && job.pricing_type !== "quote_request"
     && isFutureJobDate(job.job_date)
-    && matchesCourier(job, courier);
+    && jobMatchesKind(job, courier);
 }
 

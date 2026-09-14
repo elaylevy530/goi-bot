@@ -288,9 +288,10 @@ export function BusinessShell({
   };
 
   const isOrder = pageClass(pathname) === "page-new";
+  const lockOrderViewport = pathname.startsWith("/business/new-delivery");
 
   return (
-    <div dir="rtl" className={cn("goi-biz", navOpen && "nav-open")}>
+    <div dir="rtl" className={cn("goi-biz", navOpen && "nav-open", lockOrderViewport && "goi-biz-order")}>
       {navOpen && (
         <button type="button" className="sidebar-overlay" aria-label="סגור תפריט" onClick={() => setNavOpen(false)} />
       )}

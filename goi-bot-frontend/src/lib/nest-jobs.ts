@@ -72,6 +72,19 @@ export function nestCreateJob(body: Record<string, unknown>) {
   });
 }
 
+export function nestDispatchJob(id: string) {
+  return apiFetch<{
+    ok: boolean;
+    dispatched: boolean;
+    sent: number;
+    matching_couriers_count?: number;
+    already_assigned?: boolean;
+  }>(`/api/jobs/${id}/dispatch`, {
+    method: "POST",
+    accessToken: token(),
+  });
+}
+
 export function nestUpdateJob(id: string, body: Record<string, unknown>) {
   return apiFetch<NestJob>(`/api/jobs/${id}`, {
     method: "PATCH",

@@ -1,13 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { Bike, CheckCheck, Eye, MapPin, Package, Phone, Plus, Search, X } from "lucide-react";
 import { BusinessShell, useBusinessJobs, useMyBusiness } from "@/components/BusinessShell";
 import { LiveJobsMap } from "@/components/business/LiveJobsMap";
 import { Badge, FilterTabs, Panel, SearchBox, SelectBox, money } from "@/components/business/goi/GoiUi";
-import { nestCancelJob, type NestJob } from "@/lib/nest-jobs";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
+import { nestCancelJob, nestDispatchJob, type NestJob } from "@/lib/nest-jobs";
 import {
   isIncomingJob,
   jobBadgeTone,
@@ -31,7 +29,6 @@ function IncomingPage() {
   const qc = useQueryClient();
   const { data: me } = useMyBusiness();
   const { data: jobs = [] } = useBusinessJobs(me?.id);
-  const dispatchFn = useServerFn(dispatchJobToCouriers);
   const [filter, setFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -51,7 +48,7 @@ function IncomingPage() {
     .filter((j) => `${j.job_number} ${jobRecipientName(j)} ${j.dropoff_address || ""}`.includes(query.trim()));
 
   const dispatch = useMutation({
-    mutationFn: async (jobId: string) => dispatchFn({ data: { jobId } }),
+    mutationFn: async (jobId: string) => nestDispatchJob(jobId),
     onSuccess: (r) => {
       toast.success(r.dispatched ? `המשלוח הופץ ל־${r.sent} שליחים` : "ההפצה הושלמה");
       qc.invalidateQueries({ queryKey: ["business-jobs"] });

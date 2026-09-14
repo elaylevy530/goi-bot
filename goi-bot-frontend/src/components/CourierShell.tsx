@@ -5,8 +5,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useCourierGpsTracker } from "@/hooks/useCourierGpsTracker";
 import { CourierDesktopNav, CourierMenuButton } from "@/components/CourierSideDrawer";
 import { CourierPushPrompt } from "@/components/courier/CourierPushPrompt";
-import { isLivePendingOffer } from "@/lib/courier-live-jobs";
-import { nestGetJob, nestListCourierOffers } from "@/lib/nest-jobs";
+import { isLivePendingOffer, isOpenBroadcastJobForCourier } from "@/lib/courier-live-jobs";
+import { nestGetJob, nestListCourierOffers, nestListOpenBroadcastJobs } from "@/lib/nest-jobs";
 
 export function useMyCourier() {
   return useQuery({
@@ -116,6 +116,8 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
   const { data: me } = useMyCourier();
 
   const incomingSeenRef = useRef(new Set<string>());
+  const meRef = useRef(me);
+  meRef.current = me;
 
   // App-like back button: hidden on primary sidebar destinations.
   const PRIMARY_PATHS = ["/courier/new-jobs", "/courier/active", "/courier/performance", "/courier/my-profile", "/courier"];
@@ -214,16 +216,25 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
         // ignore fetch errors for alert overlay
       }
     };
-    const timer = window.setInterval(() => {
-      void nestListCourierOffers("pending").then((offers) => {
+    const poll = () => {
+      void Promise.all([
+        nestListCourierOffers("pending"),
+        nestListOpenBroadcastJobs(),
+      ]).then(([offers, openJobs]) => {
         if (!ready) return;
         for (const offer of offers) {
           const jobId = offer.job_id;
-          if (jobId && isLivePendingOffer(offer, me)) void showJobAlert(jobId);
+          if (jobId && isLivePendingOffer(offer, meRef.current)) void showJobAlert(jobId);
+        }
+        for (const job of openJobs) {
+          const jobId = String(job?.id ?? "");
+          if (jobId && isOpenBroadcastJobForCourier(job, meRef.current)) void showJobAlert(jobId);
         }
       }).catch(() => {});
-    }, 2_000);
+    };
+    const timer = window.setInterval(poll, 2_000);
     ready = true;
+    poll();
     return () => {
       window.clearInterval(timer);
     };

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { JobStatusBadge } from "@/components/StatusBadges";
-import { nestGetJob, nestUpdateJob, nestCreateJob, nestListJobStatusLogs, nestGetJobOutcome, nestPutJobOutcome } from "@/lib/nest-jobs";
+import { nestGetJob, nestUpdateJob, nestCreateJob, nestDispatchJob, nestListJobStatusLogs, nestGetJobOutcome, nestPutJobOutcome } from "@/lib/nest-jobs";
 import { nestGetCourierStats, nestGetFavoriteCourier, nestSetFavoriteCourier, nestUpsertSavedContact } from "@/lib/nest-domain";
 import { nestGetCourier } from "@/lib/nest-accounts";
 import { ArrowRight, Copy, MessageSquare, Phone, XCircle, AlertCircle, MapPin, User, Package, Wallet, Navigation, Share2, UserPlus, Star, Heart, Ban } from "lucide-react";
@@ -17,7 +17,6 @@ import { CourierAvatar } from "@/components/CourierAvatar";
 import { toast } from "sonner";
 import type { JobStatus } from "@/lib/constants";
 import { useServerFn } from "@tanstack/react-start";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import { geocodeJob } from "@/lib/geocode-job.functions";
 
 export const Route = createFileRoute("/business/order/$id")({
@@ -41,7 +40,6 @@ function OrderDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: me } = useMyBusiness();
-  const dispatchFn = useServerFn(dispatchJobToCouriers);
   const geocodeFn = useServerFn(geocodeJob);
 
   const { data: jobRaw } = useQuery({
@@ -128,7 +126,7 @@ function OrderDetailPage() {
       const data = await nestCreateJob({ ...rest, customer_id: me.id, status: "נשלחה לשליחים" });
       geocodeFn({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
       if ((data as any).pricing_type !== "quote_request") {
-        try { await dispatchFn({ data: { jobId: data.id } }); } catch (e) { console.error("dispatch", e); }
+        try { await nestDispatchJob(data.id); } catch (e) { console.error("dispatch", e); }
       }
       return data;
     },

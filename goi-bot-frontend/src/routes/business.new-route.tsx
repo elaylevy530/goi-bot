@@ -8,12 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { nestCreateJob } from "@/lib/nest-jobs";
+import { nestCreateJob, nestDispatchJob } from "@/lib/nest-jobs";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeJob } from "@/lib/geocode-job.functions";
-import { dispatchJobToCouriers } from "@/lib/dispatch-job.functions";
 import { COURIER_VEHICLE_OPTIONS } from "@/lib/courier-vehicles";
 
 export const Route = createFileRoute("/business/new-route")({
@@ -26,7 +25,6 @@ function NewRoutePage() {
   const navigate = useNavigate();
   const { data: me } = useMyBusiness();
   const geocode = useServerFn(geocodeJob);
-  const dispatch = useServerFn(dispatchJobToCouriers);
   const [f, setF] = useState({
     pickup_address: "",
     distribution_area: "",
@@ -60,9 +58,9 @@ function NewRoutePage() {
       });
       geocode({ data: { jobId: data.id } }).catch((e) => console.error("geocode", e));
       try {
-        const res = await dispatch({ data: { jobId: data.id } });
+        const res = await nestDispatchJob(data.id);
         if (res?.sent) toast.success(`נשלח ל-${res.sent} שליחים ✅`);
-        else toast.message("הקו נוצר — אין שליחים תואמים כרגע");
+        else toast.message("הקו פתוח לשליחים — יופיע כששליח זמין");
       } catch (e) {
         console.error("dispatch", e);
         toast.error("שיגור נכשל: " + (e as Error).message);

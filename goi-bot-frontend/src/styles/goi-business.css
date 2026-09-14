@@ -486,14 +486,53 @@
 .goi-biz .page-new .header-actions .order-top-actions>span{font-size:13px;color:#6b8172;display:inline-flex;align-items:center;gap:6px}
 .goi-biz .page-new .header-actions .order-top-actions .btn{min-height:40px}
 @media(min-width:768px){
+  html:has(.goi-biz-order),
+  body:has(.goi-biz-order){
+    height:100dvh;
+    max-height:100dvh;
+    overflow:hidden;
+  }
+  .goi-biz.goi-biz-order,
+  .goi-biz.goi-biz-order .app-shell{
+    height:100dvh;
+    max-height:100dvh;
+    min-height:0;
+    overflow:hidden;
+  }
+  .goi-biz .app-main.page-new{
+    min-height:0;
+  }
+  .goi-biz .page-new .page-scroll,
+  .goi-biz .page-new .order-page{
+    display:flex;
+    flex-direction:column;
+    flex:1 1 0;
+    min-height:0;
+    height:auto;
+    overflow:hidden;
+  }
   .goi-biz .page-new .order-split{
     display:grid!important;
     grid-template-columns:minmax(360px,42%) minmax(0,1fr)!important;
-    flex:1;min-height:0;height:100%;
+    grid-template-rows:minmax(0,1fr);
+    align-items:stretch!important;
+    flex:1 1 0;
+    min-height:0;
+    height:auto!important;
   }
-  .goi-biz .page-new .order-fields{overflow:auto;height:100%;max-height:calc(100dvh - 74px)}
+  .goi-biz .page-new .order-fields{
+    overflow:auto;
+    min-height:0;
+    height:auto!important;
+    max-height:none!important;
+  }
   .goi-biz .page-new .order-map{
-    position:relative!important;height:100%!important;min-height:calc(100dvh - 74px)!important;top:0;
+    position:relative!important;
+    top:0;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    align-self:stretch;
   }
   .goi-biz .page-new .mobile-order-start{display:none!important}
   .goi-biz .page-new .expanded-form-content{display:block!important}

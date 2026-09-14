@@ -485,15 +485,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       shortCode = generateJobShortCode();
     }
 
-    return this.jobs.save(
+    const saved = await this.jobs.save(
       this.jobs.create({
         job_number: jobNumber,
         order_number: dto.order_number?.trim() || null,
         short_code: shortCode,
         recipient_tracking_token: generateTrackingToken(),
         // Prefer Hebrew open/draft statuses. English `pending` is legacy — dispatch
-        // normalizes to `נשלחה לשליחים`. Callers that intend courier fan-out MUST
-        // also call `dispatchJob` after create (see dispatchJob JSDoc).
+        // normalizes to `נשלחה לשליחים`. Non-draft creates auto-dispatch below so
+        // courier inbox does not depend on a second client call succeeding.
         status: dto.status ?? "טיוטה",
         job_type: dto.job_type ?? "delivery",
         pricing_type: dto.pricing_type ?? "fixed",
@@ -538,6 +538,25 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         delivery_minutes: deliveryMinutes,
       }),
     );
+
+    const skipFanOut =
+      saved.pricing_type === "quote_request" ||
+      saved.status === "טיוטה" ||
+      saved.status === "בוטלה" ||
+      saved.status === "הושלמה" ||
+      saved.status === "נדחתה";
+    if (!skipFanOut) {
+      try {
+        await this.dispatchJob(saved.id);
+        return (await this.jobs.findOne({ where: { id: saved.id } })) ?? saved;
+      } catch (e) {
+        this.logger.error(
+          `auto-dispatch after create ${saved.id}`,
+          e instanceof Error ? e.stack : e,
+        );
+      }
+    }
+    return saved;
   }
 
   async update(id: string, userId: string, roles: AppRole[], dto: UpdateJobDto) {
