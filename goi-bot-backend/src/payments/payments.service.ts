@@ -30,7 +30,7 @@ export class PaymentsService {
     private readonly walletTx: Repository<WalletTransaction>,
   ) {}
 
-  private async requireBusinessOwner(userId: string) {
+  async requireBusinessOwner(userId: string) {
     const access = await resolveBusinessAccess(this.customers, this.teamMembers, userId);
     if (!access) throw new ForbiddenException("Business profile required");
     if (access.role !== "owner") throw new ForbiddenException("אין הרשאה לכספים");
@@ -46,21 +46,22 @@ export class PaymentsService {
     });
   }
 
-  /**
-   * Ledger credit for prepaid wallet. Card capture from a future processor can be layered later;
-   * this records the recharge + bonus so the business UI balance works.
-   */
-  async rechargeWallet(
-    userId: string,
-    body: { amount: number; bonusVal?: number; pct?: number },
+  /** Ledger credit after a captured Tranzila charge. Idempotent on processorId. */
+  async creditPrepaidRecharge(
+    businessId: string,
+    body: { amount: number; bonusVal: number; pct: number; processorId?: string },
   ) {
-    const businessId = await this.requireBusinessOwner(userId);
     const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount < 50) {
-      throw new BadRequestException("Minimum recharge is ₪50");
-    }
     const bonusVal = Math.max(0, Number(body.bonusVal ?? 0));
     const pct = Math.max(0, Number(body.pct ?? 0));
+    if (body.processorId) {
+      const existing = await this.walletTx
+        .createQueryBuilder("t")
+        .where("t.business_id = :businessId", { businessId })
+        .andWhere("t.metadata->>'processorId' = :pid", { pid: body.processorId })
+        .getOne();
+      if (existing) return existing;
+    }
     const credit = amount + bonusVal;
     return this.walletTx.save(
       this.walletTx.create({
@@ -71,7 +72,7 @@ export class PaymentsService {
           bonusVal > 0
             ? `טעינה ₪${amount} + בונוס ${pct}% (₪${bonusVal})`
             : `טעינה ₪${amount}`,
-        metadata: { amount, bonusVal, pct },
+        metadata: { amount, bonusVal, pct, processorId: body.processorId ?? null },
       }),
     );
   }

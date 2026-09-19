@@ -5,6 +5,8 @@ import { TeamMember } from "../accounts/entities/team-member.entity";
 import { Job } from "../jobs/entities/job.entity";
 import { BillingRecord } from "./entities/billing-record.entity";
 import { WalletTransaction } from "./entities/wallet-transaction.entity";
+import { SavedPaymentMethod } from "./entities/saved-payment-method.entity";
+import { WalletChargeIntent } from "./entities/wallet-charge-intent.entity";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { TranzilaPaymentsService } from "./tranzila-payments.service";
@@ -19,6 +21,8 @@ import { TranzilaController } from "./tranzila.controller";
       Customer,
       TeamMember,
       WalletTransaction,
+      SavedPaymentMethod,
+      WalletChargeIntent,
     ]),
   ],
   controllers: [PaymentsController, TranzilaController],

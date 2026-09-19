@@ -35,6 +35,10 @@ export class OpenConversationDto {
   @IsOptional() @IsString() subject?: string;
 }
 
+export class UpdateConversationDto {
+  @IsOptional() @IsIn(["new", "bot", "agent", "closed"]) support_status?: string;
+}
+
 export class CreateMessageDto {
   @IsOptional() @IsString() body?: string;
   @IsOptional() @IsString() attachment_url?: string;

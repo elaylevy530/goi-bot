@@ -269,6 +269,15 @@ export class DomainService {
       conversation.subject !== SUPPORT_HANDOFF_SUBJECT;
     if (isSupportConversationKind(conversation.kind) && senderRole === "admin") {
       conversation.subject = SUPPORT_HANDOFF_SUBJECT;
+      if (conversation.support_status !== "closed") conversation.support_status = "agent";
+    }
+    if (
+      isSupportConversationKind(conversation.kind) &&
+      senderRole !== "admin" &&
+      conversation.support_status === "closed"
+    ) {
+      conversation.support_status =
+        conversation.subject === SUPPORT_HANDOFF_SUBJECT ? "agent" : "bot";
     }
     if (conversation.kind === "guest_support") {
       // Admin reply → guest unread; guest messages are posted via public API.
@@ -291,7 +300,11 @@ export class DomainService {
       const bot = replyToSupport(message.body);
       if (bot.handoff) {
         conversation.subject = SUPPORT_HANDOFF_SUBJECT;
+        conversation.support_status = "agent";
         conversation.unread_admin += 1;
+        await this.conversations.save(conversation);
+      } else if (conversation.support_status !== "agent" && conversation.support_status !== "closed") {
+        conversation.support_status = "bot";
         await this.conversations.save(conversation);
       }
       await this.postSupportBotMessage(conversation, userId, bot.reply);
@@ -305,6 +318,7 @@ export class DomainService {
         conversation_id: conversation.id,
         sender_user_id: actorUserId,
         sender_role: "admin",
+        from_bot: true,
         body,
         attachment_url: null,
         attachment_kind: null,
@@ -357,6 +371,22 @@ export class DomainService {
     else conversation.unread_business = 0;
     await this.conversations.save(conversation);
     return { ok: true as const };
+  }
+
+  async updateConversation(id: string, userId: string, roles: AppRole[], body: Mutable) {
+    if (!roles.includes("admin") && !roles.includes("manager")) {
+      throw new ForbiddenException("Conversation update denied");
+    }
+    const conversation = await this.conversations.findOne({ where: { id } });
+    if (!conversation) throw new NotFoundException("Conversation not found");
+    await this.assertConversationAccess(conversation, userId, roles);
+    const next = String(body.support_status ?? "");
+    if (next === "new" || next === "bot" || next === "agent" || next === "closed") {
+      conversation.support_status = next;
+      if (next === "agent") conversation.subject = SUPPORT_HANDOFF_SUBJECT;
+    }
+    await this.conversations.save(conversation);
+    return conversation;
   }
 
   listNotifications() {

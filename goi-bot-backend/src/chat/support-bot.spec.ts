@@ -15,7 +15,11 @@ describe("support bot", () => {
     assert.match(r.reply, /ארנק/);
   });
 
-  it("falls back on unknown text", () => {
+  it("answers other-topic without a handoff", () => {
+    const r = replyToSupport("נושא אחר");
+    assert.equal(r.handoff, false);
+    assert.match(r.reply, /כתבו/);
+  });
     const r = replyToSupport("שלום מה נשמע");
     assert.equal(r.handoff, false);
     assert.match(r.reply, /נציג אנושי/);

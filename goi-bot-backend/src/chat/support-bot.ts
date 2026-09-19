@@ -21,6 +21,11 @@ const REPLIES = {
 • סטטוס «ממתין לאישור» או השהיה — נציג יבדוק את החשבון.
 • סיסמה: מתוך מסך ההתחברות אפשר לאפס.`,
   human: `מעביר אתכם לנציג אנושי.\nהשיחה נשמרת כאן — נציג יחזור אליכם בהקדם.`,
+  policy: `כללים ומדיניות:
+• תנאי השימוש, דילוגים ותשלום מופיעים במסכי הארנק והפרופיל.
+• מחלוקת על משלוח — שלחו מספר משלוח ותיאור קצר.
+• לשאלות חשבון או אישור — בקשו נציג אנושי.`,
+  other: `כתבו בקצרה במה אפשר לעזור — משלוח, תשלום, אפליקציה או החשבון.\nאפשר גם לבחור נושא מהכרטיסים או לבקש נציג אנושי.`,
   fallback: `לא זיהיתי את הנושא.\nבחרו אחד מהכפתורים למטה, או לחצו «נציג אנושי» אם צריך עזרה אישית.`,
 } as const;
 
@@ -46,11 +51,17 @@ export function replyToSupport(body: string | null | undefined): SupportBotResul
   if (includesAny(text, ["תשלום", "ארנק", "משיכ", "עמלה", "כסף", "משכור"])) {
     return { reply: REPLIES.pay, handoff: false };
   }
-  if (includesAny(text, ["משלוח", "עבוד", "איסוף", "מסיר", "דילג", "דלג", "הזמנ"])) {
+  if (includesAny(text, ["משלוח", "עבוד", "איסוף", "מסיר", "דילג", "דלג", "הזמנ", "בעיה בהזמנה"])) {
     return { reply: REPLIES.job, handoff: false };
   }
-  if (includesAny(text, ["אפליקצ", "מיקום", "gps", "מפה", "התרא", "פוש", "נכשל"])) {
+  if (includesAny(text, ["אפליקצ", "מיקום", "gps", "מפה", "התרא", "פוש", "נכשל", "טכני"])) {
     return { reply: REPLIES.app, handoff: false };
+  }
+  if (includesAny(text, ["כלל", "מדיני", "תנאי"])) {
+    return { reply: REPLIES.policy, handoff: false };
+  }
+  if (includesAny(text, ["נושא אחר", "משהו אחר"])) {
+    return { reply: REPLIES.other, handoff: false };
   }
   if (includesAny(text, ["חשבון", "טלפון", "סיסמ", "פרופיל", "אישור", "מושהה", "חסום"])) {
     return { reply: REPLIES.account, handoff: false };

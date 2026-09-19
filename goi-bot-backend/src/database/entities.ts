@@ -58,6 +58,8 @@ import { TeamMember } from "../accounts/entities/team-member.entity";
 import { RecurringOrder } from "../accounts/entities/recurring-order.entity";
 import { ReferralCommission } from "../accounts/entities/referral-commission.entity";
 import { WalletTransaction } from "../payments/entities/wallet-transaction.entity";
+import { SavedPaymentMethod } from "../payments/entities/saved-payment-method.entity";
+import { WalletChargeIntent } from "../payments/entities/wallet-charge-intent.entity";
 
 /** All TypeORM entities registered for synchronize. No migrations. */
 export const TYPEORM_ENTITIES = [
@@ -109,6 +111,8 @@ export const TYPEORM_ENTITIES = [
   RecurringOrder,
   ReferralCommission,
   WalletTransaction,
+  SavedPaymentMethod,
+  WalletChargeIntent,
   SupportTicket,
   PilotCity,
   Partner,

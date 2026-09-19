@@ -6,6 +6,7 @@ export class Message {
   @Index() @Column({ type: "uuid" }) conversation_id!: string;
   @Index() @Column({ type: "uuid" }) sender_user_id!: string;
   @Column({ type: "varchar", length: 32 }) sender_role!: string;
+  @Column({ type: "boolean", default: false }) from_bot!: boolean;
   @Column({ type: "text", nullable: true }) body!: string | null;
   @Column({ type: "text", nullable: true }) attachment_url!: string | null;
   @Column({ type: "varchar", length: 64, nullable: true }) attachment_kind!: string | null;

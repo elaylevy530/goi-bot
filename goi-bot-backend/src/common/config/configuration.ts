@@ -48,6 +48,7 @@ export default () => {
       appKey: process.env.TRANZILA_APP_KEY || undefined,
       secretKey: process.env.TRANZILA_SECRET_KEY || undefined,
       terminalName: process.env.TRANZILA_TERMINAL_NAME || undefined,
+      tokenTerminalName: process.env.TRANZILA_TOKEN_TERMINAL_NAME || undefined,
       apiUser: process.env.TRANZILA_API_USER || undefined,
       notifySecret: process.env.TRANZILA_NOTIFY_SECRET || undefined,
     },

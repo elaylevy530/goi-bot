@@ -33,6 +33,10 @@ export class Conversation {
   @Column({ type: "text", nullable: true })
   subject!: string | null;
 
+  /** Support inbox: new | bot | agent | closed. Unused for job chats. */
+  @Column({ type: "varchar", length: 16, default: "new" })
+  support_status!: "new" | "bot" | "agent" | "closed";
+
   @Column({ type: "timestamptz" })
   last_message_at!: Date;
 

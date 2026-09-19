@@ -38,6 +38,7 @@ const envSchema = z
     TRANZILA_TERMINAL_NAME: z.string().optional(),
     TRANZILA_API_USER: z.string().optional(),
     TRANZILA_NOTIFY_SECRET: z.string().min(24).optional(),
+    TRANZILA_TOKEN_TERMINAL_NAME: z.string().optional(),
 
     // Meta WhatsApp Cloud API — optional.
     WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().optional(),

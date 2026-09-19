@@ -28,6 +28,7 @@ import {
   OpenConversationDto,
   SupportTicketDto,
   UpdateClassificationRuleDto,
+  UpdateConversationDto,
   UpdateExpressPricingDto,
   UpdateWithdrawalDto,
   WithdrawalDto,
@@ -99,6 +100,17 @@ export class ChatController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.domain.markRead(id, auth.userId, auth.roles);
+  }
+
+  @Patch("conversations/:id")
+  @UseGuards(RolesGuard)
+  @Roles("admin", "manager")
+  updateConversation(
+    @CurrentUser() auth: AuthUserContext,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: UpdateConversationDto,
+  ) {
+    return this.domain.updateConversation(id, auth.userId, auth.roles, data(body));
   }
 }
 

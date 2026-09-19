@@ -33,7 +33,13 @@ export class TranzilaClient {
     if (!appKey || !secretKey || !terminalName) {
       throw new AppError("config_missing", { userMessage: "סליקת כרטיס אינה זמינה כרגע" });
     }
-    return { appKey, secretKey, terminalName };
+    const tokenTerminal =
+      this.config.get<string>("tranzila.tokenTerminalName") || terminalName;
+    return { appKey, secretKey, terminalName, tokenTerminal };
+  }
+
+  tokenTerminalName(): string {
+    return this.creds().tokenTerminal;
   }
 
   private authHeaders(appKey: string, secretKey: string): Record<string, string> {
@@ -49,15 +55,20 @@ export class TranzilaClient {
   }
 
   /** Creates a handshake token (thtk, valid ~20 min) locked to `sum`. */
-  async createHandshake(sum: number, requestParams: Record<string, string>): Promise<string> {
-    const { appKey, secretKey, terminalName } = this.creds();
+  async createHandshake(
+    sum: number,
+    requestParams: Record<string, string>,
+    terminalName?: string,
+  ): Promise<string> {
+    const creds = this.creds();
+    const terminal = terminalName ?? creds.terminalName;
     const res = await fetch(`${API_BASE}/v2/handshake/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...this.authHeaders(appKey, secretKey),
+        ...this.authHeaders(creds.appKey, creds.secretKey),
       },
-      body: JSON.stringify({ terminal_name: terminalName, sum, request_params: requestParams }),
+      body: JSON.stringify({ terminal_name: terminal, sum, request_params: requestParams }),
     });
     const body = (await res.json().catch(() => null)) as HandshakeResponse | null;
     if (!res.ok || !body || body.error_code !== 0 || !body.thtk) {
@@ -67,19 +78,96 @@ export class TranzilaClient {
   }
 
   /** Public, non-secret iframe URL. `sum` must equal the handshake sum. */
-  buildIframeUrl(params: { thtk: string; sum: number; jobId: string }): string {
-    const { terminalName } = this.creds();
+  buildIframeUrl(params: {
+    thtk: string;
+    sum: number;
+    extra?: Record<string, string>;
+    terminalName?: string;
+    tokenize?: boolean;
+    tranmode?: string;
+  }): string {
+    const creds = this.creds();
+    const terminal = params.terminalName ?? creds.terminalName;
     const qs = new URLSearchParams({
       sum: String(params.sum),
       currency: CURRENCY_NIS,
-      tranmode: "A",
+      tranmode: params.tranmode ?? "A",
       thtk: params.thtk,
       lang: "il",
-      goi_job: params.jobId,
+      ...(params.extra ?? {}),
     });
-    // Personal response_hash uses the API user + TRANZILA_SECRET_KEY (Hosted Fields / iframe notify).
+    if (params.tokenize) qs.set("tokenize", "1");
     const apiUser = this.config.get<string>("tranzila.apiUser");
     if (apiUser) qs.set("requested_by_user", apiUser);
-    return `${IFRAME_BASE}/${encodeURIComponent(terminalName)}/iframenew.php?${qs.toString()}`;
+    return `${IFRAME_BASE}/${encodeURIComponent(terminal)}/iframenew.php?${qs.toString()}`;
   }
+
+  /** Charges a previously saved Tranzila card token. Never send PAN. */
+  async chargeToken(params: {
+    amount: number;
+    token: string;
+    expireMonth: number;
+    expireYear: number;
+  }): Promise<{ transactionId: string }> {
+    const { appKey, secretKey, tokenTerminal } = this.creds();
+    const res = await fetch(`${API_BASE}/v1/transaction/credit_card/create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...this.authHeaders(appKey, secretKey),
+      },
+      body: JSON.stringify({
+        terminal_name: tokenTerminal,
+        txn_type: "debit",
+        txn_currency_code: "ILS",
+        card_number: params.token,
+        expire_month: params.expireMonth,
+        expire_year: params.expireYear,
+        items: [
+          {
+            name: "Wallet recharge",
+            type: "I",
+            unit_price: params.amount,
+            units_number: 1,
+            price_type: "G",
+            vat_percent: 0,
+          },
+        ],
+      }),
+    });
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!res.ok || !tokenChargeSucceeded(body)) {
+      throw new AppError("upstream_failed", { userMessage: "החיוב נדחה. נסו כרטיס אחר או טעינה מחדש." });
+    }
+    const transactionId =
+      nestedString(body, "transaction_id") ||
+      nestedString(body, "transaction_response", "transaction_id") ||
+      nestedString(body, "ConfirmationCode") ||
+      "";
+    if (!transactionId) {
+      throw new AppError("upstream_failed", { userMessage: "החיוב נדחה. נסו כרטיס אחר או טעינה מחדש." });
+    }
+    return { transactionId };
+  }
+}
+
+function nestedString(body: Record<string, unknown> | null, ...path: string[]): string {
+  let cur: unknown = body;
+  for (const key of path) {
+    if (!cur || typeof cur !== "object") return "";
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return typeof cur === "string" || typeof cur === "number" ? String(cur).trim() : "";
+}
+
+function tokenChargeSucceeded(body: Record<string, unknown> | null): boolean {
+  if (!body) return false;
+  const codes = [
+    nestedString(body, "processor_response_code"),
+    nestedString(body, "Response"),
+    nestedString(body, "transaction_response", "processor_response_code"),
+  ];
+  if (codes.some((c) => c === "000" || c === "0")) return true;
+  const tr = body.transaction_response;
+  return Boolean(tr && typeof tr === "object" && (tr as { success?: boolean }).success === true);
 }
