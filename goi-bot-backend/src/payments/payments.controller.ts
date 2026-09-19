@@ -36,8 +36,10 @@ export class PaymentsController {
     return this.payments.updateBillingRecord(id, dto);
   }
 
+  // Manual admin override only; real card payments are confirmed by the Tranzila notify.
   @Post("per-job/capture")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "manager")
   capturePerJob(@Body() dto: CapturePerJobDto) {
     return this.payments.capturePerJob(dto);
   }

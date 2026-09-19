@@ -32,6 +32,13 @@ const envSchema = z
     GREEN_API_INSTANCE_ID: z.string().optional(),
     GREEN_API_TOKEN: z.string().optional(),
 
+    // Tranzila card payments — optional; checkout/notify fail closed when unset.
+    TRANZILA_APP_KEY: z.string().optional(),
+    TRANZILA_SECRET_KEY: z.string().optional(),
+    TRANZILA_TERMINAL_NAME: z.string().optional(),
+    TRANZILA_API_USER: z.string().optional(),
+    TRANZILA_NOTIFY_SECRET: z.string().min(24).optional(),
+
     // Meta WhatsApp Cloud API — optional.
     WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().optional(),
     WHATSAPP_CLOUD_ACCESS_TOKEN: z.string().optional(),

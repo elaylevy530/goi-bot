@@ -1,4 +1,6 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { Transform } from "class-transformer";
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from "class-validator";
+import { normalizeOfferRadiusStored } from "../../common/offer-radius";
 import { UpdateCourierSelfDto } from "./update-courier-self.dto";
 
 /** Admin/manager may patch everything a courier can, plus operational fields. */
@@ -53,4 +55,12 @@ export class UpdateCourierAdminDto extends UpdateCourierSelfDto {
   @IsString()
   @MaxLength(32)
   invoice_status?: string | null;
+
+  /** GPS offer radius in km. Couriers cannot change this from the app. */
+  @IsOptional()
+  @Transform(({ value }) => normalizeOfferRadiusStored(value))
+  @ValidateIf((_, v) => v != null)
+  @IsString()
+  @MaxLength(8)
+  work_distance_from_base?: string | null;
 }

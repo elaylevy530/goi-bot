@@ -17,8 +17,8 @@ export class BillingRecord {
   job_id!: string;
 
   @Index()
-  @Column({ type: "uuid" })
-  business_id!: string;
+  @Column({ type: "uuid", nullable: true })
+  business_id!: string | null;
 
   @Column({ type: "varchar", length: 64, default: "pending" })
   provider!: string;
@@ -47,6 +47,13 @@ export class BillingRecord {
 
   @Column({ type: "varchar", length: 128, nullable: true })
   paypal_payout_batch_id!: string | null;
+
+  @Index({ unique: true, where: '"tranzila_transaction_id" IS NOT NULL' })
+  @Column({ type: "varchar", length: 128, nullable: true })
+  tranzila_transaction_id!: string | null;
+
+  @Column({ type: "varchar", length: 128, nullable: true })
+  tranzila_index!: string | null;
 
   @Column({ type: "text", nullable: true })
   error_message!: string | null;

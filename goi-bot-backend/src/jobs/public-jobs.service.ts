@@ -310,6 +310,12 @@ export class PublicJobsService {
     if (job.selected_courier_id) {
       return { ok: true as const, already_assigned: true };
     }
+    const dueNow = Number(
+      ((job.pricing_snapshot ?? {}) as Record<string, unknown>).amount_to_charge_now ?? 0,
+    );
+    if (dueNow > 0 && !job.per_job_paid) {
+      throw new AppError("conflict", { userMessage: "יש להשלים את התשלום לפני שליחת ההזמנה" });
+    }
 
     const result = await this.jobsService.dispatchJob(job.id);
     return {

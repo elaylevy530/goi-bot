@@ -44,6 +44,13 @@ export default () => {
       instanceId: process.env.GREEN_API_INSTANCE_ID || undefined,
       token: process.env.GREEN_API_TOKEN || undefined,
     },
+    tranzila: {
+      appKey: process.env.TRANZILA_APP_KEY || undefined,
+      secretKey: process.env.TRANZILA_SECRET_KEY || undefined,
+      terminalName: process.env.TRANZILA_TERMINAL_NAME || undefined,
+      apiUser: process.env.TRANZILA_API_USER || undefined,
+      notifySecret: process.env.TRANZILA_NOTIFY_SECRET || undefined,
+    },
     whatsappCloud: {
       phoneNumberId: process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID || undefined,
       accessToken: process.env.WHATSAPP_CLOUD_ACCESS_TOKEN || undefined,

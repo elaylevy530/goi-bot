@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -48,12 +49,15 @@ import { resolveJobTiming } from "../jobs/job-timing";
 import { withdrawableBalance } from "../accounts/courier-wallet-balance";
 import { OfferEvent } from "../jobs/entities/offer-event.entity";
 import { AdminPushService } from "../push/admin-push.service";
+import { ChatPushService } from "../push/chat-push.service";
 import { WaMaintenance } from "../whatsapp/entities/wa-maintenance.entity";
 
 type Mutable = Record<string, unknown>;
 
 @Injectable()
 export class DomainService {
+  private readonly logger = new Logger(DomainService.name);
+
   constructor(
     @InjectRepository(JobOutcome) private readonly outcomes: Repository<JobOutcome>,
     @InjectRepository(StatusLog) private readonly logs: Repository<StatusLog>,
@@ -89,6 +93,7 @@ export class DomainService {
     @InjectRepository(ReferralCommission)
     private readonly referralCommissions: Repository<ReferralCommission>,
     private readonly adminPush: AdminPushService,
+    private readonly chatPush: ChatPushService,
     private readonly auth: AuthService,
   ) {}
 
@@ -276,6 +281,12 @@ export class DomainService {
     }
     await this.conversations.save(conversation);
 
+    this.notifyChatPush(
+      conversation.id,
+      senderRole,
+      message.body ?? message.attachment_name,
+    );
+
     if (supportBotOpen) {
       const bot = replyToSupport(message.body);
       if (bot.handoff) {
@@ -308,7 +319,33 @@ export class DomainService {
     if (conversation.kind === "courier_support") conversation.unread_courier += 1;
     if (conversation.kind === "business_support") conversation.unread_business += 1;
     await this.conversations.save(conversation);
+    this.notifyChatPush(conversation.id, "admin", body);
     return botMessage;
+  }
+
+  /** Fail-soft: chat save must succeed even if Web Push is down. */
+  private notifyChatPush(
+    conversationId: string,
+    senderRole: string,
+    bodyPreview: string | null | undefined,
+  ) {
+    const role =
+      senderRole === "courier" || senderRole === "business" || senderRole === "admin"
+        ? senderRole
+        : null;
+    if (!role) return;
+    this.chatPush
+      .handle({
+        kind: "conversation_message",
+        conversation_id: conversationId,
+        sender_role: role,
+        body_preview: bodyPreview ?? undefined,
+      })
+      .catch((e) => {
+        this.logger.warn(
+          `chat push failed conv=${conversationId}: ${e instanceof Error ? e.message : e}`,
+        );
+      });
   }
 
   async markRead(id: string, userId: string, roles: AppRole[]) {
@@ -425,11 +462,6 @@ export class DomainService {
     if (!isStaff) {
       if (amount < 1) {
         throw new BadRequestException("סכום משיכה לא תקין");
-      }
-      const existing = await this.withdrawals.find({ where: { courier_id: courierId } });
-      const hasPending = existing.some((w) => w.status !== "נדחתה" && w.status !== "rejected" && w.status !== "שולמה" && w.status !== "paid");
-      if (hasPending) {
-        throw new BadRequestException("יש כבר בקשת משיכה ממתינה");
       }
       const available = await this.withdrawableBalanceForCourier(courierId);
       if (Math.round(amount * 100) > Math.round(available * 100)) {

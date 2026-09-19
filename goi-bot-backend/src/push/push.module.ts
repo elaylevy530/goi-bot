@@ -38,6 +38,6 @@ import { WebPushService } from "./web-push.service";
     PushSubscriptionsService,
     AdminPushService,
   ],
-  exports: [WebPushService, OfferPushService, AdminPushService],
+  exports: [WebPushService, OfferPushService, AdminPushService, ChatPushService],
 })
 export class PushModule {}

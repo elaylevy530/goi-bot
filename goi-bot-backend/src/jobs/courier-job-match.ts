@@ -1,3 +1,5 @@
+import { parseOfferRadiusKm } from "../common/offer-radius";
+
 export type VehicleClass = "bike" | "moto" | "car" | "van";
 
 const RANK: Record<VehicleClass, number> = {
@@ -117,15 +119,6 @@ function distanceKm(aLat?: unknown, aLng?: unknown, bLat?: unknown, bLng?: unkno
   return 2 * r * Math.asin(Math.sqrt(x));
 }
 
-function radiusKmFromLabel(label?: string | null): number {
-  if (!label) return 15;
-  if (label.includes("כל הארץ")) return 200;
-  if (label.includes("המרכז")) return 30;
-  if (label.includes("בתוך העיר")) return 5;
-  const m = String(label).match(/(\d+)/);
-  return m ? Math.max(2, Math.min(200, parseInt(m[1], 10))) : 15;
-}
-
 function hasFreshGps(courier?: {
   location_sharing_enabled?: boolean | null;
   last_lat?: number | null;
@@ -187,7 +180,7 @@ export function courierIsNearbyOrMatching(
   } | null,
 ) {
   if (!courier) return false;
-  const radius = radiusKmFromLabel(courier.work_distance_from_base);
+  const radius = parseOfferRadiusKm(courier.work_distance_from_base);
   if (hasFreshGps(courier)) {
     const km = distanceKm(job?.pickup_lat, job?.pickup_lng, courier.last_lat, courier.last_lng);
     if (km != null && km <= radius) return true;

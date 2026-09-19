@@ -7,6 +7,9 @@ import { BillingRecord } from "./entities/billing-record.entity";
 import { WalletTransaction } from "./entities/wallet-transaction.entity";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
+import { TranzilaPaymentsService } from "./tranzila-payments.service";
+import { TranzilaClient } from "./tranzila.client";
+import { TranzilaController } from "./tranzila.controller";
 
 @Module({
   imports: [
@@ -18,8 +21,8 @@ import { PaymentsService } from "./payments.service";
       WalletTransaction,
     ]),
   ],
-  controllers: [PaymentsController],
-  providers: [PaymentsService],
+  controllers: [PaymentsController, TranzilaController],
+  providers: [PaymentsService, TranzilaPaymentsService, TranzilaClient],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

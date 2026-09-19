@@ -69,11 +69,6 @@ export class UpdateCourierSelfDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(60)
-  work_distance_from_base?: string | null;
-
-  @IsOptional()
-  @IsString()
   @MaxLength(64)
   vehicle_type?: string | null;
 
