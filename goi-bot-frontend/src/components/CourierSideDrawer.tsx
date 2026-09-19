@@ -367,12 +367,12 @@ function CourierSideDrawer() {
       <SheetContent
         side="right"
         dir="rtl"
-        className="inset-y-0 right-0 h-dvh max-h-dvh w-[min(300px,86vw)] max-w-[300px] gap-0 overflow-hidden rounded-none border-0 bg-surface p-0 shadow-card-strong sm:max-w-[300px] [&>button]:hidden"
+        className="inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-[min(300px,86vw)] max-w-[300px] flex-col gap-0 overflow-hidden rounded-none border-0 bg-surface p-0 shadow-card-strong sm:max-w-[300px] [&>button]:hidden"
       >
         <SheetTitle className="sr-only">תפריט</SheetTitle>
 
         <div
-          className="flex h-full min-h-0 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
           style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
         >
           <div className="shrink-0 px-3 pb-1.5 pt-2">
@@ -427,7 +427,7 @@ function CourierSideDrawer() {
             </div>
           </div>
 
-          <nav className="shrink-0 overflow-hidden px-1.5" aria-label="תפריט צד">
+          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5" aria-label="תפריט צד">
             <NavSection title="עבודה" dense>
               {work.map((item) => (
                 <DrawerNavLink key={item.key} item={item} path={path} onNavigate={closeMenu} dense />
@@ -441,10 +441,10 @@ function CourierSideDrawer() {
             </NavSection>
           </nav>
 
-          <div className="mt-1.5 shrink-0 border-t border-border/80">
+          <div className="shrink-0 border-t border-border/80">
             <InstallAppSidebarItem variant="light" compact />
             <CourierLogoutButton compact onSignOut={() => void handleSignOut()} />
-            <div className="pb-[max(0.35rem,env(safe-area-inset-bottom))]" aria-hidden />
+            <div className="pb-[max(0.35rem,env(safe-area-inset-bottom,0px))]" aria-hidden />
           </div>
         </div>
       </SheetContent>
@@ -469,12 +469,12 @@ export function CourierDesktopNav() {
   };
 
   return (
-    <aside className="hidden h-full w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-surface lg:flex">
+    <aside className="hidden h-full min-h-0 w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-surface lg:flex">
       <div className="shrink-0 border-b border-border px-5 py-4">
         <p className="text-lg font-extrabold text-text-strong">Goi שליח</p>
         <p className="mt-1 truncate text-sm text-text-muted">{displayName}</p>
       </div>
-      <nav className="shrink-0 overflow-hidden px-2 py-2" aria-label="תפריט מחשב">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" aria-label="תפריט מחשב">
         <NavSection title="עבודה">
           {work.map((item) => (
             <DrawerNavLink key={item.key} item={item} path={path} />
@@ -487,7 +487,7 @@ export function CourierDesktopNav() {
           ))}
         </NavSection>
       </nav>
-      <div className="mt-1.5 shrink-0 border-t border-border/80 pt-1">
+      <div className="shrink-0 border-t border-border/80 pt-1">
         <CourierLogoutButton onSignOut={() => void handleSignOut()} />
       </div>
     </aside>

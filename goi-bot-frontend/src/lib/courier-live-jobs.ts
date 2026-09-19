@@ -1,3 +1,4 @@
+import { parseOfferRadiusKm } from "@/lib/courier-offer-radius";
 import { courierVehicleFitsJob } from "@/lib/courier-vehicle";
 import { isWorkAreaLabel, locationMatchesWorkAreas, NATIONWIDE_WORK_AREA } from "@/lib/regions";
 
@@ -116,15 +117,6 @@ export function isCourierApproved(courier?: any | null) {
 
 
 
-function radiusKmFromLabel(label?: string | null): number {
-  if (!label) return 15;
-  if (label.includes("כל הארץ")) return 200;
-  if (label.includes("המרכז")) return 30;
-  if (label.includes("בתוך העיר")) return 5;
-  const m = String(label).match(/(\d+)/);
-  return m ? Math.max(2, Math.min(200, parseInt(m[1], 10))) : 15;
-}
-
 function normJobType(v?: string | null) {
   return String(v ?? "")
     .replace(/[\s/\\|·\-–—]+/g, "")
@@ -189,7 +181,7 @@ export function matchesCourier(job: any, courier?: any | null) {
   if (!courierSupportsJobType(job, courier)) return false;
   if (!courierVehicleFitsJob(job, courier)) return false;
 
-  const personalRadius = radiusKmFromLabel(courier.work_distance_from_base);
+  const personalRadius = parseOfferRadiusKm(courier.work_distance_from_base);
   const pickup = String(job?.pickup_area || job?.pickup_address || "").trim();
   if (hasFreshGps(courier)) {
     const km = distanceKm(job?.pickup_lat, job?.pickup_lng, courier.last_lat, courier.last_lng);

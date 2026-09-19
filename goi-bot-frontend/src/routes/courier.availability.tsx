@@ -36,13 +36,6 @@ export const Route = createFileRoute("/courier/availability")({
 
 type VehicleChoice = (typeof COURIER_VEHICLE_OPTIONS)[number]["value"] | "";
 
-const DISTANCE_OPTIONS = [
-  { value: "בתוך העיר", label: "בתוך העיר" },
-  { value: "15 ק״מ", label: "15 ק״מ" },
-  { value: "המרכז", label: "אזור רחב" },
-  { value: "כל הארץ", label: "כל הארץ" },
-] as const;
-
 function normalizeVehicle(value: string | null | undefined): VehicleChoice {
   const canonical = canonicalizeVehicleValue(value);
   if (COURIER_VEHICLE_OPTIONS.some((o) => o.value === canonical)) {
@@ -82,7 +75,6 @@ function AvailabilityPage() {
   const [cities, setCities] = useState<string[]>([]);
   const [vehicle, setVehicle] = useState<VehicleChoice>("");
   const [areasError, setAreasError] = useState<string | null>(null);
-  const [distance, setDistance] = useState("15 ק״מ");
   const [shareLocation, setShareLocation] = useState(true);
 
   const approved = me?.courier_status === "פעיל" && me?.is_paused !== true;
@@ -94,14 +86,11 @@ function AvailabilityPage() {
     const row = me as {
       working_areas?: string[] | null;
       vehicle_type?: string | null;
-      work_distance_from_base?: string | null;
       location_sharing_enabled?: boolean | null;
     };
     setAreas(expandWorkAreasForCards(row.working_areas));
     setCities(splitWorkingAreas(row.working_areas).legacy);
     setVehicle(normalizeVehicle(row.vehicle_type));
-    const dist = String(row.work_distance_from_base ?? "").trim();
-    setDistance(DISTANCE_OPTIONS.some((o) => o.value === dist) ? dist : dist || "15 ק״מ");
     setShareLocation(row.location_sharing_enabled !== false);
     setAreasError(null);
   }, [me]);
@@ -146,7 +135,6 @@ function AvailabilityPage() {
         working_areas: areas.length > 0 ? composeWorkingAreas(areas, cities) : cities,
       };
       if (vehicle) payload.vehicle_type = vehicle;
-      payload.work_distance_from_base = distance;
       payload.location_sharing_enabled = shareLocation;
       await nestUpdateMyCourier(payload);
     },
@@ -364,36 +352,7 @@ function AvailabilityPage() {
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-[1.5rem] border border-black/5 bg-white p-4 shadow-sm space-y-4">
-              <div>
-                <SectionLabel
-                  step={3}
-                  title="רדיוס מהמיקום שלך"
-                  subtitle="כמה רחוק לקבל הצעות לפי GPS"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  {DISTANCE_OPTIONS.map((option) => {
-                    const on = distance === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => setDistance(option.value)}
-                        className={cn(
-                          "min-h-11 rounded-2xl border text-sm font-extrabold transition-colors",
-                          on
-                            ? "border-primary bg-primary-soft text-primary"
-                            : "border-black/5 bg-[#F7F8F7] text-text-strong",
-                        )}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="h-px bg-black/5" />
+            <section className="overflow-hidden rounded-[1.5rem] border border-black/5 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <Switch
                   checked={shareLocation}
@@ -404,7 +363,7 @@ function AvailabilityPage() {
                 <div className="min-w-0 flex-1 text-right">
                   <p className="text-sm font-extrabold text-text-strong">שיתוף מיקום בזמן אמת</p>
                   <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
-                    אופציונלי. עם מיקום תקבל גם הצעות לפי קרבה, ובלי — לפי האזורים והערים שבחרת
+                    אופציונלי. עם מיקום תקבל גם הצעות לפי רדיוס GPS שהוגדר במערכת, ובלי — לפי האזורים והערים שבחרת
                   </p>
                 </div>
               </div>
@@ -418,7 +377,7 @@ function AvailabilityPage() {
               <div className="min-w-0 flex-1 text-right">
                 <h2 className="text-sm font-extrabold text-text-strong">איך זה עובד?</h2>
                 <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
-                  Goi ישלח לך הצעות לפי האזורים והערים שבחרת וגם לפי GPS כששיתוף מיקום דולק. אפשר להיות זמין גם בלי GPS.
+                  Goi ישלח לך הצעות לפי האזורים והערים שבחרת, וגם לפי רדיוס GPS שהוגדר במערכת כששיתוף מיקום דולק. אפשר להיות זמין גם בלי GPS.
                 </p>
               </div>
             </section>

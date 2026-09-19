@@ -76,7 +76,7 @@ export const RULE_FIELDS = [
   { value: "working_areas", label: "אזורי עבודה רצויים" },
   { value: "pickup_areas", label: "אזורי איסוף" },
   { value: "dropoff_areas", label: "אזורי מסירה" },
-  { value: "work_distance_from_base", label: "מרחק מבסיס" },
+  { value: "work_distance_from_base", label: "רדיוס קבלת משלוחים" },
   { value: "job_types", label: "סוגי עבודה" },
   { value: "availability", label: "זמינות" },
 ] as const;

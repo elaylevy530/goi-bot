@@ -33,6 +33,15 @@ export const confirmGuestOrderFn = createServerFn({ method: "POST" })
     nestServerFetch(`/api/public/jobs/${data.job_id}/confirm`, { method: "POST", body: data }),
   );
 
+export const createTranzilaCheckoutFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => refSchema.parse(data))
+  .handler(({ data }) =>
+    nestServerFetch<
+      | { paid: true }
+      | { paid: false; iframe_url: string; amount: number; currency: string; expires_at: string }
+    >("/api/payments/tranzila/checkout", { method: "POST", body: data }),
+  );
+
 export const getGuestJobQuotesFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => refSchema.parse(data))
   .handler(({ data }) =>

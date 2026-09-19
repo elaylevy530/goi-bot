@@ -211,14 +211,14 @@ function NotificationsPage() {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
-          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:max-w-5xl">
-            <section className="overflow-hidden rounded-card bg-courier-hero p-4 text-primary-foreground shadow-card-strong">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-5">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-2.5 lg:max-w-5xl">
+            <section className="overflow-hidden rounded-card bg-courier-hero p-3 text-primary-foreground shadow-card-strong">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 text-right">
                   <p className="text-sm text-primary-foreground/80">הודעות חדשות</p>
-                  <p className="mt-1 text-3xl font-black tabular-nums">{unreadCount}</p>
-                  <p className="mt-2 text-xs text-primary-foreground/70">
+                  <p className="mt-0.5 text-2xl font-black tabular-nums">{unreadCount}</p>
+                  <p className="mt-1 text-xs text-primary-foreground/70">
                     {unreadCount === 0
                       ? "הכול מעודכן — אין הודעות שלא נקראו"
                       : unreadCount === 1
@@ -226,8 +226,8 @@ function NotificationsPage() {
                         : `יש ${unreadCount} הודעות שממתינות לקריאה`}
                   </p>
                 </div>
-                <div className="grid size-14 shrink-0 place-items-center rounded-card bg-primary-foreground/10">
-                  <Bell className="size-7" aria-hidden />
+                <div className="grid size-11 shrink-0 place-items-center rounded-card bg-primary-foreground/10">
+                  <Bell className="size-6" aria-hidden />
                 </div>
               </div>
               {unreadCount > 0 && (
@@ -235,7 +235,7 @@ function NotificationsPage() {
                   type="button"
                   onClick={() => markAllRead.mutate()}
                   disabled={markAllRead.isPending}
-                  className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-courier-hero active:bg-primary-soft disabled:opacity-60"
+                  className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-pill bg-surface text-sm font-extrabold text-courier-hero active:bg-primary-soft disabled:opacity-60"
                 >
                   <CheckCheck className="size-4" aria-hidden />
                   {markAllRead.isPending ? "מסמן…" : "סמן הכל כנקרא"}
@@ -244,26 +244,26 @@ function NotificationsPage() {
             </section>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+              <div className="rounded-card border border-border bg-surface p-2.5 shadow-card">
                 <p className="text-xs font-bold text-text-strong">חדשות</p>
-                <p className="mt-1 text-[11px] text-text-muted">ממתינות לקריאה</p>
-                <p className={cn("mt-2 text-xl font-black tabular-nums", unreadCount > 0 ? "text-primary" : "text-text-strong")}>
+                <p className="mt-0.5 text-[11px] text-text-muted">ממתינות לקריאה</p>
+                <p className={cn("mt-1 text-lg font-black tabular-nums", unreadCount > 0 ? "text-primary" : "text-text-strong")}>
                   {unreadCount}
                 </p>
               </div>
-              <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+              <div className="rounded-card border border-border bg-surface p-2.5 shadow-card">
                 <p className="text-xs font-bold text-text-strong">נקראו</p>
-                <p className="mt-1 text-[11px] text-text-muted">הודעות שכבר ראית</p>
-                <p className="mt-2 text-xl font-black tabular-nums text-text-strong">{readCount}</p>
+                <p className="mt-0.5 text-[11px] text-text-muted">הודעות שכבר ראית</p>
+                <p className="mt-1 text-lg font-black tabular-nums text-text-strong">{readCount}</p>
               </div>
             </div>
 
-            <section className="rounded-card border border-border bg-surface p-3 shadow-card">
+            <section className="rounded-card border border-border bg-surface p-2.5 shadow-card">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h2 className="text-sm font-extrabold text-text-strong">סינון לפי סוג</h2>
                 <p className="text-[11px] text-text-muted">{counts[filter]} בסינון הנוכחי</p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {FILTERS.map((item) => {
                   const Icon = item.icon;
                   const active = filter === item.key;
@@ -275,17 +275,17 @@ function NotificationsPage() {
                       onClick={() => setFilter(item.key)}
                       aria-pressed={active}
                       className={cn(
-                        "inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3 text-xs font-extrabold transition-colors",
+                        "inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-pill border px-1.5 text-[11px] font-extrabold transition-colors",
                         active
                           ? "border-transparent bg-courier-hero text-primary-foreground shadow-card"
                           : "border-border bg-bg text-text-strong",
                       )}
                     >
-                      <Icon className="size-3.5" aria-hidden />
-                      {item.label}
+                      <Icon className="size-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">{item.label}</span>
                       <span
                         className={cn(
-                          "min-w-5 rounded-pill px-1.5 py-0.5 text-[10px] tabular-nums",
+                          "min-w-4 rounded-pill px-1 py-0.5 text-[10px] tabular-nums",
                           active ? "bg-primary-foreground/15" : unread > 0 ? "bg-primary-soft text-primary" : "bg-muted text-text-muted",
                         )}
                       >
@@ -308,6 +308,7 @@ function NotificationsPage() {
               </section>
             ) : visible.length === 0 ? (
               <ListEmptyState
+                className="px-4 py-8"
                 title={filter === "all" ? "אין הודעות עדיין" : EMPTY_BY_CATEGORY[filter].title}
                 description={filter === "all" ? "כשנשלח עדכון מהמערכת — הוא יופיע כאן." : EMPTY_BY_CATEGORY[filter].description}
                 icon={<Inbox className="size-6" />}

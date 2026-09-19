@@ -187,15 +187,15 @@ function WalletPage() {
     fillBankFields();
     setBankEditOpen(true);
   };
-  const requestBlockReason = latestPending
-    ? "יש כבר בקשת משיכה ממתינה"
-    : !hasBank
-      ? "יש למלא פרטי בנק"
-      : available <= 0
-        ? currentMonthEarned > 0
-          ? `רווחי ${currentMonthLabel} עדיין נעולים. ₪ ${money(unlockingAmount)} ייפתחו ב-${unlockDateLabel}`
+  const requestBlockReason = !hasBank
+    ? "יש למלא פרטי בנק"
+    : available <= 0
+      ? currentMonthEarned > 0
+        ? `רווחי ${currentMonthLabel} עדיין נעולים. ₪ ${money(unlockingAmount)} ייפתחו ב-${unlockDateLabel}`
+        : reserved > 0
+          ? "היתרה הזמינה כבר כלולה בבקשת משיכה ממתינה"
           : "אין יתרה למשיכה מחודשים שנסגרו"
-        : null;
+      : null;
   const needsInvoice = (me as { invoice_status?: string | null } | null)?.invoice_status === "כן";
   const invoiceWithdrawalId = invoiceTargetId || latestPending?.id || null;
   const invoiceAlreadyAttached = !!latestPending?.receipt_url;
@@ -263,7 +263,6 @@ function WalletPage() {
     mutationFn: async () => {
       const n = Number(amount);
       if (!me?.id) throw new Error("לא מחובר");
-      if (latestPending) throw new Error("יש כבר בקשת משיכה ממתינה");
       if (!hasBank) throw new Error("יש למלא פרטי בנק");
       if (!Number.isFinite(n) || n < 1) throw new Error("יש להזין סכום למשיכה");
       if (n > available) throw new Error("הסכום גבוה מהיתרה הזמינה");
@@ -322,7 +321,7 @@ function WalletPage() {
       toast.success("פרטי הבנק נשמרו");
       setBankEditOpen(false);
       qc.invalidateQueries({ queryKey: ["my-courier-me"] });
-      if (available > 0 && !latestPending) {
+      if (available > 0) {
         setFieldError(null);
         setAmount(String(Number(available.toFixed(2))));
         setWithdrawOpen(true);
@@ -415,6 +414,11 @@ function WalletPage() {
                   <p className="mt-1 text-[11px] text-text-muted">
                     הוגשה בתאריך: {latestPending.created_at ? new Date(latestPending.created_at).toLocaleDateString("he-IL") : "—"}
                   </p>
+                  {available > 0 && (
+                    <p className="mt-1 text-[11px] text-text-muted">
+                      אפשר להגיש בקשה נוספת על ₪ {money(available)} שנותרו זמינים.
+                    </p>
+                  )}
                   <WithdrawSteps status={latestPending.status} />
                   {needsInvoice && invoiceAlreadyAttached && (
                     <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-success-text">
@@ -639,6 +643,7 @@ function WalletPage() {
           <div className="space-y-3">
             <p className="text-sm text-text-subtle">
               יתרה זמינה למשיכה: ₪ {money(available)}
+              {reserved > 0 ? `. ₪ ${money(reserved)} שמורים בבקשות ממתינות` : ""}
               {unlockingAmount > 0
                 ? `. ₪ ${money(unlockingAmount)} מרווחי ${currentMonthLabel} ייפתחו ב-${unlockDateLabel}`
                 : ""}

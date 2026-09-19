@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { CourierStatusBadge } from "@/components/StatusBadges";
 import { nestCreateCourier, nestListCouriers, nestUpdateCourier } from "@/lib/nest-accounts";
+import { formatOfferRadiusKm } from "@/lib/courier-offer-radius";
 import { nestProvisionCourier } from "@/lib/nest-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { reclassifyCourier, deleteCourier, approveCourier } from "@/lib/courier-intake.functions";
@@ -755,7 +756,7 @@ function CouriersPage() {
                 <TableHead>אזורי עבודה</TableHead>
                 <TableHead>אזורי איסוף</TableHead>
                 <TableHead>אזורי מסירה</TableHead>
-                <TableHead>מרחק עבודה</TableHead>
+                <TableHead>רדיוס קבלה</TableHead>
                 <TableHead>כלי עבודה</TableHead>
                 <TableHead>סוגי עבודות</TableHead>
                 <TableHead>זמינות</TableHead>
@@ -794,7 +795,7 @@ function CouriersPage() {
                   <TableCell className="text-xs max-w-[140px] truncate" title={((c as any).dropoff_areas ?? []).join(", ")}>
                     {((c as any).dropoff_areas ?? []).join(", ") || "—"}
                   </TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{(c as any).work_distance_from_base ?? "—"}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{formatOfferRadiusKm((c as any).work_distance_from_base)}</TableCell>
                   <TableCell className="text-xs max-w-[140px] truncate" title={((c as any).vehicle_types ?? []).join(", ")}>
                     {((c as any).vehicle_types ?? []).join(", ") || c.vehicle_type || "—"}
                   </TableCell>

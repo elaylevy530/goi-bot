@@ -1,9 +1,13 @@
 import { useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ArrowRight, Radar, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import {
+  confirmGuestOrderFn,
+  createTranzilaCheckoutFn,
   getGuestJobStatusFn,
+  getGuestOrderDetailFn,
   type createGuestOrderFn,
 } from "@/lib/guest-order.functions";
 
@@ -18,8 +22,40 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Payment step — card checkout is not connected yet. */
-export function PaymentSheet({ created, onBack }: { created: CreatedOrder; onDone: () => void; onBack: () => void }) {
+/**
+ * Payment step — Tranzila iframe. The server marks the job paid from Tranzila's notify;
+ * we only poll per_job_paid, then confirm (dispatch) the order and call onDone.
+ */
+export function PaymentSheet({ created, onDone, onBack }: { created: CreatedOrder; onDone: () => void; onBack: () => void }) {
+  const ref = { job_id: created.job_id, tracking_token: created.tracking_token };
+  const checkoutFn = useServerFn(createTranzilaCheckoutFn);
+  const detailFn = useServerFn(getGuestOrderDetailFn);
+  const confirmFn = useServerFn(confirmGuestOrderFn);
+
+  const checkout = useQuery({
+    queryKey: ["tranzila-checkout", created.job_id],
+    queryFn: () => checkoutFn({ data: ref }),
+    staleTime: Infinity,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  const { data: detail } = useQuery({
+    queryKey: ["tranzila-paid", created.job_id],
+    queryFn: () => detailFn({ data: ref }),
+    refetchInterval: 3000,
+  });
+  const paid = Boolean(detail?.job?.per_job_paid);
+
+  useEffect(() => {
+    if (!paid) return;
+    confirmFn({ data: ref })
+      .then(onDone)
+      .catch((e: unknown) => toast.error(e instanceof Error ? e.message : "שגיאה בשליחת ההזמנה"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paid]);
+
+  const iframeUrl = checkout.data && !checkout.data.paid ? checkout.data.iframe_url : null;
+
   return (
     <div className="fixed inset-0 bottom-16 md:bottom-0 flex flex-col bg-slate-100">
       <div className="px-4 pt-3">
@@ -46,9 +82,24 @@ export function PaymentSheet({ created, onBack }: { created: CreatedOrder; onDon
             </div>
           </div>
 
+          {checkout.isLoading && (
+            <div className="flex justify-center py-6"><Loader2 className="size-6 animate-spin" /></div>
+          )}
+          {checkout.isError && (
+            <div className="text-sm text-red-600">לא ניתן לפתוח את דף התשלום. נסו שוב מאוחר יותר.</div>
+          )}
+          {iframeUrl && !paid && (
+            <iframe
+              title="תשלום בכרטיס אשראי"
+              src={iframeUrl}
+              className="w-full h-[420px] rounded-2xl border border-slate-200"
+            />
+          )}
+          {paid && <div className="text-sm font-bold text-emerald-600">התשלום התקבל, שולחים את ההזמנה…</div>}
+
           <div className="flex items-start gap-2 text-xs text-slate-500">
             <ShieldCheck className="size-4 text-emerald-600 shrink-0 mt-0.5" />
-            סליקת כרטיס תחובר בהמשך. ההזמנה נשמרה, אבל התשלום לא בוצע.
+            התשלום מתבצע בדף מאובטח של Tranzila. פרטי הכרטיס אינם עוברים דרך השרתים שלנו.
           </div>
         </div>
       </div>

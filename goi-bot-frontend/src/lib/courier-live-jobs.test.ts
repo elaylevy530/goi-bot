@@ -128,7 +128,7 @@ describe("courier matching is GPS or work areas", () => {
         location_sharing_enabled: true,
         last_lat: 32.43,
         last_lng: 34.92,
-        work_distance_from_base: "15 ק״מ",
+        work_distance_from_base: "12",
       }),
     ).toBe(true);
   });

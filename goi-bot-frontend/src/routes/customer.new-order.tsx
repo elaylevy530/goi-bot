@@ -20,6 +20,7 @@ import {
   selectGuestJobQuoteFn,
 } from "@/lib/guest-order.functions";
 import { getPartnerBySlugFn } from "@/lib/partners.functions";
+import { PaymentSheet } from "@/components/customer/booking/sheets";
 
 
 import {
@@ -610,6 +611,7 @@ function NewOrderPage() {
   const confirmOrder = useServerFn(confirmGuestOrderFn);
 
   const [created, setCreated] = useState<CreatedOrder | null>(null);
+  const [paymentDone, setPaymentDone] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [guestDialog, setGuestDialog] = useState(false);
   const [guestName, setGuestName] = useState("");
@@ -829,6 +831,8 @@ function NewOrderPage() {
         delete all[serviceId];
         window.localStorage.setItem(DRAFTS_KEY, JSON.stringify(all));
       } catch {}
+      // Orders with a charge due are dispatched by PaymentSheet after the card is paid.
+      if (result.amount_to_charge_now > 0) return;
       try {
         await confirmOrder({ data: { job_id: result.job_id, tracking_token: result.tracking_token } });
       } catch (e: any) {
@@ -903,6 +907,15 @@ function NewOrderPage() {
   // No online payment in the launch flow: once the order is created it is
   // broadcast to movers immediately and the customer watches the live search
   // map until a mover accepts the price or their quote is chosen.
+  if (created && created.amount_to_charge_now > 0 && !paymentDone) {
+    return (
+      <PaymentSheet
+        created={created}
+        onDone={() => setPaymentDone(true)}
+        onBack={() => navigate({ to: "/customer/order/$id", params: { id: created.job_id } })}
+      />
+    );
+  }
   if (created) {
 
     return (

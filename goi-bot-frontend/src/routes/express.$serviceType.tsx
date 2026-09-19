@@ -8,6 +8,8 @@ import {
   getPricingRulesFn,
   createGuestOrderFn,
   confirmGuestOrderFn,
+  createTranzilaCheckoutFn,
+  getGuestOrderDetailFn,
 } from "@/lib/guest-order.functions";
 
 const VALID = new Set(["same_day", "scheduled", "small_move", "big_move"]);
@@ -239,8 +241,8 @@ function ExpressOrderPage() {
               <div className="font-semibold text-[#0d0d0d]/70 mb-1">אופן תשלום:</div>
               <div className="text-[#0d0d0d]">
                 {rule.payment_mode === "cash_only" && "תשלום במזומן ישירות לשליח."}
-                {rule.payment_mode === "deposit" && `מקדמה של ${rule.deposit_percent}% בפייפאל, השאר במזומן לשליח.`}
-                {rule.payment_mode === "full_upfront" && "תשלום מלא מראש בפייפאל."}
+                {rule.payment_mode === "deposit" && `מקדמה של ${rule.deposit_percent}% בכרטיס אשראי, השאר במזומן לשליח.`}
+                {rule.payment_mode === "full_upfront" && "תשלום מלא מראש בכרטיס אשראי."}
               </div>
             </div>
           )}
@@ -357,9 +359,40 @@ function MoveCategoryPicker({ selected, onChange }: { selected: string; onChange
   );
 }
 
-function PaymentStep({ created, onBack }: {
+function PaymentStep({ created, onDone, onBack }: {
   created: CreatedOrder; onDone: () => void; onBack: () => void;
 }) {
+  const ref = { job_id: created.job_id, tracking_token: created.tracking_token };
+  const checkoutFn = useServerFn(createTranzilaCheckoutFn);
+  const detailFn = useServerFn(getGuestOrderDetailFn);
+  const confirmFn = useServerFn(confirmGuestOrderFn);
+
+  const checkout = useQuery({
+    queryKey: ["tranzila-checkout", created.job_id],
+    queryFn: () => checkoutFn({ data: ref }),
+    staleTime: Infinity,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  // The server marks the job paid from Tranzila's notify; we only poll for that result.
+  const { data: detail } = useQuery({
+    queryKey: ["tranzila-paid", created.job_id],
+    queryFn: () => detailFn({ data: ref }),
+    refetchInterval: 3000,
+  });
+  const paid = Boolean(detail?.job?.per_job_paid);
+
+  useEffect(() => {
+    if (!paid) return;
+    confirmFn({ data: ref })
+      .then(onDone)
+      .catch((e: any) => toast.error(e?.message ?? "שגיאה בשליחת ההזמנה"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paid]);
+
+  const iframeUrl = checkout.data && !checkout.data.paid ? checkout.data.iframe_url : null;
+
   return (
     <div dir="rtl" className="min-h-screen bg-[#f5f3ee] text-[#0d0d0d]">
       <header className="border-b border-[#0d0d0d]/10 bg-[#f5f3ee]/85 backdrop-blur-xl sticky top-0 z-10">
@@ -395,9 +428,24 @@ function PaymentStep({ created, onBack }: {
             </div>
           </div>
 
+          {checkout.isLoading && (
+            <div className="flex justify-center py-8"><Loader2 className="size-6 animate-spin" /></div>
+          )}
+          {checkout.isError && (
+            <div className="text-sm text-red-600">לא ניתן לפתוח את דף התשלום. נסו שוב מאוחר יותר.</div>
+          )}
+          {iframeUrl && !paid && (
+            <iframe
+              title="תשלום בכרטיס אשראי"
+              src={iframeUrl}
+              className="w-full h-[560px] rounded-2xl border border-[#0d0d0d]/10"
+            />
+          )}
+          {paid && <div className="text-sm font-bold text-[#35AD29]">התשלום התקבל, שולחים את ההזמנה…</div>}
+
           <div className="flex items-start gap-2 text-xs text-[#0d0d0d]/50">
             <ShieldCheck className="size-4 text-[#35AD29] shrink-0 mt-0.5" />
-            סליקת כרטיס תחובר בהמשך. ההזמנה נשמרה, אבל התשלום לא בוצע.
+            התשלום מתבצע בכרטיס אשראי בדף מאובטח של Tranzila. פרטי הכרטיס אינם עוברים דרך השרתים שלנו.
           </div>
         </div>
       </div>

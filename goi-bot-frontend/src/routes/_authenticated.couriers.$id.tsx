@@ -18,6 +18,7 @@ import { nestGetCourier, nestUpdateCourier, type NestCourierDocument } from "@/l
 import { nestSignedFileUrlResolved } from "@/lib/nest-files";
 import { COURIER_DOCUMENT_TYPES } from "@/lib/courier-session";
 import { canonicalizeVehicleValue, vehicleLabel } from "@/lib/courier-vehicles";
+import { formatOfferRadiusKm, parseOfferRadiusKm } from "@/lib/courier-offer-radius";
 import {
   nestListAreas, nestListCourierTags, nestListAllTags, nestAddCourierTag, nestRemoveCourierTag,
   nestListCourierWhatsappMessages, nestListCourierEntityStatusLogs,
@@ -273,6 +274,7 @@ function EditCourierDialog({ courier }: { courier: any }) {
     job_types: (courier.job_types as string[]) ?? [],
     availability: (courier.availability as string[]) ?? [],
     notes: courier.notes ?? "",
+    offer_radius_km: String(parseOfferRadiusKm(courier.work_distance_from_base)),
   });
 
   const { data: areas = [] } = useQuery({
@@ -298,6 +300,7 @@ function EditCourierDialog({ courier }: { courier: any }) {
         job_types: form.job_types,
         availability: form.availability,
         notes: form.notes || null,
+        work_distance_from_base: String(parseOfferRadiusKm(form.offer_radius_km)),
       });
       await reclassify({ data: { id: courier.id } });
     },
@@ -358,6 +361,20 @@ function EditCourierDialog({ courier }: { courier: any }) {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{COURIER_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
+          </div>
+          <div className="col-span-2">
+            <Label>רדיוס קבלת משלוחים (ק״מ)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={200}
+              inputMode="numeric"
+              value={form.offer_radius_km}
+              onChange={(e) => setForm({ ...form, offer_radius_km: e.target.value })}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              מחושב בזמן אמת ממיקום ה-GPS של השליח. משלוח בתוך הרדיוס יכול להופיע גם אם העיר לא מסומנת.
+            </p>
           </div>
 
           <div className="col-span-2">
@@ -627,7 +644,7 @@ function CourierProfile() {
                 <div className="text-xs text-muted-foreground mt-1">נוסף ידני: {(c as any).custom_dropoff_area}</div>
               )}
             </div>
-            <Detail label="מרחק מבסיס" value={(c as any).work_distance_from_base ?? "—"} />
+            <Detail label="רדיוס קבלת משלוחים" value={formatOfferRadiusKm((c as any).work_distance_from_base)} />
             <Detail
               label="כלי עבודה"
               value={
