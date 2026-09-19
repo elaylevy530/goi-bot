@@ -45,21 +45,6 @@ function StatusBadge({ status }: { status?: string | null }) {
   );
 }
 
-function greetingHe() {
-  const h = new Date().getHours();
-  if (h < 5) return "לילה טוב";
-  if (h < 12) return "בוקר טוב";
-  if (h < 17) return "צהריים טובים";
-  if (h < 21) return "ערב טוב";
-  return "לילה טוב";
-}
-
-function initialsOf(name?: string | null) {
-  if (!name) return "ש";
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]).join("");
-}
-
 type IncomingJobAlert = {
   id: string;
   title: string;
@@ -271,20 +256,7 @@ export function CourierShell({ children, title, subtitle, headerExtra, fullBleed
               <>
                 <div className="flex items-center justify-between gap-3">
                   <CourierMenuButton className="size-11 shadow-card border-0" />
-
-                  <div className="flex items-center gap-3 min-w-0">
-                    {me && <StatusBadge status={me?.courier_status} />}
-                    <div className="min-w-0 text-right">
-                      <div className="text-[11px] text-text-muted font-semibold leading-none mb-1">{greetingHe()}</div>
-                      <div className="text-sm font-extrabold text-text-strong truncate leading-tight">{me?.full_name ?? "שליח"}</div>
-                    </div>
-                    <div className="relative shrink-0">
-                      <div className="size-11 rounded-pill bg-primary-deep text-primary-foreground grid place-items-center font-extrabold text-sm shadow-fab">
-                        {initialsOf(me?.full_name)}
-                      </div>
-                      <span className={`absolute bottom-0 left-0 size-3 rounded-full border-2 border-surface ${isAvailable ? "bg-primary-deep animate-pulse" : "bg-border-strong"}`} />
-                    </div>
-                  </div>
+                  {me && <StatusBadge status={me?.courier_status} />}
                 </div>
 
                 {(title || subtitle) && (

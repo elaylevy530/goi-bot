@@ -21,6 +21,7 @@ export type NestConversation = {
   unread_admin: number;
   unread_guest?: number;
   hidden_from_participants?: boolean;
+  support_status?: "new" | "bot" | "agent" | "closed";
   created_at?: string;
   updated_at?: string;
 };
@@ -37,6 +38,7 @@ export type NestChatMessage = {
   attachment_size: number | string | null;
   attachment_kind: "image" | "audio" | "video" | "file" | null;
   duration_ms: number | null;
+  from_bot?: boolean;
   created_at: string;
 };
 
@@ -129,6 +131,17 @@ export function nestMarkConversationRead(conversationId: string) {
   return apiFetch<{ ok: true }>(`/api/chat/conversations/${conversationId}/mark-read`, {
     method: "POST",
     accessToken: token(),
+  });
+}
+
+export function nestPatchConversation(
+  conversationId: string,
+  body: { support_status: "new" | "bot" | "agent" | "closed" },
+) {
+  return apiFetch<NestConversation>(`/api/chat/conversations/${conversationId}`, {
+    method: "PATCH",
+    accessToken: token(),
+    body: JSON.stringify(body),
   });
 }
 

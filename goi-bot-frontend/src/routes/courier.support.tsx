@@ -1,22 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CourierShell } from "@/components/CourierShell";
-import { ChatCenter } from "@/components/ChatCenter";
+import { CourierSupportFlow } from "@/components/courier/CourierSupportFlow";
 
-type Search = { c?: string };
+type Search = { c?: string; chat?: boolean };
 
 export const Route = createFileRoute("/courier/support")({
-  head: () => ({ meta: [{ title: "צ׳אט עם התמיכה — Goi" }] }),
+  head: () => ({ meta: [{ title: "תמיכה לשליחים — Goi" }] }),
   validateSearch: (s: Record<string, unknown>): Search => ({
     c: typeof s.c === "string" ? s.c : undefined,
+    chat: s.chat === true || s.chat === "1" || s.chat === "true",
   }),
   component: CourierSupportPage,
 });
 
 function CourierSupportPage() {
-  const { c } = Route.useSearch();
-  return (
-    <CourierShell>
-      <ChatCenter viewerRole="courier" inbox="support" initialConversationId={c} />
-    </CourierShell>
-  );
+  const search = Route.useSearch();
+  return <CourierSupportFlow search={search} />;
 }

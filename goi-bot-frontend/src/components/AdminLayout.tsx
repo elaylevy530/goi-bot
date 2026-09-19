@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, Bike, Users, Briefcase, Send, Activity,
   MessageSquare, MapPin, BarChart3, Settings, Search, Bell, LogOut, Wallet, Menu, Gift, HandCoins, Sparkles, Rocket, DollarSign, Globe, Banknote, Handshake,
-  PanelLeftClose, PanelLeft, ChevronDown, type LucideIcon,
+  PanelLeftClose, PanelLeft, ChevronDown, LifeBuoy, type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  search?: { inbox?: string };
 };
 
 type NavGroup = {
@@ -38,7 +39,8 @@ const navGroups: NavGroup[] = [
       { to: "/jobs", label: "עבודות", icon: Briefcase },
       { to: "/send-job", label: "שליחת עבודה", icon: Send },
       { to: "/quote-requests", label: "הצעות מחיר", icon: HandCoins },
-      { to: "/messages", label: "מרכז תמיכה", icon: MessageSquare },
+      { to: "/messages", label: "מרכז תמיכה", icon: MessageSquare, search: {} },
+      { to: "/messages", label: "צ׳אט תמיכת שליחים", icon: LifeBuoy, search: { inbox: "couriers" } },
       { to: "/customers", label: "מזמינים", icon: Users },
       { to: "/businesses", label: "ניהול עסקים", icon: Users },
       { to: "/dispatch-groups", label: "קבוצות שידור", icon: MessageSquare },
@@ -108,21 +110,26 @@ function readOpenGroups(): Record<string, boolean> {
   }
 }
 
-function isItemActive(pathname: string, item: NavItem) {
+function isItemActive(pathname: string, search: Record<string, unknown>, item: NavItem) {
   if (item.exact) return pathname === item.to;
-  // Avoid /pricing matching /pricing-rules
   if (item.to === "/pricing" && pathname.startsWith("/pricing-rules")) return false;
-  return pathname === item.to || pathname.startsWith(`${item.to}/`);
+  const pathOk = pathname === item.to || pathname.startsWith(`${item.to}/`);
+  if (!pathOk) return false;
+  if (item.search?.inbox) return search.inbox === item.search.inbox;
+  if (item.to === "/messages") return search.inbox !== "couriers";
+  return true;
 }
 
 function NavList({
   pathname,
+  search,
   onNavigate,
   collapsed = false,
   openGroups,
   onToggleGroup,
 }: {
   pathname: string;
+  search: Record<string, unknown>;
   onNavigate?: () => void;
   collapsed?: boolean;
   openGroups: Record<string, boolean>;
@@ -132,7 +139,7 @@ function NavList({
     <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-3 text-right">
       {navGroups.map((group) => {
         const open = collapsed ? true : (openGroups[group.id] ?? true);
-        const hasActive = group.items.some((item) => isItemActive(pathname, item));
+        const hasActive = group.items.some((item) => isItemActive(pathname, search, item));
 
         return (
           <div key={group.id}>
@@ -157,12 +164,13 @@ function NavList({
             {open && (
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const active = isItemActive(pathname, item);
+                  const active = isItemActive(pathname, search, item);
                   const Icon = item.icon;
                   return (
                     <Link
-                      key={item.to}
+                      key={item.label}
                       to={item.to}
+                      search={item.search}
                       onClick={onNavigate}
                       title={collapsed ? item.label : undefined}
                       className={cn(
@@ -214,6 +222,7 @@ export function AdminLayout({
   children: ReactNode;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -280,6 +289,7 @@ export function AdminLayout({
         </div>
         <NavList
           pathname={pathname}
+          search={search}
           collapsed={collapsed}
           openGroups={openGroups}
           onToggleGroup={toggleGroup}
@@ -316,6 +326,7 @@ export function AdminLayout({
               </SheetHeader>
               <NavList
                 pathname={pathname}
+                search={search}
                 onNavigate={() => setMobileOpen(false)}
                 openGroups={openGroups}
                 onToggleGroup={toggleGroup}

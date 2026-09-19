@@ -207,7 +207,7 @@ function courierNavGroups(
     },
     {
       key: "support",
-      label: "צ׳אט עם התמיכה",
+      label: "עזרה ותמיכה",
       to: "/courier/support",
       icon: LifeBuoy,
       badge: counts?.unreadSupport ?? 0,

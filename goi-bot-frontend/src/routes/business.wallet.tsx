@@ -1,13 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BusinessShell, useMyBusiness } from "@/components/BusinessShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { nestListWalletTransactions, nestRechargeWallet } from "@/lib/nest-domain";
-import { Wallet, Plus, TrendingUp, TrendingDown, CreditCard, Sparkles } from "lucide-react";
+import {
+  nestDeleteWalletSavedMethod,
+  nestListWalletTransactions,
+  nestWalletIntentStatus,
+  nestWalletRecharge,
+  nestWalletSaveCard,
+  nestWalletSavedMethod,
+  type WalletCheckout,
+} from "@/lib/nest-domain";
+import { Wallet, Plus, TrendingUp, TrendingDown, CreditCard, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/wallet")({
@@ -16,7 +24,6 @@ export const Route = createFileRoute("/business/wallet")({
   component: WalletPage,
 });
 
-// Bonus tiers: load more upfront → bigger discount on every delivery
 const BONUS_TIERS = [
   { min: 100, pct: 5, label: "5% מתנה" },
   { min: 300, pct: 8, label: "8% מתנה" },
@@ -34,6 +41,7 @@ function WalletPage() {
   const { data: me } = useMyBusiness();
   const qc = useQueryClient();
   const [amount, setAmount] = useState<number>(300);
+  const [checkout, setCheckout] = useState<Extract<WalletCheckout, { paid: false }> | null>(null);
 
   const { data: txs = [] } = useQuery({
     queryKey: ["wallet-tx", me?.id],
@@ -41,16 +49,66 @@ function WalletPage() {
     queryFn: () => nestListWalletTransactions(),
   });
 
-  const balance = (txs as any[]).reduce((acc, t) => acc + Number(t.amount || 0), 0);
+  const { data: method } = useQuery({
+    queryKey: ["wallet-card", me?.id],
+    enabled: !!me?.id,
+    queryFn: () => nestWalletSavedMethod(),
+  });
+
+  const balance = (txs as { amount?: number | string }[]).reduce((acc, t) => acc + Number(t.amount || 0), 0);
   const { pct, value: bonusVal } = bonusFor(amount);
+  const saved = method?.saved === true ? method : null;
+
+  const { data: intent } = useQuery({
+    queryKey: ["wallet-intent", checkout?.intent_id],
+    enabled: Boolean(checkout?.intent_id),
+    queryFn: () => nestWalletIntentStatus(checkout!.intent_id),
+    refetchInterval: 3000,
+  });
+
+  useEffect(() => {
+    if (!intent?.paid) return;
+    setCheckout(null);
+    toast.success("התשלום התקבל");
+    void qc.invalidateQueries({ queryKey: ["wallet-tx"] });
+    void qc.invalidateQueries({ queryKey: ["wallet-card"] });
+  }, [intent?.paid, qc]);
 
   const recharge = useMutation({
     mutationFn: async () => {
-      if (!me) throw new Error("חסר פרופיל");
       if (!amount || amount < 50) throw new Error("סכום מינימלי לטעינה: ₪50");
-      await nestRechargeWallet({ amount, bonusVal, pct });
+      return nestWalletRecharge(amount);
     },
-    onSuccess: () => { toast.success("הארנק נטען"); qc.invalidateQueries({ queryKey: ["wallet-tx"] }); },
+    onSuccess: (result) => {
+      if (result.paid) {
+        toast.success("הארנק נטען");
+        void qc.invalidateQueries({ queryKey: ["wallet-tx"] });
+        return;
+      }
+      setCheckout(result);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveCard = useMutation({
+    mutationFn: () => nestWalletSaveCard(),
+    onSuccess: (result) => {
+      if (result.paid) {
+        toast.success("הכרטיס נשמר");
+        void qc.invalidateQueries({ queryKey: ["wallet-card"] });
+        return;
+      }
+      setCheckout(result);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeCard = useMutation({
+    mutationFn: () => nestDeleteWalletSavedMethod(),
+    onSuccess: () => {
+      toast.success("אמצעי התשלום הוסר");
+      void qc.invalidateQueries({ queryKey: ["wallet-card"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -65,11 +123,11 @@ function WalletPage() {
                 <div className="text-4xl font-extrabold text-slate-900 mt-1 flex items-center gap-2">
                   <Wallet className="size-7 text-[#35AD29]" /> ₪{balance.toLocaleString("he-IL")}
                 </div>
-                <div className="text-xs text-slate-500 mt-2">כל משלוח יורד מהיתרה אוטומטית. סליקת כרטיס תחובר בהמשך.</div>
+                <div className="text-xs text-slate-500 mt-2">כל משלוח יורד מהיתרה אוטומטית. טעינה בכרטיס אשראי מאובטח.</div>
               </div>
               <div className="text-xs text-slate-600 max-w-[280px] text-right space-y-1 bg-white/70 rounded-xl p-3 border border-emerald-100">
                 <div className="font-extrabold text-emerald-700">מדרגות בונוס:</div>
-                {BONUS_TIERS.map(t => (
+                {BONUS_TIERS.map((t) => (
                   <div key={t.min} className="flex items-center justify-between">
                     <span>טעינה מ-₪{t.min}</span>
                     <span className="font-bold text-emerald-700">{t.label}</span>
@@ -89,7 +147,7 @@ function WalletPage() {
                 <Input type="number" min={50} value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
               </div>
               <div className="flex gap-2 flex-wrap">
-                {[100, 300, 500, 1000].map(v => (
+                {[100, 300, 500, 1000].map((v) => (
                   <Button key={v} variant="outline" size="sm" onClick={() => setAmount(v)} className={amount === v ? "border-[#35AD29] text-[#35AD29]" : ""}>₪{v}</Button>
                 ))}
               </div>
@@ -100,9 +158,11 @@ function WalletPage() {
                 </div>
               )}
               <Button onClick={() => recharge.mutate()} disabled={recharge.isPending} className="w-full bg-primary-deep hover:bg-primary-deep/90">
-                {recharge.isPending ? "טוען..." : "טען יתרה"}
+                {recharge.isPending ? "טוען..." : saved ? `טען עם כרטיס •••• ${saved.last4}` : "טען בכרטיס אשראי"}
               </Button>
-              <div className="text-[11px] text-slate-400 text-center">הטעינה נרשמת בארנק. סליקת כרטיס תחובר בהמשך.</div>
+              <div className="text-[11px] text-slate-400 text-center">
+                {saved ? "נחייב את הכרטיס השמור. פרטי הכרטיס לא נשמרים אצלנו." : "ייפתח דף סליקה מאובטח של Tranzila. הכרטיס יישמר לטעינות הבאות."}
+              </div>
             </CardContent>
           </Card>
 
@@ -110,17 +170,49 @@ function WalletPage() {
             <CardContent className="p-5 space-y-3">
               <div className="flex items-center gap-2 font-extrabold text-slate-900"><CreditCard className="size-4 text-indigo-500" /> אמצעי תשלום שמור</div>
               <div className="text-sm text-slate-600">
-                במקום לטעון ארנק — שמרו אמצעי תשלום קבוע. בכל הזמנה שאין בה יתרה בארנק, נחייב אוטומטית את האמצעי השמור.
+                שמירת כרטיס מאפשרת טעינת ארנק בלי להקליד פרטים בכל פעם. נשמר רק טוקן אצל Tranzila.
               </div>
-              <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500 border border-slate-200">
-                אין אמצעי תשלום שמור. סליקת כרטיס תחובר בהמשך — בינתיים אפשר לטעון את הארנק.
-              </div>
-              <Button variant="outline" className="w-full" disabled>
-                הוסף אמצעי תשלום — בקרוב
-              </Button>
+              {saved ? (
+                <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 border border-slate-200">
+                  כרטיס •••• {saved.last4}
+                  <span className="text-xs text-slate-500 block mt-1">תוקף {saved.exp_month}/{saved.exp_year}</span>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500 border border-slate-200">
+                  אין אמצעי תשלום שמור. הוספה כוללת חיוב אימות של ₪1 שנכנס ליתרה.
+                </div>
+              )}
+              {saved ? (
+                <Button variant="outline" className="w-full" disabled={removeCard.isPending} onClick={() => removeCard.mutate()}>
+                  הסר אמצעי תשלום
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full" disabled={saveCard.isPending} onClick={() => saveCard.mutate()}>
+                  {saveCard.isPending ? "פותח סליקה..." : "הוסף אמצעי תשלום"}
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
+
+        {checkout && (
+          <Card className="rounded-2xl border-slate-200 shadow-sm">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-extrabold text-slate-900">תשלום מאובטח</div>
+                <Button variant="ghost" size="sm" onClick={() => setCheckout(null)}>סגור</Button>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Loader2 className="size-3.5 animate-spin" /> ממתין לאישור מ-Tranzila…
+              </div>
+              <iframe
+                title="תשלום בכרטיס אשראי"
+                src={checkout.iframe_url}
+                className="w-full h-[560px] rounded-2xl border border-slate-200"
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-5">
@@ -129,7 +221,7 @@ function WalletPage() {
               <div className="text-center text-sm text-slate-400 py-8">אין תנועות עדיין</div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {(txs as any[]).map((t) => {
+                {(txs as { id: string; amount?: number | string; description?: string; kind?: string; created_at?: string }[]).map((t) => {
                   const pos = Number(t.amount) >= 0;
                   return (
                     <div key={t.id} className="flex items-center justify-between py-2.5">
@@ -137,7 +229,7 @@ function WalletPage() {
                         {pos ? <TrendingUp className="size-4 text-emerald-600" /> : <TrendingDown className="size-4 text-rose-500" />}
                         <div>
                           <div className="text-sm font-semibold text-slate-900">{t.description || t.kind}</div>
-                          <div className="text-[11px] text-slate-400">{new Date(t.created_at).toLocaleString("he-IL")}</div>
+                          <div className="text-[11px] text-slate-400">{t.created_at ? new Date(t.created_at).toLocaleString("he-IL") : ""}</div>
                         </div>
                       </div>
                       <div className={`text-sm font-extrabold ${pos ? "text-emerald-600" : "text-rose-600"}`}>

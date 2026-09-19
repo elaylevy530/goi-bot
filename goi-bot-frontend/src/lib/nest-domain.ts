@@ -348,12 +348,41 @@ export function nestListWalletTransactions() {
   return apiFetch<Record<string, unknown>[]>("/api/payments/wallet/transactions", options());
 }
 
-export function nestRechargeWallet(body: Record<string, unknown>) {
-  return apiFetch("/api/payments/wallet/recharge", {
+export type WalletCheckout =
+  | { paid: true }
+  | { paid: false; intent_id: string; iframe_url: string; amount: number; currency: string; expires_at: string };
+
+export function nestWalletSavedMethod() {
+  return apiFetch<{ saved: false } | { saved: true; last4: string; exp_month: string; exp_year: string }>(
+    "/api/payments/tranzila/wallet/method",
+    options(),
+  );
+}
+
+export function nestDeleteWalletSavedMethod() {
+  return apiFetch("/api/payments/tranzila/wallet/method", { method: "DELETE", ...options() });
+}
+
+export function nestWalletRecharge(amount: number) {
+  return apiFetch<WalletCheckout>("/api/payments/tranzila/wallet/recharge", {
     method: "POST",
     ...options(),
-    body: JSON.stringify(body),
+    body: JSON.stringify({ amount }),
   });
+}
+
+export function nestWalletSaveCard() {
+  return apiFetch<WalletCheckout>("/api/payments/tranzila/wallet/save-card", {
+    method: "POST",
+    ...options(),
+  });
+}
+
+export function nestWalletIntentStatus(id: string) {
+  return apiFetch<{ paid: boolean; kind: string; amount: number }>(
+    `/api/payments/tranzila/wallet/intents/${id}`,
+    options(),
+  );
 }
 
 export function nestListCourierTags(courierId: string) {

@@ -312,33 +312,25 @@ function MyProfilePage() {
 
         <Link
           to="/courier/account-settings"
-          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-4"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-4 shadow-card"
         >
-          <ChevronLeft className="size-5 text-slate-400" />
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-slate-900">הגדרות חשבון</span>
-            <span className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-700">
-              <Settings className="size-5" />
-            </span>
-          </div>
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-text-strong">
+            <Settings className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1 text-start text-sm font-bold text-text-strong">הגדרות חשבון</span>
+          <ChevronLeft className="size-5 shrink-0 text-text-muted" />
         </Link>
 
-        <div className="bg-slate-50 rounded-2xl p-6 mt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <ChevronLeft className="size-6 text-slate-400" />
-              <div className="size-14 bg-green-100 rounded-full flex items-center justify-center">
-                <Headphones className="size-7 text-green-600" />
-              </div>
-              <div>
-                <div className="text-base font-bold text-slate-900 mb-1">זקוק לעזרה?</div>
-                <div className="text-sm text-slate-600">צוות התמיכה שלנו כאן במיוחד</div>
-              </div>
+        <div className="mt-6 rounded-2xl bg-surface p-4 shadow-card">
+          <div className="flex items-center gap-3">
+            <div className="grid size-14 shrink-0 place-items-center rounded-full bg-primary-soft text-primary">
+              <Headphones className="size-7" />
             </div>
-            <Button
-              asChild
-              className="bg-primary-deep hover:bg-primary-deep/90 text-white font-bold px-6 py-6 text-base rounded-xl"
-            >
+            <div className="min-w-0 flex-1 text-start">
+              <div className="mb-0.5 text-base font-bold text-text-strong">זקוק לעזרה?</div>
+              <div className="text-sm text-text-subtle">צוות התמיכה שלנו כאן במיוחד</div>
+            </div>
+            <Button asChild className="h-auto shrink-0 rounded-xl px-5 py-3 text-base font-bold">
               <Link to="/courier/support">פנה לתמיכה</Link>
             </Button>
           </div>

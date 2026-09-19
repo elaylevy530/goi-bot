@@ -5,12 +5,18 @@ import {
   nestListMessages,
   nestMarkConversationRead,
   nestOpenConversation,
+  nestPatchConversation,
   nestPostMessage,
   type EnrichedConversation,
 } from "@/lib/nest-chat";
 import { nestSignedFileUrlResolved, nestUploadFile } from "@/lib/nest-files";
 import { nestListJobs } from "@/lib/nest-jobs";
 import { BUSINESS_CHAT_CHIPS, SUPPORT_CHAT_CHIPS } from "@/lib/chat-quick-replies";
+import {
+  resolveSupportStatus,
+  SUPPORT_STATUS_LABEL,
+  type SupportStatus,
+} from "@/lib/courier-support-help";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +43,7 @@ type MessageRow = {
   attachment_size: number | null;
   attachment_kind: "image" | "audio" | "video" | "file" | null;
   duration_ms: number | null;
+  from_bot?: boolean;
   created_at: string;
 };
 
@@ -98,7 +105,7 @@ function shortTimeAgo(iso: string) {
 type AdminFilter = "all" | "courier_support" | "business_support" | "courier_business" | "guest_support" | "unread";
 type CourierFilter = "all" | "support" | "customers";
 
-type ChatInbox = "all" | "business" | "support";
+type ChatInbox = "all" | "business" | "support" | "couriers";
 
 export function ChatCenter({
   viewerRole,
@@ -114,7 +121,10 @@ export function ChatCenter({
   const [mobileView, setMobileView] = useState<"list" | "thread">(
     initialConversationId || inbox === "support" ? "thread" : "list",
   );
-  const [adminFilter, setAdminFilter] = useState<AdminFilter>("all");
+  const [adminFilter, setAdminFilter] = useState<AdminFilter>(
+    inbox === "couriers" ? "courier_support" : "all",
+  );
+  const [adminStatusFilter, setAdminStatusFilter] = useState<SupportStatus | "all">("all");
   const [courierFilter, setCourierFilter] = useState<CourierFilter>(
     inbox === "support" ? "support" : inbox === "business" ? "customers" : "all",
   );
@@ -185,8 +195,16 @@ export function ChatCenter({
   const filteredConversations = useMemo(() => {
     let list = conversations;
     if (viewerRole === "admin") {
-      if (adminFilter === "unread") list = list.filter((c) => c.unread_admin > 0);
+      if (inbox === "couriers") list = list.filter((c) => c.kind === "courier_support");
+      else if (adminFilter === "unread") list = list.filter((c) => c.unread_admin > 0);
       else if (adminFilter !== "all") list = list.filter((c) => c.kind === adminFilter);
+      if (adminStatusFilter !== "all") {
+        list = list.filter(
+          (c) =>
+            (c.kind === "courier_support" || c.kind === "business_support") &&
+            resolveSupportStatus(c.support_status, c.subject) === adminStatusFilter,
+        );
+      }
     } else if (viewerRole === "courier") {
       const forced = inbox === "support" ? "support" : inbox === "business" ? "customers" : courierFilter;
       if (forced === "support") list = list.filter((c) => c.kind === "courier_support");
@@ -201,7 +219,7 @@ export function ChatCenter({
       });
     }
     return list;
-  }, [conversations, adminFilter, courierFilter, search, viewerRole, inbox]);
+  }, [conversations, adminFilter, adminStatusFilter, courierFilter, search, viewerRole, inbox]);
 
   const adminCounts = useMemo(() => {
     if (viewerRole !== "admin") return null;
@@ -366,7 +384,7 @@ export function ChatCenter({
               className="h-8 text-sm"
             />
             <div className="flex flex-wrap gap-1">
-              {([
+              {inbox !== "couriers" && ([
                 ["all", "הכל", adminCounts.all],
                 ["unread", "לא נקראו", adminCounts.unread],
                 ["courier_support", "שליחים", adminCounts.courier_support],
@@ -385,6 +403,20 @@ export function ChatCenter({
                   }`}
                 >
                   {label} <span className="opacity-70">{count}</span>
+                </button>
+              ))}
+              {(["all", "new", "bot", "agent", "closed"] as const).map((key) => (
+                <button
+                  key={`st-${key}`}
+                  type="button"
+                  onClick={() => setAdminStatusFilter(key)}
+                  className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
+                    adminStatusFilter === key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card hover:bg-muted border-border text-muted-foreground"
+                  }`}
+                >
+                  {key === "all" ? "כל הסטטוסים" : SUPPORT_STATUS_LABEL[key]}
                 </button>
               ))}
             </div>
@@ -464,6 +496,11 @@ export function ChatCenter({
                       {viewerRole === "admin" && (
                         <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
                           <span>{kindLabel}</span>
+                          {(c.kind === "courier_support" || c.kind === "business_support") && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                              {SUPPORT_STATUS_LABEL[resolveSupportStatus(c.support_status, c.subject)]}
+                            </Badge>
+                          )}
                           {c.kind === "courier_business" && c.hidden_from_participants && (
                             <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">הושלם</Badge>
                           )}
@@ -607,6 +644,14 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const setStatus = useMutation({
+    mutationFn: (support_status: SupportStatus) => nestPatchConversation(conv.id, { support_status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat-conversations", viewerRole] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (recording) return;
@@ -692,7 +737,11 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
           <div className="font-bold truncate">{titleFor(conv, viewerRole)}</div>
           {conv.kind === "courier_support" || conv.kind === "business_support" ? (
             <div className="text-[11px] text-muted-foreground truncate">
-              {conv.subject === "human" ? "נציג אנושי יחזור אליכם" : "בוט Goi · בחרו נושא או כתבו חופשי"}
+              {resolveSupportStatus(conv.support_status, conv.subject) === "agent"
+                ? "נציג אנושי יחזור אליכם"
+                : resolveSupportStatus(conv.support_status, conv.subject) === "closed"
+                  ? "הפנייה נסגרה"
+                  : "בוט Goi · בחרו נושא או כתבו חופשי"}
             </div>
           ) : null}
           {conv.kind === "courier_business" && conv.job && (
@@ -711,6 +760,39 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
             </div>
           )}
         </div>
+        {viewerRole === "admin" && (conv.kind === "courier_support" || conv.kind === "business_support") && (
+          <div className="flex shrink-0 flex-col gap-1">
+            <Badge variant="outline" className="justify-center text-[10px]">
+              {SUPPORT_STATUS_LABEL[resolveSupportStatus(conv.support_status, conv.subject)]}
+            </Badge>
+            <div className="flex gap-1">
+              {resolveSupportStatus(conv.support_status, conv.subject) !== "agent" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[10px]"
+                  disabled={setStatus.isPending}
+                  onClick={() => setStatus.mutate("agent")}
+                >
+                  נציג
+                </Button>
+              )}
+              {resolveSupportStatus(conv.support_status, conv.subject) !== "closed" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[10px]"
+                  disabled={setStatus.isPending}
+                  onClick={() => setStatus.mutate("closed")}
+                >
+                  סגור
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/20">
@@ -722,7 +804,8 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
           const url = m.attachment_url ? urls[m.id] : null;
           const kind = m.attachment_kind ?? detectKind(m.attachment_mime);
           const roleInitial =
-            m.sender_role === "admin" ? "מ"
+            m.from_bot ? "ב"
+            : m.sender_role === "admin" ? "מ"
             : m.sender_role === "courier" ? "ש"
             : m.sender_role === "guest" ? "ל"
             : "ע";
@@ -762,6 +845,7 @@ function Thread({ conv, viewerRole, onBack }: { conv: ConversationRow; viewerRol
                 )}
                 {m.body && <div className="text-sm whitespace-pre-wrap break-words">{m.body}</div>}
                 <div className={`text-[10px] mt-1 text-left ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                  {m.from_bot ? "בוט · " : m.sender_role === "admin" ? "נציג · " : ""}
                   {new Date(m.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
                 </div>
               </div>
